@@ -157,4 +157,5 @@ GRAPH_COLORS = {
     "stage": "#ffd27a",
     "field": "#e8d44d",
     "trigger": "#36d6c4",
+    "user": "#c77dff",
 }

@@ -5,6 +5,16 @@ export interface Tokens {
   tokenId: string;
 }
 
+/** Extrai o company_id do JWT `token-id` (necessário para o endpoint de usuários). */
+export function decodeCompanyId(tokenId: string): string {
+  try {
+    const payload = JSON.parse(Buffer.from(tokenId.split(".")[1], "base64url").toString("utf-8"));
+    return typeof payload.company_id === "string" ? payload.company_id : "";
+  } catch {
+    return "";
+  }
+}
+
 const WORKFLOWS_URL = (loc: string) =>
   `https://app.gohighlevel.com/v2/location/${loc}/automation/workflows`;
 

@@ -18,6 +18,7 @@ NODE_TYPES = {
     "stage": "#c956b1",
     "field": "#f2a900",
     "trigger": "#00b5ad",
+    "user": "#c77dff",
 }
 
 
@@ -107,9 +108,28 @@ def _edges_from_step(ctx: DumpContext, wf: Workflow, wf_node: str, step: dict, n
             n = _add_node(nodes, f"wf:{target}", label, "workflow", missing=missing)
             edges.append({"from": wf_node, "to": n, "rel": "add_to_workflow"})
 
+    elif t == "assign_user":
+        uids = set((attrs.get("traffic_weightage") or {}).keys())
+        uids.update(ti["id"] for ti in attrs.get("traffic_index", []) or [] if ti.get("id"))
+        for uid in uids:
+            _user_edge(ctx, wf_node, uid, nodes, edges, "assign")
+
+    elif t == "internal_notification":
+        for uid in (attrs.get("sms") or {}).get("selectedUser", []) or []:
+            _user_edge(ctx, wf_node, uid, nodes, edges, "notify")
+
 
 def _pipeline_edge(ctx: DumpContext, wf_node: str, pid: str, nodes: dict, edges: list, rel: str) -> None:
     missing = pid not in ctx.pipeline_ids
     label = ctx.pipeline_names.get(pid, pid)
     n = _add_node(nodes, f"pipe:{pid}", label, "pipeline", missing=missing)
+    edges.append({"from": wf_node, "to": n, "rel": rel})
+
+
+def _user_edge(ctx: DumpContext, wf_node: str, uid: str, nodes: dict, edges: list, rel: str) -> None:
+    # missing se usuários foram extraídos e o id não existe ou está deletado
+    known = bool(ctx.user_ids)
+    missing = known and (uid not in ctx.user_ids or uid in ctx.user_deleted)
+    label = ctx.user_names.get(uid, uid)
+    n = _add_node(nodes, f"user:{uid}", label, "user", missing=missing)
     edges.append({"from": wf_node, "to": n, "rel": rel})

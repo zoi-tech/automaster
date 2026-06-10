@@ -25,7 +25,9 @@ def make_dump(tmp_path):
         )
     """
 
-    def _build(workflows=None, tags=None, pipelines=None, fields=None, extracted_at="2026-06-10T00:00:00+00:00"):
+    def _build(workflows=None, tags=None, pipelines=None, fields=None,
+               users=None, custom_values=None, calendars=None,
+               extracted_at="2026-06-10T00:00:00+00:00"):
         root = tmp_path / "dump"
         (root / "workflows").mkdir(parents=True)
         workflows = workflows or []
@@ -34,6 +36,12 @@ def make_dump(tmp_path):
         _write(root / "pipelines.json", {"raw": {"pipelines": pipelines or []}})
         _write(root / "tags.json", {"raw": {"tags": [{"name": t} for t in (tags or [])]}})
         _write(root / "custom_fields.json", {"raw": {"customFields": fields or []}})
+        if users is not None:
+            _write(root / "users.json", {"raw": {"users": users}})
+        if custom_values is not None:
+            _write(root / "custom_values.json", {"raw": {"customValues": custom_values}})
+        if calendars is not None:
+            _write(root / "calendars.json", {"raw": {"calendars": calendars}})
         _write(
             root / "manifest.json",
             {

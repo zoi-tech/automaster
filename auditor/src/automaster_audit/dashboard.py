@@ -6,20 +6,25 @@ quais workflows a usam (e flag de órfã = existe mas ninguém referencia).
 """
 from __future__ import annotations
 
+import json
+import re
 from collections import Counter
 
 from .loader import DumpContext, Workflow
 from .rules._helpers import add_to_workflow_targets
 
 CHANNEL_TYPES = ("sms", "email", "whatsapp", "internal_notification", "webhook", "drip", "manual-call")
+_CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")
 
 
 def _wf_refs(wf: Workflow) -> dict:
-    """Extrai tags, fields, pipelines, chamadas e canais de um workflow."""
+    """Extrai tags, fields, pipelines, chamadas, canais, usuários e custom values."""
     tags: set[str] = set()
     fields: set[str] = set()
     pipelines: set[str] = set()
     calls: set[str] = set()
+    users: set[str] = set()
+    cvs: set[str] = set()
     channels: Counter = Counter()
     for s in wf.steps:
         t = s.get("type")
@@ -43,7 +48,14 @@ def _wf_refs(wf: Workflow) -> dict:
         elif t == "add_to_workflow":
             if a.get("workflow_id"):
                 calls.add(a["workflow_id"])
-    return {"tags": tags, "fields": fields, "pipelines": pipelines, "calls": calls, "channels": channels}
+        elif t == "assign_user":
+            users.update((a.get("traffic_weightage") or {}).keys())
+            users.update(ti["id"] for ti in a.get("traffic_index", []) or [] if ti.get("id"))
+        elif t == "internal_notification":
+            users.update((a.get("sms") or {}).get("selectedUser", []) or [])
+        cvs.update(m.lower() for m in _CV_TOKEN.findall(json.dumps(a, ensure_ascii=False)))
+    return {"tags": tags, "fields": fields, "pipelines": pipelines, "calls": calls,
+            "users": users, "cvs": cvs, "channels": channels}
 
 
 def build_dashboard(ctx: DumpContext) -> dict:
@@ -55,6 +67,8 @@ def build_dashboard(ctx: DumpContext) -> dict:
     field_users: dict[str, list[str]] = {}
     pipe_users: dict[str, list[str]] = {}
     called_by: dict[str, list[str]] = {}
+    user_users: dict[str, list[str]] = {}
+    cv_users: dict[str, list[str]] = {}
     for wf in ctx.workflows:
         r = refs[wf.id]
         for tag in r["tags"]:
@@ -65,6 +79,10 @@ def build_dashboard(ctx: DumpContext) -> dict:
             pipe_users.setdefault(pid, []).append(wf.name)
         for tid in r["calls"]:
             called_by.setdefault(tid, []).append(wf.name)
+        for uid in r["users"]:
+            user_users.setdefault(uid, []).append(wf.name)
+        for cv in r["cvs"]:
+            cv_users.setdefault(cv, []).append(wf.name)
 
     workflows = []
     for wf in ctx.workflows:
@@ -97,6 +115,41 @@ def build_dashboard(ctx: DumpContext) -> dict:
         for pid in sorted(ctx.pipeline_ids)
     ]
 
+    # usuários
+    users = []
+    for u in ctx.users:
+        uid = u.get("id") or u.get("_id")
+        used = sorted(user_users.get(uid, []))
+        users.append({
+            "name": u.get("name") or f"{u.get('firstName','')} {u.get('lastName','')}".strip() or uid,
+            "email": u.get("email", ""),
+            "deleted": bool(u.get("deleted")),
+            "used_by": used,
+            "orphan": not used,
+        })
+    users.sort(key=lambda x: x["name"].lower())
+
+    # custom values (chave -> usado por)
+    custom_values = []
+    for cv in ctx.custom_values:
+        keys = _CV_TOKEN.findall(cv.get("fieldKey", "") or "")
+        keyset = {k.lower() for k in keys} or {(cv.get("name", "")).strip().lower()}
+        used = sorted({w for k in keyset for w in cv_users.get(k, [])})
+        custom_values.append({
+            "name": cv.get("name", "") or next(iter(keyset), ""),
+            "token": next(iter(keyset), ""),
+            "used_by": used,
+            "orphan": not used,
+        })
+    custom_values.sort(key=lambda x: x["name"].lower())
+
+    # calendários (backup; sem refs de workflow)
+    calendars = sorted(
+        ({"name": c.get("name", c.get("id", "")), "active": bool(c.get("isActive", True)),
+          "type": c.get("eventType", "")} for c in ctx.calendars),
+        key=lambda x: x["name"].lower(),
+    )
+
     summary = {
         "workflows": len(ctx.workflows),
         "published": sum(1 for w in ctx.workflows if w.status == "published"),
@@ -106,6 +159,11 @@ def build_dashboard(ctx: DumpContext) -> dict:
         "fields": len(fields),
         "fields_orphan": sum(1 for f in fields if f["orphan"]),
         "pipelines": len(pipelines),
+        "users": len(users),
+        "calendars": len(calendars),
+        "custom_values": len(custom_values),
+        "cv_orphan": sum(1 for c in custom_values if c["orphan"]),
     }
 
-    return {"summary": summary, "workflows": workflows, "tags": tags, "fields": fields, "pipelines": pipelines}
+    return {"summary": summary, "workflows": workflows, "tags": tags, "fields": fields,
+            "pipelines": pipelines, "users": users, "calendars": calendars, "custom_values": custom_values}

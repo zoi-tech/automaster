@@ -14,6 +14,7 @@ As actions de cada workflow vivem em raw.steps.templates (baixadas do Firebase).
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -70,6 +71,14 @@ class DumpContext:
     stage_names: dict[str, str] = field(default_factory=dict)
     field_names: dict[str, str] = field(default_factory=dict)
     workflow_names: dict[str, str] = field(default_factory=dict)
+    # usuários, calendários, custom values (podem faltar em dumps antigos)
+    user_ids: set[str] = field(default_factory=set)
+    user_names: dict[str, str] = field(default_factory=dict)
+    user_deleted: set[str] = field(default_factory=set)
+    cv_keys: set[str] = field(default_factory=set)  # chaves custom_values, lower-case
+    users: list[dict] = field(default_factory=list)
+    calendars: list[dict] = field(default_factory=list)
+    custom_values: list[dict] = field(default_factory=list)
 
     def has_tag(self, name: str) -> bool:
         return name.strip().lower() in self.tag_names
@@ -133,9 +142,51 @@ def load_dump(path: Path) -> DumpContext:
             ctx.field_ids.add(fid)
             ctx.field_names[fid] = f.get("name", fid)
 
+    # entidades opcionais (ausentes em dumps anteriores ao schema com users/etc)
+    users = _entity_raw_optional(path / "users.json").get("users", [])
+    ctx.users = users
+    for u in users:
+        uid = u.get("id") or u.get("_id")
+        if uid:
+            ctx.user_ids.add(uid)
+            ctx.user_names[uid] = u.get("name") or f"{u.get('firstName','')} {u.get('lastName','')}".strip() or uid
+            if u.get("deleted"):
+                ctx.user_deleted.add(uid)
+
+    ctx.calendars = _entity_raw_optional(path / "calendars.json").get("calendars", [])
+
+    cvs = _entity_raw_optional(path / "custom_values.json").get("customValues", [])
+    ctx.custom_values = cvs
+    for cv in cvs:
+        for key in _cv_keys(cv):
+            ctx.cv_keys.add(key)
+
     ctx.pipeline_ids.discard(None)
     ctx.stage_ids.discard(None)
     return ctx
+
+
+_CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")
+
+
+def _cv_keys(cv: dict) -> set[str]:
+    """Extrai as chaves custom_values de um registro (do fieldKey/name), lower-case."""
+    keys: set[str] = set()
+    fk = cv.get("fieldKey", "") or ""
+    keys.update(m.lower() for m in _CV_TOKEN.findall(fk))
+    if not keys:
+        # fallback: fieldKey/name simples (sem template)
+        bare = (fk or cv.get("name", "")).strip().lower()
+        if bare:
+            keys.add(bare)
+    return keys
+
+
+def _entity_raw_optional(path: Path) -> dict:
+    """Como _entity_raw, mas devolve {} se o arquivo não existir (compat dumps antigos)."""
+    if not path.exists():
+        return {}
+    return _entity_raw(path)
 
 
 def _entity_raw(path: Path) -> dict:

@@ -45,7 +45,7 @@ _TEMPLATE = """<!DOCTYPE html>
 const DATA = {data};
 const COLORS = {colors};
 const MISSING = '#ff4d6d';
-const LABELS = {{workflow:"Workflows",tag:"Tags",pipeline:"Pipelines",stage:"Stages",field:"Custom fields",trigger:"Triggers"}};
+const LABELS = {{workflow:"Workflows",tag:"Tags",pipeline:"Pipelines",stage:"Stages",field:"Custom fields",trigger:"Triggers",user:"Usuários"}};
 const missingSet = new Set(DATA.nodes.filter(n=>n.missing).map(n=>n.id));
 
 const allNodes = DATA.nodes.map(n => ({{

@@ -1,10 +1,17 @@
 import { Command } from "commander";
 import path from "node:path";
 import { openSession } from "./auth/session.js";
-import { captureTokens, type Tokens } from "./auth/token.js";
+import { captureTokens, decodeCompanyId, type Tokens } from "./auth/token.js";
 import { GhlClient } from "./api/client.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
-import { fetchPipelines, fetchCustomFields, fetchTags } from "./api/entities.js";
+import {
+  fetchPipelines,
+  fetchCustomFields,
+  fetchTags,
+  fetchUsers,
+  fetchCalendars,
+  fetchCustomValues,
+} from "./api/entities.js";
 import { DumpWriter, stampNow } from "./dump/writer.js";
 
 const DUMPS_DIR = path.resolve(process.cwd(), "..", "dumps");
@@ -43,10 +50,14 @@ async function runExtract(opts: { location: string }): Promise<void> {
       }
     }
 
-    console.log("Baixando entidades (pipelines, tags, custom fields)...");
+    console.log("Baixando entidades (pipelines, tags, custom fields, users, calendars, custom values)...");
     await writer.writeEntity("pipelines", await fetchPipelines(client, locationId));
     await writer.writeEntity("tags", await fetchTags(client, locationId));
     await writer.writeEntity("custom_fields", await fetchCustomFields(client, locationId));
+    const companyId = decodeCompanyId(tokens.tokenId);
+    await writer.writeEntity("users", await fetchUsers(client, locationId, companyId));
+    await writer.writeEntity("calendars", await fetchCalendars(client, locationId));
+    await writer.writeEntity("custom_values", await fetchCustomValues(client, locationId));
 
     await writer.writeManifest({ workflows: ok });
     console.log(`\nDump salvo em: ${writer.dir}`);

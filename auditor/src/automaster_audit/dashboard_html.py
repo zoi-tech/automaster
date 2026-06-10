@@ -41,6 +41,9 @@ const TABS = [
   {{key:'tags', label:'Tags'}},
   {{key:'fields', label:'Custom fields'}},
   {{key:'pipelines', label:'Pipelines'}},
+  {{key:'users', label:'Usuários'}},
+  {{key:'custom_values', label:'Custom values'}},
+  {{key:'calendars', label:'Calendários'}},
 ];
 let current = 'workflows', sortCol = null, sortDir = 1;
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}}[c]));
@@ -66,10 +69,21 @@ function columns(key){{
     {{h:'Chamado por', f:r=>drill(r.called_by), v:r=>r.called_by.length}},
     {{h:'Entrada', f:r=>r.has_entry?'<span class="pill published">ok</span>':'<span class="pill orphan">sem entrada</span>', v:r=>r.has_entry?1:0}},
   ];
-  if(key==='tags'||key==='fields') return [
+  if(key==='tags'||key==='fields'||key==='custom_values') return [
     {{h:'Nome', f:r=>esc(r.name)+(r.orphan?' <span class="pill orphan">órfã</span>':''), v:r=>r.name}},
     {{h:'Usada por', f:r=>r.used_by.length, v:r=>r.used_by.length}},
     {{h:'Workflows', f:r=>drill(r.used_by)}},
+  ];
+  if(key==='users') return [
+    {{h:'Nome', f:r=>esc(r.name)+(r.deleted?' <span class="pill orphan">deletado</span>':'')+(r.orphan?' <span class="pill chan">sem workflow</span>':''), v:r=>r.name}},
+    {{h:'Email', f:r=>esc(r.email)||'<span class=muted>—</span>', v:r=>r.email}},
+    {{h:'Workflows', f:r=>r.used_by.length, v:r=>r.used_by.length}},
+    {{h:'Usado em', f:r=>drill(r.used_by)}},
+  ];
+  if(key==='calendars') return [
+    {{h:'Nome', f:r=>esc(r.name), v:r=>r.name}},
+    {{h:'Tipo', f:r=>esc(r.type)||'<span class=muted>—</span>', v:r=>r.type}},
+    {{h:'Status', f:r=>r.active?'<span class="pill published">ativo</span>':'<span class="pill draft">inativo</span>', v:r=>r.active?1:0}},
   ];
   return [
     {{h:'Nome', f:r=>esc(r.name), v:r=>r.name}},
@@ -116,6 +130,10 @@ def _cards(summary: dict) -> str:
         ("fields", "Custom fields", False),
         ("fields_orphan", "Fields órfãos", True),
         ("pipelines", "Pipelines", False),
+        ("users", "Usuários", False),
+        ("custom_values", "Custom values", False),
+        ("cv_orphan", "C. values órfãos", True),
+        ("calendars", "Calendários", False),
     ]
     out = []
     for key, label, warn in items:

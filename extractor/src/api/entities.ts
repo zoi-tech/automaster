@@ -27,3 +27,19 @@ export function fetchTags(client: GhlClient, locationId: string): Promise<unknow
   const qs = new URLSearchParams({ skip: "0", limit: "10000", query: "", getCount: "true" });
   return client.getJson(`${SERVICES}/locations/${locationId}/tags/search?${qs}`);
 }
+
+/** Usuários da subconta. Requer companyId (decodificado do token). */
+export function fetchUsers(client: GhlClient, locationId: string, companyId: string): Promise<unknown> {
+  const qs = new URLSearchParams({ companyId, locationId, limit: "500", skip: "0" });
+  return client.getJson(`${BACKEND}/users/search?${qs}`);
+}
+
+/** Calendários (lista geral). */
+export function fetchCalendars(client: GhlClient, locationId: string): Promise<unknown> {
+  return client.getJson(`${BACKEND}/calendars/?locationId=${locationId}`);
+}
+
+/** Custom values (host `backend`: fieldKey traz o token literal `{{ custom_values.x }}`). */
+export function fetchCustomValues(client: GhlClient, locationId: string): Promise<unknown> {
+  return client.getJson(`${BACKEND}/locations/${locationId}/customValues/`);
+}
