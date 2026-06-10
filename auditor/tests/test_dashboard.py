@@ -41,5 +41,7 @@ def test_dashboard_html_safe_and_selfcontained(make_dump, tmp_path):
     out = write_dashboard_html(build_dashboard(load_dump(path)), tmp_path / "d.html", title="T")
     html = out.read_text(encoding="utf-8")
     assert "</script><img" not in html
-    assert "unpkg" not in html and "cdn" not in html.lower()
+    # auto-contido: sem recurso externo (script/link/@import http). Fonte vai como data: URI.
+    assert 'src="http' not in html and 'href="http' not in html and "@import" not in html
+    assert "unpkg" not in html
     assert "const DATA =" in html

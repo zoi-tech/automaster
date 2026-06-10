@@ -11,5 +11,8 @@ requires-python = ">=3.12"
 [project.scripts]
 automaster-audit = "automaster_audit.cli:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/automaster_audit"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

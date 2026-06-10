@@ -1,9 +1,11 @@
-"""Renderiza o inventário como HTML auto-contido (sem CDN; JS/CSS inline)."""
+"""Renderiza o inventário como HTML auto-contido, tema Tron/Encom (sem CDN)."""
 from __future__ import annotations
 
 import html as _html
 import json
 from pathlib import Path
+
+from .theme import head_assets, overlays
 
 
 def _safe_json(obj) -> str:
@@ -18,46 +20,18 @@ def _safe_json(obj) -> str:
 
 _TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
-<title>Painel GHL — {title}</title>
-<style>
-  :root{{--bg:#16161c;--card:#22222b;--line:#33333f;--fg:#e8e8ee;--mut:#9a9aa8;--accent:#4f86f7}}
-  *{{box-sizing:border-box}}
-  body{{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}}
-  header{{padding:18px 24px;border-bottom:1px solid var(--line)}}
-  h1{{margin:0 0 4px;font-size:18px}}
-  .sub{{color:var(--mut);font-size:12px}}
-  .cards{{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}}
-  .card{{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-width:90px}}
-  .card .n{{font-size:20px;font-weight:600}}
-  .card .l{{font-size:11px;color:var(--mut)}}
-  .card.warn .n{{color:#ffb84d}}
-  nav{{display:flex;gap:4px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0}}
-  nav button{{background:none;border:none;color:var(--mut);padding:12px 16px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent}}
-  nav button.active{{color:var(--fg);border-bottom-color:var(--accent)}}
-  .wrap{{padding:16px 24px}}
-  input#q{{width:100%;max-width:360px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);margin-bottom:12px}}
-  table{{width:100%;border-collapse:collapse;font-size:13px}}
-  th,td{{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}}
-  th{{color:var(--mut);font-weight:500;cursor:pointer;user-select:none;position:sticky;top:49px;background:var(--bg)}}
-  th:hover{{color:var(--fg)}}
-  tr:hover td{{background:#1d1d25}}
-  .pill{{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;margin:1px}}
-  .published{{background:#173d22;color:#5fd07f}} .draft{{background:#3d3417;color:#e0c050}}
-  .chan{{background:#1b2b3d;color:#7fb0e0}}
-  .orphan{{background:#3d1717;color:#ff7b7b}}
-  .muted{{color:var(--mut)}}
-  .drill{{font-size:12px;color:var(--mut)}}
-  details summary{{cursor:pointer;color:var(--accent)}}
-  .hidden{{display:none}}
-</style></head><body>
-<header>
-  <h1>Painel de automações GHL</h1>
-  <div class="sub">{title} · gerado do dump</div>
+<title>ENCOM OS // {title}</title>
+{head_assets}
+</head><body>
+{overlays}
+<header class="framed">
+  <div class="hud-top"><span class="dot-online"></span><span class="sub">ENCOM OS // SECTOR {title} // STATUS ONLINE</span></div>
+  <h1>Painel de Automações</h1>
   <div class="cards">{cards}</div>
 </header>
 <nav id="tabs"></nav>
 <div class="wrap">
-  <input id="q" placeholder="filtrar na aba atual…" autocomplete="off">
+  <input id="q" placeholder="// filtrar na aba atual" autocomplete="off">
   <div id="content"></div>
 </div>
 <script>
@@ -155,6 +129,8 @@ def write_dashboard_html(data: dict, out_path: Path, title: str = "") -> Path:
     out_path = Path(out_path)
     html = _TEMPLATE.format(
         title=_html.escape(title or "dump"),
+        head_assets=head_assets(),
+        overlays=overlays(),
         cards=_cards(data["summary"]),
         data=_safe_json(data),
     )
