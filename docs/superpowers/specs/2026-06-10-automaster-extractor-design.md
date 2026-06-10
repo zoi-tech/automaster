@@ -151,8 +151,8 @@ Cada regra é um arquivo em `auditor/rules/` com severidade ERROR/WARN/INFO:
 | `broken_field_ref` | ERROR | Referência a custom field deletado |
 | `broken_template_ref` | ERROR | Action usa template SMS/email inexistente (no spike, SMS vinha inline no step; confirmar no discover se há refs a templates externos antes de implementar) |
 | `broken_workflow_ref` | ERROR | Action "add to workflow" aponta para workflow deletado |
-| `no_trigger` | WARN | Workflow publicado sem trigger |
-| `empty_branch` | WARN | Branch if/else sem nenhuma action |
+| `workflow_unreachable` | WARN / INFO | Sem entrada conhecida. Tem trigger OU é alvo de `add_to_workflow` → OK. Sem trigger e sem chamada: 0 steps → WARN (vazio/morto); com steps → INFO (provável execução manual). Execução manual é entrada legítima, por isso nunca é ERROR. (Substitui o antigo `no_trigger` binário, que dava falso positivo em sub-rotinas.) |
+| ~~`empty_branch`~~ | — | Removida: `if_else` com `branches:[]` é estrutura normal do canvas GHL; detectar ramo vazio exige reconstruir o grafo de nós. |
 | `dead_end_draft` | INFO | Draft sem modificação há mais de 90 dias |
 | `naming_convention` | INFO | Nome fora do padrão ZOI `[Produto] Gatilho → Ação` |
 

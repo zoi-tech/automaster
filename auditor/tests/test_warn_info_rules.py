@@ -1,19 +1,43 @@
 from automaster_audit.loader import load_dump
-from automaster_audit.rules import dead_end_draft, naming_convention, no_trigger
+from automaster_audit.rules import dead_end_draft, naming_convention, workflow_unreachable
 from conftest import wf
 
+STEP = {"type": "sms", "name": "SMS", "attributes": {}}
 
-# --- no_trigger (WARN) ---
-def test_no_trigger_flags_published_without_trigger(make_dump):
-    path = make_dump(workflows=[wf(status="published", triggers=[])])
-    findings = no_trigger.check(load_dump(path))
+
+# --- workflow_unreachable ---
+def test_unreachable_warn_for_empty_workflow(make_dump):
+    # sem trigger, sem chamada, 0 steps → WARN (morto)
+    path = make_dump(workflows=[wf(triggers=[], steps=[])])
+    findings = workflow_unreachable.check(load_dump(path))
     assert len(findings) == 1
     assert findings[0].severity == "WARN"
 
 
-def test_no_trigger_clean_when_trigger_present(make_dump):
-    path = make_dump(workflows=[wf(status="published", triggers=[{"id": "t1"}])])
-    assert no_trigger.check(load_dump(path)) == []
+def test_unreachable_info_for_manual_candidate(make_dump):
+    # sem trigger, sem chamada, com steps → INFO (provável manual)
+    path = make_dump(workflows=[wf(triggers=[], steps=[STEP])])
+    findings = workflow_unreachable.check(load_dump(path))
+    assert len(findings) == 1
+    assert findings[0].severity == "INFO"
+
+
+def test_unreachable_clean_when_has_trigger(make_dump):
+    path = make_dump(workflows=[wf(triggers=[{"id": "t1"}], steps=[])])
+    assert workflow_unreachable.check(load_dump(path)) == []
+
+
+def test_unreachable_clean_when_called_by_another(make_dump):
+    # 'sub' não tem trigger mas é chamado por 'caller' via add_to_workflow → OK
+    caller_step = {"type": "add_to_workflow", "name": "Add", "attributes": {"workflow_id": "sub"}}
+    path = make_dump(
+        workflows=[
+            wf(id="caller", triggers=[{"id": "t1"}], steps=[caller_step]),
+            wf(id="sub", triggers=[], steps=[STEP]),
+        ]
+    )
+    findings = workflow_unreachable.check(load_dump(path))
+    assert all(f.workflow_id != "sub" for f in findings)
 
 
 # --- naming_convention (INFO) ---
