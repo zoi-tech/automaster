@@ -65,6 +65,11 @@ class DumpContext:
     tag_names: set[str] = field(default_factory=set)  # lower-case
     field_ids: set[str] = field(default_factory=set)
     workflow_ids: set[str] = field(default_factory=set)
+    # nomes legíveis (id -> nome), para rótulos de grafo/relatório
+    pipeline_names: dict[str, str] = field(default_factory=dict)
+    stage_names: dict[str, str] = field(default_factory=dict)
+    field_names: dict[str, str] = field(default_factory=dict)
+    workflow_names: dict[str, str] = field(default_factory=dict)
 
     def has_tag(self, name: str) -> bool:
         return name.strip().lower() in self.tag_names
@@ -105,13 +110,18 @@ def load_dump(path: Path) -> DumpContext:
 
     ctx = DumpContext(path=path, manifest=manifest, workflows=workflows)
     ctx.workflow_ids = {w.id for w in workflows}
+    ctx.workflow_names = {w.id: w.name for w in workflows}
 
     # entidades (envelope {raw: <resposta API>})
     pipelines = _entity_raw(path / "pipelines.json").get("pipelines", [])
     for p in pipelines:
         ctx.pipeline_ids.add(p.get("id"))
+        if p.get("id"):
+            ctx.pipeline_names[p["id"]] = p.get("name", p["id"])
         for s in p.get("stages", []):
             ctx.stage_ids.add(s.get("id"))
+            if s.get("id"):
+                ctx.stage_names[s["id"]] = s.get("name", s["id"])
 
     tags = _entity_raw(path / "tags.json").get("tags", [])
     ctx.tag_names = {t.get("name", "").strip().lower() for t in tags if t.get("name")}
@@ -121,6 +131,7 @@ def load_dump(path: Path) -> DumpContext:
         fid = f.get("id") or f.get("_id")
         if fid:
             ctx.field_ids.add(fid)
+            ctx.field_names[fid] = f.get("name", fid)
 
     ctx.pipeline_ids.discard(None)
     ctx.stage_ids.discard(None)
