@@ -152,6 +152,13 @@ Cada regra é um arquivo em `auditor/rules/` com severidade ERROR/WARN/INFO:
 | `broken_template_ref` | ERROR | Action usa template SMS/email inexistente (no spike, SMS vinha inline no step; confirmar no discover se há refs a templates externos antes de implementar) |
 | `broken_workflow_ref` | ERROR | Action "add to workflow" aponta para workflow deletado |
 | `workflow_unreachable` | WARN / INFO | Sem entrada conhecida. Tem trigger OU é alvo de `add_to_workflow` → OK. Sem trigger e sem chamada: 0 steps → WARN (vazio/morto); com steps → INFO (provável execução manual). Execução manual é entrada legítima, por isso nunca é ERROR. (Substitui o antigo `no_trigger` binário, que dava falso positivo em sub-rotinas.) |
+| `broken_user_ref` | ERROR | `assign_user`/`internal_notification` aponta para usuário inexistente ou deletado |
+| `broken_custom_value_ref` | ERROR | `{{custom_values.X}}` em mensagem sem custom value definido na subconta |
+| **Camada 1 — lógica sã (grafo de execução, `flow.py`)** | | |
+| `unreachable_step` | WARN | Step que nunca executa (não alcançável a partir da entrada) — dead code no canvas |
+| `broken_goto` | ERROR | `goto.targetNodeId` aponta para nó inexistente |
+| `workflow_call_cycle` | WARN | Ciclo de chamadas `add_to_workflow` (ex.: A→B→A) — handoff ou loop infinito |
+| `uncovered_condition` | INFO | `if/else` sem ramo ELSE — contato sem match sai em silêncio |
 | ~~`empty_branch`~~ | — | Removida: `if_else` com `branches:[]` é estrutura normal do canvas GHL; detectar ramo vazio exige reconstruir o grafo de nós. |
 | `dead_end_draft` | INFO | Draft sem modificação há mais de 90 dias |
 | `naming_convention` | INFO | Nome fora do padrão ZOI `[Produto] Gatilho → Ação` |
