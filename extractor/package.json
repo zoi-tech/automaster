@@ -1,0 +1,24 @@
+{
+  "name": "automaster-extractor",
+  "version": "0.1.0",
+  "description": "Extrai workflows GHL de uma subconta via API interna",
+  "type": "module",
+  "bin": {
+    "automaster-extract": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "extract": "tsx src/cli.ts extract",
+    "discover": "tsx src/cli.ts discover"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.9.0"
+  }
+}
