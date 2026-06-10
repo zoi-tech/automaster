@@ -11,3 +11,4 @@ __pycache__/
 build/
 dist/
 spike/realdump/
+.DS_Store
