@@ -1,10 +1,22 @@
 """Renderiza o grafo de conexões como HTML interativo auto-contido (vis-network)."""
 from __future__ import annotations
 
+import html as _html
 import json
 from pathlib import Path
 
 from .graph import NODE_TYPES
+
+
+def _safe_json(obj) -> str:
+    """JSON seguro para embutir em <script>: neutraliza fechamento de tag e separadores JS."""
+    return (
+        json.dumps(obj, ensure_ascii=False)
+        .replace("</", "<\\/")
+        .replace("<!--", "<\\!--")
+        .replace(chr(0x2028), "\\u2028")
+        .replace(chr(0x2029), "\\u2029")
+    )
 
 _TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR">
@@ -124,11 +136,11 @@ document.getElementById('search').addEventListener('input', e => {{
 def write_graph_html(graph: dict, out_path: Path, title: str = "") -> Path:
     out_path = Path(out_path)
     html = _TEMPLATE.format(
-        title=title or "dump",
+        title=_html.escape(title or "dump"),
         n_nodes=len(graph["nodes"]),
         n_edges=len(graph["edges"]),
-        data=json.dumps(graph, ensure_ascii=False),
-        colors=json.dumps(NODE_TYPES),
+        data=_safe_json(graph),
+        colors=_safe_json(NODE_TYPES),
     )
     out_path.write_text(html, encoding="utf-8")
     return out_path
