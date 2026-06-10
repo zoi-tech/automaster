@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 from . import rules
+from .dashboard import build_dashboard
+from .dashboard_html import write_dashboard_html
 from .finding import ERROR, INFO, WARN
 from .graph import build_graph
 from .graph_html import write_graph_html
@@ -49,6 +51,22 @@ def run_graph(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_dashboard(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    data = build_dashboard(ctx)
+    out = args.output or (Path(args.dump_path) / "dashboard.html")
+    write_dashboard_html(data, out, title=ctx.manifest.get("locationId", ""))
+    s = data["summary"]
+    print(f"painel: {s['workflows']} workflows, {s['tags']} tags ({s['tags_orphan']} órfãs), "
+          f"{s['fields']} fields ({s['fields_orphan']} órfãos)")
+    print(f"abra no browser: {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -60,6 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_graph.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_graph.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/graph.html)")
     p_graph.set_defaults(func=run_graph)
+
+    p_dash = sub.add_parser("dashboard", help="gera painel HTML (inventário de workflows/tags/fields)")
+    p_dash.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_dash.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/dashboard.html)")
+    p_dash.set_defaults(func=run_dashboard)
     return parser
 
 
@@ -67,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)
