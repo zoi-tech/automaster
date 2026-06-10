@@ -6,42 +6,58 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Automaster v2: ferramenta de backup e auditoria de automações GoHighLevel (GHL). Extrai todos os workflows de uma subconta usando a API interna (`backend.leadconnectorhq.com`) — a mesma observada na aba Network do Chrome — com autenticação capturada via Playwright.
 
-Spec completa e aprovada: `docs/superpowers/specs/2026-06-10-automaster-extractor-design.md`. Leia antes de qualquer mudança estrutural.
+Docs-chave (leia antes de mudança estrutural):
+- Spec: `docs/superpowers/specs/2026-06-10-automaster-extractor-design.md`
+- Endpoints da API interna mapeados: `docs/endpoints.md`
+- **Próximo trabalho (Camadas 2 e 3 de validação): `docs/superpowers/plans/2026-06-10-validation-layers-2-3-plan.md`** — contém o modelo do grafo de execução já reverso-engenheirado. NÃO re-derivar.
 
 ## Arquitetura (big picture)
 
 Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `dumps/`:
 
-- **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), intercepta headers de auth (`token-id` JWT Firebase + `channel: APP` + `source: WEB_USER` + `version`) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar token (a página fica aberta durante toda a extração). Token nunca vai para disco.
-- **`auditor/`** — Python. Lê um dump, roda regras de auditoria (`auditor/automaster_audit/rules/`, 1 arquivo por regra, severidade ERROR/WARN/INFO) e gera `report.md` + `report.json` na pasta do dump.
+- **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar (página fica aberta durante a extração). Tokens nunca vão para disco. Extrai workflows + 6 entidades: pipelines, tags, custom_fields, **users, calendars, custom_values**.
+- **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 3 saídas na pasta do dump:
+  - `report.md`/`report.json` — auditoria (`automaster-audit audit`)
+  - `graph.html` — grafo interativo de conexões, tema Tron (`automaster-audit graph`)
+  - `dashboard.html` — inventário navegável, tema Tron (`automaster-audit dashboard`)
 
-O contrato entre as partes é o formato do dump (`dumps/<locationId>/<YYYY-MM-DD_HHmm>/`): `manifest.json` com `schemaVersion` + envelopes finos com o campo `raw` contendo a resposta da API **intocada**. Nunca transformar/limpar o `raw` — ele é o backup fiel. Mudou o formato do dump? Incremente `schemaVersion` e atualize o loader do auditor.
+Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `theme.py` (CSS Tron + fonte Share Tech Mono embutida em `assets/`).
+
+**Regras de auditoria (13):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value}_ref` (ERROR); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `naming_convention`/`dead_end_draft` (INFO).
+
+O contrato entre as partes é o formato do dump (`dumps/<locationId>/<YYYY-MM-DD_HHmm>/`): `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
 
 ## Comandos
 
 ```bash
 # Extractor (em extractor/)
-npm install
-npx playwright install chromium
-npm run extract -- --location <locationId>    # extração completa
-npm run discover -- --location <locationId>   # mapear endpoints da API interna
-npm test                                       # unit tests (fixtures em extractor/fixtures/)
+npm install && npx playwright install chromium
+npm run extract -- --location <locationId>    # extração completa (abre Chrome p/ login 1x)
+npm run discover -- --location <locationId>   # observar requests ao backend
+npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
-# Auditor (em auditor/)
-pip install -e .
-automaster-audit dumps/<locationId>/<timestamp>/   # gera report.md + report.json
-pytest                                              # roda 1 fixture quebrada + 1 limpa por regra
-pytest tests/test_rules/test_broken_tag_ref.py     # teste de uma regra só
+# Auditor (em auditor/) — usa venv: .venv/bin/...
+python -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/automaster-audit audit dumps/<loc>/<ts>/        # report.md + report.json
+.venv/bin/automaster-audit graph dumps/<loc>/<ts>/        # graph.html
+.venv/bin/automaster-audit dashboard dumps/<loc>/<ts>/    # dashboard.html
+.venv/bin/python -m pytest -q                             # suíte (44 testes)
+.venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
+
+Subconta de validação: `WPIUKW3L4lDyMhLhKYKG` (Instaltech). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
 
 ## Pontos críticos
 
-- **API interna é não-documentada e muda sem aviso.** Endpoints ficam hardcoded em `extractor/src/api/*.ts`. Quando o GHL mudar algo (validação de shape falhando), rode `discover` para re-mapear e atualize `docs/endpoints.md` + fixtures.
-- **Rate limit conservador:** ~5 req/s, backoff exponencial em 429. Não aumentar sem motivo — é API de produção de terceiros.
-- **Falha em workflow individual não aborta a extração** — registra em `warnings` do manifest e segue.
-- **Sem testes E2E contra GHL real.** Validação real = rodar `extract` em subconta de teste. Unit tests usam fixtures anonimizadas capturadas pelo `discover`.
-- Nomenclatura ZOI para workflows: `[Produto] Gatilho → Ação` (a regra de auditoria `naming_convention` verifica isso).
+- **API interna não-documentada, muda sem aviso.** Endpoints hardcoded em `extractor/src/api/*.ts` (catálogo em `docs/endpoints.md`). Quebrou? Rode `discover`, re-mapeie, atualize o doc.
+- **Dois esquemas de auth:** workflows aceitam só `Bearer`; entidades `locations/*` e `opportunities/*` exigem `token-id`. UA de browser obrigatório (UA não-browser → 403).
+- **Steps vêm do Firebase** (`detail.fileUrl`, URL pré-assinada, baixada **sem** headers de auth). Nunca mandar auth nessa chamada.
+- **Lista de workflows:** `?type=workflow` (lista plana); `parentId=root` só traz pastas.
+- **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
+- **Nova regra de auditoria** = novo arquivo em `auditor/src/automaster_audit/rules/` com `check(ctx)->list[Finding]`; o registry pkgutil descobre sozinho. Adicione fixture quebrada + limpa em `tests/` (use `conftest.make_dump(...)`).
+- **Regras devem evitar falso positivo.** Histórico: `empty_branch` removida (estrutura normal do GHL); `no_trigger` → `workflow_unreachable` (cruza `add_to_workflow` + execução manual). Regra que dependa de entidade não extraída deve ser no-op.
+- **HTML auto-contido + XSS-safe.** Nomes vêm do CRM (input externo): escapar (`_safe_json`/`html.escape`). Fonte via data-URI; só o grafo usa vis-network via CDN (com SRI).
 
-## Fora de escopo
+## Fora de escopo (por enquanto)
 
-Migração/clonagem entre subcontas, extração em lote multi-subconta, execução agendada/diff automático, e entidades além de workflows + pipelines/tags/custom fields/templates.
+Teste ao vivo no GHL (escreve em produção), clonagem/migração entre subcontas, multi-subconta em lote, diff entre snapshots, `broken_template_ref` (templates internos existem — `internal_notification.template_id` — falta puxar a lista).
