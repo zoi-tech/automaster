@@ -2,6 +2,7 @@ dumps/
 spike/all/
 spike/entities/
 spike/*.json
+spike-*.json
 .playwright-mcp/
 node_modules/
 __pycache__/
