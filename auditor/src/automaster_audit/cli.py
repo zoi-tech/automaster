@@ -13,6 +13,8 @@ from .finding import ERROR, INFO, WARN
 from .flow import enumerate_paths
 from .graph import build_graph
 from .graph_html import write_graph_html
+from .journey import build_journey
+from .journey_html import write_journey_html
 from .loader import DumpError, load_dump
 from .path_report import write_paths_report
 from .report import write_reports
@@ -131,6 +133,25 @@ def run_validation(args: argparse.Namespace) -> int:
     return 0  # relatório, não gate — sempre 0
 
 
+def run_journey(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    data = build_journey(ctx)
+    out = args.output or (Path(args.dump_path) / "journey.html")
+    write_journey_html(data, out, title=ctx.manifest.get("locationId", ""))
+    s = data["stats"]
+    print(f"jornada: {len(data['criacao'])} entradas na criação, "
+          f"{len(data['anytime'])} eventos avulsos, "
+          f"{s['workflows_alcancaveis']} workflows alcançáveis, {s['loops']} loops")
+    if data["truncated"]:
+        print("atenção: árvore truncada (caps de profundidade/nós)", file=sys.stderr)
+    print(f"abra no browser: {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -164,6 +185,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_val.add_argument("--contracts", type=Path, default=Path("contracts"),
                        help="dir dos contratos *.json (default: contracts/; ausente → camada 3 indisponível)")
     p_val.set_defaults(func=run_validation)
+
+    p_journey = sub.add_parser("journey", help="gera árvore de jornada do contato (HTML)")
+    p_journey.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_journey.add_argument("-o", "--output", type=Path,
+                           help="arquivo HTML de saída (default: <dump>/journey.html)")
+    p_journey.set_defaults(func=run_journey)
     return parser
 
 
@@ -171,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

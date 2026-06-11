@@ -32,3 +32,15 @@ def test_journey_html_renders_tree_and_stats(make_dump, tmp_path):
     assert "Contato criado" in html and "A qualquer momento" in html
     assert "<details" in html and "TAG+" in html
     assert "data-jfilter" in html  # input de filtro presente
+
+
+def test_cli_journey_subcommand(make_dump, capsys):
+    from automaster_audit.cli import main
+    a = wf(id="a", name="A", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a")])
+    path = make_dump(workflows=[a])
+    rc = main(["journey", str(path)])
+    assert rc == 0
+    assert (path / "journey.html").exists()
+    outtxt = capsys.readouterr().out
+    assert "jornada" in outtxt.lower()
