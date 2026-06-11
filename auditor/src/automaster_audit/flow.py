@@ -9,6 +9,8 @@ Modelo (reverso-engenheirado do GHL):
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .loader import Workflow
 
 
@@ -59,3 +61,68 @@ def is_branch_node(step: dict) -> bool:
         a = step.get("attributes", {})
         return not a.get("branches")  # container tem branches; ramo não
     return False
+
+
+@dataclass
+class Path:
+    """Um caminho de execução: (step_id, rótulo do ramo tomado; None se linear) + terminal."""
+    steps: list[tuple[str, str | None]]
+    terminal: str  # "exit" | "loop → <step_id>"
+
+
+def _branch_label(container: dict, node: dict) -> str | None:
+    """Rótulo do ramo: name em branches do container, name da transition, ou ELSE."""
+    if node.get("type") == "transition":
+        name = node.get("name")
+        return name if isinstance(name, str) else None
+    for b in container.get("attributes", {}).get("branches") or []:
+        if b.get("id") == node.get("id"):
+            return b.get("name")
+    if "else" in (node.get("attributes") or {}):
+        return "ELSE"
+    return None
+
+
+def enumerate_paths(wf: Workflow, cap: int = 500) -> tuple[list[Path], bool]:
+    """Enumera os caminhos de execução a partir das raízes, sem avaliar condições.
+
+    Ciclo (goto/aresta de retorno) corta o caminho com terminal "loop → <id>".
+    Devolve (paths, truncated); truncated=True quando o cap foi atingido.
+    """
+    by_id = index_steps(wf)
+    paths: list[Path] = []
+    truncated = False
+
+    def emit(trail: list[tuple[str, str | None]], terminal: str) -> None:
+        nonlocal truncated
+        if len(paths) >= cap:
+            truncated = True
+            return
+        paths.append(Path(steps=trail, terminal=terminal))
+
+    def walk(nid: str, label: str | None, trail: list[tuple[str, str | None]], seen: set[str]) -> None:
+        if truncated:
+            return
+        if nid in seen:
+            emit(trail, f"loop → {nid}")
+            return
+        step = by_id.get(nid)
+        if step is None:
+            emit(trail, "exit")
+            return
+        trail = trail + [(nid, label)]
+        seen = seen | {nid}
+        succ = successors(step)
+        if not succ:
+            emit(trail, "exit")
+            return
+        if isinstance(step.get("next"), list):
+            for sid in succ:
+                walk(sid, _branch_label(step, by_id.get(sid, {})), trail, seen)
+        else:
+            for sid in succ:
+                walk(sid, None, trail, seen)
+
+    for rid in roots(wf):
+        walk(rid, None, [], set())
+    return paths, truncated
