@@ -13,7 +13,12 @@ import {
   fetchCustomValues,
 } from "./api/entities.js";
 import { DumpWriter, stampNow } from "./dump/writer.js";
-import { fetchAuditLogs } from "./api/audit.js";
+import {
+  fetchAuditLogs,
+  fetchContactAppointments,
+  fetchContactOpportunityIds,
+  type AuditLog,
+} from "./api/audit.js";
 import { renderTimelineHtml } from "./timeline_html.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -109,6 +114,28 @@ function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
   return names;
 }
 
+/** id → nome de pipelines e stages do dump mais recente (melhor esforço). */
+function stageNamesFromLatestDump(locationId: string): {
+  pipelines: Map<string, string>;
+  stages: Map<string, string>;
+} {
+  const pipelines = new Map<string, string>();
+  const stages = new Map<string, string>();
+  try {
+    const base = path.join(DUMPS_DIR, locationId);
+    const latest = fs.readdirSync(base).sort().at(-1);
+    if (!latest) return { pipelines, stages };
+    const obj = JSON.parse(fs.readFileSync(path.join(base, latest, "pipelines.json"), "utf-8"));
+    for (const p of obj?.raw?.pipelines ?? []) {
+      if (p.id && p.name) pipelines.set(p.id, p.name);
+      for (const s of p.stages ?? []) if (s.id && s.name) stages.set(s.id, s.name);
+    }
+  } catch {
+    /* sem pipelines no dump — mostra id cru */
+  }
+  return { pipelines, stages };
+}
+
 /** id → nome dos usuários do dump mais recente da subconta (melhor esforço). */
 function userNamesFromLatestDump(locationId: string): Map<string, string> {
   const names = new Map<string, string>();
@@ -143,14 +170,49 @@ async function runTimeline(opts: { location: string; id: string; days: string })
 
     console.log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
     const logs = await fetchAuditLogs(client, locationId, opts.id, days);
-    console.log(`${logs.length} eventos.`);
+    console.log(`${logs.length} eventos do contato.`);
 
-    const html = renderTimelineHtml(logs, {
+    // oportunidades associadas → audit log de cada uma (criação, stage, status)
+    let oppLogs: AuditLog[] = [];
+    try {
+      const oppIds = await fetchContactOpportunityIds(client, locationId, opts.id);
+      for (const oid of oppIds) {
+        const ol = await fetchAuditLogs(client, locationId, oid, days);
+        oppLogs = oppLogs.concat(ol.map((l) => ({ ...l, documentType: l.documentType || "OPPORTUNITY" })));
+      }
+      console.log(`${oppIds.length} oportunidade(s), ${oppLogs.length} eventos.`);
+    } catch (e) {
+      console.warn(`aviso: oportunidades indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
+    }
+
+    // agendamentos → eventos sintéticos (marcos por natureza)
+    let apptLogs: AuditLog[] = [];
+    try {
+      const appts = await fetchContactAppointments(client, locationId, opts.id, days);
+      apptLogs = appts.map((a) => ({
+        documentType: "APPOINTMENT",
+        type: "APPOINTMENT",
+        id: String(a.id ?? ""),
+        documentName: String(a.title ?? "Agendamento"),
+        createdAt: String(a.startTime ?? a.dateAdded ?? ""),
+        after: a,
+        changedFields: [],
+        source: String((a as { createdBy?: { source?: string } }).createdBy?.source ?? ""),
+      }));
+      console.log(`${apptLogs.length} agendamento(s).`);
+    } catch (e) {
+      console.warn(`aviso: agendamentos indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
+    }
+
+    const { pipelines, stages } = stageNamesFromLatestDump(locationId);
+    const html = renderTimelineHtml([...logs, ...oppLogs, ...apptLogs], {
       locationId,
       id: opts.id,
       days,
       wfNames: workflowNamesFromLatestDump(locationId),
       userNames: userNamesFromLatestDump(locationId),
+      pipelineNames: pipelines,
+      stageNames: stages,
     });
     const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
     fs.writeFileSync(out, html, "utf-8");

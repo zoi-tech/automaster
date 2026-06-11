@@ -99,3 +99,15 @@ GET services.leadconnectorhq.com/audit/search/v2
   `sourceId` = id do workflow causador; `WEB_USER` com `sourceName`; `INTEGRATION`; etc.).
 - Uso no projeto: `npm run timeline -- --location <loc> --id <recordId> [--days 60]`
   (sob demanda, HTML efêmero em /tmp — POR DESIGN não grava em dumps/).
+
+### Oportunidades de um contato (associations) — validado 2026-06-11
+```
+GET services.leadconnectorhq.com/associations/relations/record/<contactId>
+    ?locationId=<loc>&associationIds=OPPORTUNITIES_CONTACTS_ASSOCIATION&skip=0&limit=10
+```
+- `{ relations: [{ recordId: <opportunityId>, ... }] }`. O audit/search/v2 aceita
+  o opportunityId no `id` → histórico da oportunidade (criação, stage, status).
+- Snapshot do registro: `POST services.../objects/opportunity/records/ids` (observado, não usado).
+- Agendamentos: `services.../calendars/events?locationId&contactId&startTime&endTime`
+  testado e RECUSADO com tokens internos — endpoint correto pendente de discover
+  (aba Appointments do contato).

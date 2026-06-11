@@ -46,14 +46,22 @@ export function renderTimelineHtml(
     days: number;
     wfNames: Map<string, string>;
     userNames?: Map<string, string>;
+    pipelineNames?: Map<string, string>;
+    stageNames?: Map<string, string>;
   },
 ): string {
   const userNames = opts.userNames ?? new Map<string, string>();
+  const pipeNames = opts.pipelineNames ?? new Map<string, string>();
+  const stgNames = opts.stageNames ?? new Map<string, string>();
+  const OPP_STATUS: Record<string, string> = {
+    won: "ganha", lost: "perdida", open: "aberta", abandoned: "abandonada", deleted: "deletada",
+  };
   const name = logs.find((l) => l.documentName)?.documentName ?? opts.id;
   const sorted = [...logs].sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")));
 
   const events = sorted.map((log) => {
-    const dt = new Date(String(log.createdAt ?? ""));
+    const rawTs = String(log.createdAt ?? "");
+    const dt = /^\d+$/.test(rawTs) ? new Date(Number(rawTs)) : new Date(rawTs);
     const t = String(log.type ?? "");
     const src = String(log.source ?? "");
     let srcKind = "other";
@@ -79,7 +87,23 @@ export function renderTimelineHtml(
     const changedSet = new Set(log.changedFields ?? []);
     const docType = String(log.documentType ?? "CONTACT");
     let phrase = "";
-    if (t === "CREATED") phrase = "Contato criado";
+    if (docType === "OPPORTUNITY") {
+      const stageId = String(
+        after.pipeline_stage_id ?? after.pipelineStageId ?? (after as Record<string, unknown>).stageId ?? "",
+      );
+      const status = String(after.status ?? "");
+      if (t === "CREATED") {
+        const pid = String(after.pipeline_id ?? after.pipelineId ?? "");
+        const pipe = pipeNames.get(pid);
+        phrase = "Oportunidade criada" + (pipe ? ` · ${pipe}` : "");
+      } else if (t === "DELETED") phrase = "Oportunidade deletada";
+      else if (changedSet.has("status") && status) phrase = `Oportunidade ${OPP_STATUS[status] ?? status}`;
+      else if (stageId && (changedSet.has("pipeline_stage_id") || changedSet.has("pipelineStageId")))
+        phrase = `Oportunidade → ${stgNames.get(stageId) ?? stageId}`;
+    } else if (docType === "APPOINTMENT") {
+      const st = String(after.appointmentStatus ?? after.status ?? "");
+      phrase = `Agendamento: ${log.documentName ?? "—"}` + (st ? ` (${st})` : "");
+    } else if (t === "CREATED") phrase = "Contato criado";
     else if (t === "DELETED") phrase = "Contato deletado";
     else if (t === "TAG_ADDED") phrase = `+ ${sum}`;
     else if (t === "TAG_REMOVED") phrase = `− ${sum}`;
