@@ -380,6 +380,10 @@ window.__amInitFlux = function () {
     effect: "Ação no contato", neutral_group: "Steps neutros",
     loop: "Loop / já expandido", terminal: "Fim da jornada", truncated: "Cortado (limite)"
   };
+  // flags que merecem destaque visual (a flag estrutural "ref" não é warning)
+  function warnFlags(n) {
+    return n.flags.filter(function (f) { return f !== "ref"; });
+  }
 
   // ---------- prep tree ----------
   var idSeq = 0, allNodes = [];
@@ -547,7 +551,8 @@ window.__amInitFlux = function () {
     g.appendChild(badge);
     n._badge = badge;
 
-    if (n.flags.length) {
+    // flag "ref" é estrutural (referência "já expandido"), não warning
+    if (warnFlags(n).length) {
       var dot = svgEl("rect", "fx-flagdot");
       dot.setAttribute("width", 8); dot.setAttribute("height", 8);
       dot.setAttribute("y", 6);
@@ -715,10 +720,11 @@ window.__amInitFlux = function () {
     var kspan = document.createElement("span");
     kspan.textContent = (KIND_NAME[n.kind] || n.kind).toUpperCase();
     kindLine.appendChild(kspan);
-    if (n.flags.length) {
+    var wf = warnFlags(n);
+    if (wf.length) {
       var w = document.createElement("span");
       w.className = "fx-warn";
-      w.textContent = "  ·  " + n.flags.join(", ").toUpperCase();
+      w.textContent = "  ·  " + wf.join(", ").toUpperCase();
       kindLine.appendChild(w);
     }
     tip.appendChild(kindLine);
@@ -841,7 +847,7 @@ window.__amInitMetro = function () {
   const END = new Set(['terminal','loop','truncated']);
   function mk(n){
     return {id:SID++, kind:n.kind, label:n.label||'', detail:n.detail||'',
-            flags:n.flags||[], conds:n.conds||[], nexts:[], spawns:[]};
+            ttype:n.ttype||'', flags:n.flags||[], conds:n.conds||[], nexts:[], spawns:[]};
   }
   function makeStation(n){
     const st = mk(n);
@@ -890,7 +896,9 @@ window.__amInitMetro = function () {
 
   /* ================= 2. enumerar linhas (raiz -> folha) ================= */
   const LINES=[];
-  function isRealLoop(s){ return s.kind==='loop' && s.label.indexOf('loop')===0; }
+  /* loop real vs referência "já expandido acima": discriminado pela flag
+     estrutural "ref" emitida em journey.py — nunca pelo texto do label */
+  function isRealLoop(s){ return s.kind==='loop' && s.flags.indexOf('ref')<0; }
   function enumerate(st, path, origin){
     path.push(st);
     if(!st.nexts.length){
@@ -909,7 +917,7 @@ window.__amInitMetro = function () {
         desc,
         hasLoop:stations.some(isRealLoop),
         hasRef:leaf.kind==='loop'&&!isRealLoop(leaf),
-        hasDecay:stations.some(s=>s.kind==='event'&&/decay|estagnar/i.test(s.label)),
+        hasDecay:stations.some(s=>s.kind==='event'&&s.ttype==='opportunity_decay'),
         hasInactive:stations.some(s=>s.flags.indexOf('inactive')>=0),
         hasDraft:stations.some(s=>s.flags.indexOf('draft')>=0),
         hasTrunc:leaf.kind==='truncated',
@@ -1195,6 +1203,7 @@ window.__amInitMetro = function () {
         tc.textContent='['+st.conds.length+' cond]'; t.appendChild(tc);
       }
       for(const f of st.flags){
+        if(f==='ref') continue; // estrutural (glifo tracejado já comunica)
         const tf=document.createElementNS(SVGNS,'tspan');
         tf.setAttribute('class','mt-flag'); tf.setAttribute('dx','8');
         tf.textContent=f==='inactive'?'INATIVO':f.toUpperCase();
@@ -1240,6 +1249,7 @@ window.__amInitMetro = function () {
     if(st.detail){ const d=document.createElement('div'); d.className='mt-d';
       d.textContent=st.detail; tip.appendChild(d); }
     for(const f of st.flags){
+      if(f==='ref') continue; // estrutural ("loop / referência" já diz)
       const fl=document.createElement('span'); fl.className='mt-fl'+(f==='missing'?' mt-red':'');
       fl.textContent=f==='inactive'?'INATIVO':f.toUpperCase(); tip.appendChild(fl);
     }

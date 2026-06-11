@@ -78,6 +78,22 @@ def test_views_lazy_containers(make_dump, tmp_path):
     assert '<div id="view-metro"></div>' in html
 
 
+def test_metro_js_classifies_by_structured_fields_not_labels(make_dump, tmp_path):
+    # review: loop real vs ref e badge DECAY eram parse de string pt-BR do
+    # label (acoplamento oculto com journey.py + falso positivo com tag "decay")
+    a = wf(id="a", name="A", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    out = write_journey_html(data, tmp_path / "j.html", title="T")
+    html = out.read_text(encoding="utf-8")
+    # discriminadores estruturais presentes no JS do metrô
+    assert "s.flags.indexOf('ref')" in html
+    assert "s.ttype==='opportunity_decay'" in html
+    # heurísticas por texto de label banidas
+    assert "label.indexOf('loop')" not in html
+    assert "/decay|estagnar/i" not in html
+
+
 def test_cli_journey_subcommand(make_dump, capsys):
     from automaster_audit.cli import main
     a = wf(id="a", name="A", steps=[step("s1", "sms")],

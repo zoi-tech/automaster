@@ -124,6 +124,9 @@ def test_workflow_cycle_marks_loop_not_infinite(make_dump):
     wf_b = ev_b["children"][0]
     ev_a = wf_b["children"][0]["children"][0]
     assert ev_a["children"][0]["kind"] == "loop"
+    # loop REAL: sem a flag estrutural "ref" (reservada à referência
+    # "já expandido acima" — vistas client-side discriminam por ela)
+    assert "ref" not in ev_a["children"][0]["flags"]
     assert data["stats"]["loops"] >= 1
 
 
@@ -239,6 +242,39 @@ def test_decay_scoped_to_uncreated_pipeline_goes_to_anytime(make_dump):
     decay_evs = [n for n in data["anytime"] if "estagnada" in n["label"]]
     assert len(decay_evs) == 1
     assert decay_evs[0]["children"][0]["label"] == "Decay"
+    # tipo estruturado do trigger no nó-evento (badge DECAY do metrô usa isso)
+    assert decay_evs[0]["ttype"] == "opportunity_decay"
+
+
+def test_event_ttype_is_structured_not_label_text(make_dump):
+    # tag do CRM chamada "decay" embute "decay" no LABEL do evento, mas o tipo
+    # estruturado continua contact_tag — é por ele que as vistas classificam
+    # (regressão: badge DECAY falso no metrô por regex sobre o label)
+    a = wf(id="a", name="A", steps=[step("s1", "add_contact_tag", attrs={"tags": ["decay"]})],
+           triggers=[trig("contact_created", "a")])
+    b = wf(id="b", name="B", steps=[step("s2", "sms")],
+           triggers=[trig("contact_tag", "b", conditions=[tag_cond("decay")], tid="tb")])
+    data = build_journey(load_dump(make_dump(workflows=[a, b], tags=["decay"])))
+    root_ev = data["criacao"][0]
+    assert root_ev["ttype"] == "contact_created"
+    tag_ev = root_ev["children"][0]["children"][0]["children"][0]
+    assert tag_ev["kind"] == "event" and "decay" in tag_ev["label"]
+    assert tag_ev["ttype"] == "contact_tag"
+
+
+def test_anchored_decay_event_carries_ttype(make_dump):
+    # decay ancorado no cria-oportunidade (rótulo fixo) também leva o ttype
+    create = step("s1", "internal_create_opportunity", attrs={"pipelineId": "P1"})
+    a = wf(id="a", name="A", steps=[create], triggers=[trig("contact_created", "a")])
+    d = wf(id="d", name="Decay", steps=[step("s2", "sms")],
+           triggers=[trig("opportunity_decay", "d", tid="t-d")])
+    data = build_journey(load_dump(make_dump(
+        workflows=[a, d], pipelines=[{"id": "P1", "name": "Vendas", "stages": []}])))
+    opp = data["criacao"][0]["children"][0]["children"][0]
+    evs = [c for c in opp["children"] if c["kind"] == "event"]
+    assert len(evs) == 1
+    assert evs[0]["label"] == "se a oportunidade estagnar (decay)"
+    assert evs[0]["ttype"] == "opportunity_decay"
 
 
 def test_unscoped_tag_trigger_goes_to_anytime_when_nothing_adds_tags(make_dump):
@@ -319,6 +355,9 @@ def test_repeated_unscoped_reply_anchor_is_deduplicated(make_dump):
     assert ev1["children"][0]["kind"] == "workflow"   # primeira âncora expande
     assert ev2["children"][0]["kind"] == "loop"        # demais referenciam
     assert "já expandido" in ev2["children"][0]["label"]
+    # discriminador estrutural: referência leva flag "ref" (o metrô NÃO pode
+    # classificar pelo texto do label, que é apresentação pt-BR)
+    assert "ref" in ev2["children"][0]["flags"]
     assert data["truncated"] is False
 
 

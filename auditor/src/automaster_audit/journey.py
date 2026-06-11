@@ -432,11 +432,18 @@ class _Walker:
         flags = [] if t.get("active", True) else ["inactive"]
         conds = [_cond_summary(c) for c in t.get("rest", t.get("conditions") or [])]
         ev = _node("event", label, detail=t.get("name") or "", flags=flags, conds=conds)
+        # discriminador estrutural p/ as vistas client-side (ex.: DECAY no
+        # metrô) — o label embute nomes de tag do CRM, não serve p/ classificar
+        ev["ttype"] = t.get("type") or ""
         tid = t.get("id") or ""
         if anchored is not None and tid and tid in anchored:
             tname = self.ctx.workflow_names.get(t["target"], t["target"])
             if self.budget.take():
-                ev["children"] = [_node("loop", f"já expandido acima → {tname}")]
+                # flag "ref": discriminador estrutural (referência a cascata já
+                # expandida, NÃO loop real) — as vistas client-side dependem
+                # disso; nunca classificar pelo texto do label
+                ev["children"] = [_node("loop", f"já expandido acima → {tname}",
+                                        flags=["ref"])]
             else:
                 ev["children"] = [_node("truncated", _TRUNC_LABEL)]
             return ev
@@ -564,6 +571,7 @@ def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH,
         flags = [] if t["active"] else ["inactive"]
         conds = [_cond_summary(c) for c in t["conditions"]]
         ev = _node("event", "Contato criado", detail=t["name"], flags=flags, conds=conds)
+        ev["ttype"] = t["type"]
         ev["children"] = [walker.workflow_node(t["target"], frozenset(), 1, set())]
         criacao.append(ev)
 
