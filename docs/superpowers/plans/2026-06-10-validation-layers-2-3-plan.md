@@ -7,7 +7,7 @@
 ## Decisões já tomadas
 
 - **Camada 1 — lógica sã (estática):** ✅ entregue (commit `2e59368`). Ver `auditor/src/automaster_audit/flow.py` + regras `unreachable_step`, `broken_goto`, `workflow_call_cycle`, `uncovered_condition`.
-- **Camada 2 — enumeração de caminhos (abordagem A):** lista TODOS os caminhos de execução de cada workflow, com as ações de cada rota e onde termina, usando os rótulos legíveis dos ramos. **Sem avaliar condição** → zero risco semântico. Responde "o que esse workflow faz?" tornando a lógica legível.
+- **Camada 2 — enumeração de caminhos (abordagem A):** ✅ entregue (commits `dd609ba`, `04f6f1f`, `e8e57e4`; plano de execução: `2026-06-10-camada-2-implementation-plan.md`). Lista TODOS os caminhos de execução de cada workflow, com as ações de cada rota e onde termina, usando os rótulos legíveis dos ramos. **Sem avaliar condição** → zero risco semântico. Responde "o que esse workflow faz?" tornando a lógica legível.
 - **Camada 3 — teste de contrato (funde a abordagem B):** usuário declara cenário + resultado esperado; a ferramenta avalia o subconjunto documentado de condições, escolhe o caminho e compara com o esperado. Condições não suportadas → marcar "ambíguo", não falhar silenciosamente.
 - **NÃO fazer:** teste ao vivo no GHL (escreve em produção).
 
