@@ -16,14 +16,17 @@ Docs-chave (leia antes de mudança estrutural):
 Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `dumps/`:
 
 - **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar (página fica aberta durante a extração). Tokens nunca vão para disco. Extrai workflows + 6 entidades: pipelines, tags, custom_fields, **users, calendars, custom_values**.
-- **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 5 saídas na pasta do dump:
+- **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 6 saídas na pasta do dump:
   - `report.md`/`report.json` — auditoria (`automaster-audit audit`)
-  - `graph.html` — grafo interativo de conexões, tema Tron (`automaster-audit graph`)
-  - `dashboard.html` — inventário navegável, tema Tron (`automaster-audit dashboard`)
+  - `graph.html` — grafo interativo de conexões (`automaster-audit graph`)
+  - `dashboard.html` — inventário navegável (`automaster-audit dashboard`)
   - `paths.md` — árvore de caminhos de execução por workflow, camada 2 (`automaster-audit paths`)
-  - `validation.html` — painel visual das 3 camadas de validação, tema Tron (`automaster-audit validation`)
+  - `validation.html` — painel visual das 3 camadas de validação (`automaster-audit validation`)
+  - `journey.html` — árvore de jornada do contato: tudo que pode acontecer desde a criação (`automaster-audit journey`)
 
-Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `theme.py` (CSS Tron + fonte Share Tech Mono embutida em `assets/`).
+  As 4 saídas HTML compartilham o design system **"Sala de Controle"** (IBM Carbon): tema claro `#f4f4f4`/painéis brancos, IBM Plex Sans/Mono embutidas como data-URI, radius zero, shell unificado (topbar escura 48px + sidebar 256px com links relativos entre `dashboard.html`/`graph.html`/`validation.html`/`journey.html`). Acento azul `#0f62fe` só em link/ativo; severidade só em status (`#da1e28`/`#f1c21b`/`#24a148`); vermelho reservado a referência quebrada.
+
+Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`).
 
 **Regras de auditoria (13):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value}_ref` (ERROR); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `naming_convention`/`dead_end_draft` (INFO).
 
@@ -46,7 +49,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit paths dumps/<loc>/<ts>/        # paths.md (árvore de caminhos)
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
-.venv/bin/python -m pytest -q                             # suíte (82 testes)
+.venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
+.venv/bin/python -m pytest -q                             # suíte (100 testes)
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
