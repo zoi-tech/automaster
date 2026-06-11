@@ -224,6 +224,120 @@ def test_manual_tag_trigger_goes_to_anytime(make_dump):
     assert vip["children"][0]["label"] == "VIP"
 
 
+def test_decay_scoped_to_uncreated_pipeline_goes_to_anytime(make_dump):
+    # decay vigia P2, mas os steps só criam em P1 → não pode sumir da árvore
+    pipe_cond = {"operator": "==", "field": "opportunity.pipelineId", "value": "P2",
+                 "title": "In pipeline", "type": "select"}
+    create = step("s1", "internal_create_opportunity", attrs={"pipelineId": "P1"})
+    a = wf(id="a", name="A", steps=[create], triggers=[trig("contact_created", "a")])
+    d = wf(id="d", name="Decay", steps=[step("s2", "sms")],
+           triggers=[trig("opportunity_decay", "d", conditions=[pipe_cond], tid="t-d")])
+    data = build_journey(load_dump(make_dump(
+        workflows=[a, d],
+        pipelines=[{"id": "P1", "name": "Vendas", "stages": []},
+                   {"id": "P2", "name": "Suporte", "stages": []}])))
+    decay_evs = [n for n in data["anytime"] if "estagnada" in n["label"]]
+    assert len(decay_evs) == 1
+    assert decay_evs[0]["children"][0]["label"] == "Decay"
+
+
+def test_unscoped_tag_trigger_goes_to_anytime_when_nothing_adds_tags(make_dump):
+    # trigger contact_tag SEM filtro de tag e nenhum step add_contact_tag no
+    # sistema → único disparo possível é tag manual → anytime (não some)
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
+    v = wf(id="v", name="QualquerTag", steps=[step("s2", "sms")],
+           triggers=[trig("contact_tag", "v", tid="t-v")])
+    data = build_journey(load_dump(make_dump(workflows=[a, v])))
+    evs = [n for n in data["anytime"] if "qualquer tag" in n["label"]]
+    assert len(evs) == 1
+    assert evs[0]["children"][0]["label"] == "QualquerTag"
+
+
+def test_budget_is_per_root_anytime_survives_criacao_exhaustion(make_dump):
+    # cap por raiz (spec): estourar a raiz de criação não pode matar a anytime
+    a = wf(id="a", name="A",
+           steps=[step(f"s{i}", "sms", next=f"s{i+1}" if i < 30 else None,
+                       parent=f"s{i-1}" if i > 0 else None) for i in range(31)],
+           triggers=[trig("contact_created", "a")])
+    b = wf(id="b", name="Aniversário", steps=[step("x1", "sms")],
+           triggers=[trig("birthday_reminder", "b", tid="t-b")])
+    data = build_journey(load_dump(make_dump(workflows=[a, b])), max_nodes=5)
+    assert data["truncated"] is True  # criação estourou
+    bday = next(n for n in data["anytime"] if "nivers" in n["label"])
+    assert bday["children"][0]["kind"] == "workflow"  # anytime inteira, sem inanição
+
+
+def test_budget_counts_every_node_kind(make_dump):
+    # nós branch/terminal/event/loop também consomem budget: o total de nós
+    # (exceto marcadores ✂ e wrapper de neutros) nunca passa do cap por raiz
+    steps = [
+        step("c", "if_else", next=["b1", "b2"],
+             attrs={"branches": [{"id": "b1", "name": "Sim"}, {"id": "b2", "name": "ELSE"}]}),
+        step("b1", "if_else", parent="c", next="x1", attrs={"if": {}}),
+        step("b2", "if_else", parent="c", attrs={"else": True}),
+        step("x1", "sms", parent="b1", next="x2"),
+        step("x2", "sms", parent="x1"),
+    ]
+    a = wf(id="a", name="A", steps=steps, triggers=[trig("contact_created", "a")])
+    cap = 4
+    data = build_journey(load_dump(make_dump(workflows=[a])), max_nodes=cap)
+
+    def count(n):
+        own = 0 if n["kind"] in ("truncated", "neutral_group") else 1
+        return own + sum(count(k) for k in n["children"])
+
+    total = sum(count(ev) - 1 for ev in data["criacao"])  # -1: nó-evento da raiz
+    assert data["truncated"] is True
+    assert total <= cap
+
+
+def test_neutral_step_hitting_cap_emits_truncated_marker(make_dump):
+    # budget esgota num step neutro → marcador ✂ no ponto, nunca drop silencioso
+    a = wf(id="a", name="A",
+           steps=[step("s1", "sms", next="s2"),
+                  step("s2", "wait", parent="s1", next="s3"),
+                  step("s3", "sms", parent="s2")],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])), max_nodes=2)
+    wnode = data["criacao"][0]["children"][0]
+    assert [c["kind"] for c in wnode["children"]] == ["effect", "truncated"]
+
+
+def test_repeated_unscoped_reply_anchor_is_deduplicated(make_dump):
+    # reply sem workflow.id ancora em toda mensagem; a cascata do alvo expande
+    # 1x por árvore de raiz — âncoras seguintes referenciam (corte tipo loop)
+    a = wf(id="a", name="A",
+           steps=[step("s1", "sms", next="s2"), step("s2", "sms", parent="s1")],
+           triggers=[trig("contact_created", "a")])
+    r = wf(id="r", name="Resposta", steps=[step("x1", "sms")],
+           triggers=[trig("customer_reply", "r", tid="t-r")])
+    data = build_journey(load_dump(make_dump(workflows=[a, r])))
+    wnode = data["criacao"][0]["children"][0]
+    msgs = [c for c in wnode["children"] if c["kind"] == "effect"]
+    ev1 = [c for c in msgs[0]["children"] if c["kind"] == "event"][0]
+    ev2 = [c for c in msgs[1]["children"] if c["kind"] == "event"][0]
+    assert ev1["children"][0]["kind"] == "workflow"   # primeira âncora expande
+    assert ev2["children"][0]["kind"] == "loop"        # demais referenciam
+    assert "já expandido" in ev2["children"][0]["label"]
+    assert data["truncated"] is False
+
+
+def test_goto_with_next_and_target_forks_both_paths(make_dump):
+    # goto com next E targetNodeId: os dois sucessores aparecem (camada 2 bifurca)
+    steps = [
+        step("g", "goto", next="s2", attrs={"targetNodeId": "s3"}),
+        step("s2", "sms", name="MsgNext", parent="g"),
+        step("s3", "email", name="MsgGoto", parent="g"),
+    ]
+    a = wf(id="a", name="A", steps=steps, triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    wnode = data["criacao"][0]["children"][0]
+    branches = [c for c in wnode["children"] if c["kind"] == "branch"]
+    assert len(branches) == 2
+    flat = str(wnode)
+    assert "MsgNext" in flat and "MsgGoto" in flat
+
+
 def test_birthday_always_anytime_and_stats(make_dump):
     a = wf(id="a", name="A", steps=[step("s1", "sms")],
            triggers=[trig("contact_created", "a"), trig("birthday_reminder", "a", tid="t-b")])

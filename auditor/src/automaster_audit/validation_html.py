@@ -1,198 +1,220 @@
-"""Renderiza as 3 camadas de validação como HTML auto-contido — linguagem editorial monocromática.
+"""Renderiza as 3 camadas de validação como HTML auto-contido — tema "Sala de Controle" (IBM Carbon).
 
-Tudo renderizado server-side com html.escape (nomes vêm do CRM = input externo);
-colapso via <details> nativo — zero JavaScript, zero requests externos.
-Fontes (Inter variável + Share Tech Mono) embutidas como data-URI a partir de assets/.
+Shell compartilhado (topbar + sidebar) vem de theme.py; tudo renderizado
+server-side com html.escape (nomes vêm do CRM = input externo); colapso via
+<details> nativo — zero JavaScript, zero requests externos.
 """
 from __future__ import annotations
 
 import html as _html
+import re
 from pathlib import Path
 
-_ASSETS = Path(__file__).parent / "assets"
+from .theme import head_assets, shell_meta, sidebar, topbar
 
-_SEV_CLS = {"ERROR": "t-error", "WARN": "t-warn", "INFO": "t-info"}
-_CASE_CLS = {"PASS": "t-pass", "FAIL": "t-fail", "AMBIGUOUS": "t-amb"}
+_SEV_CLS = {"ERROR": "err", "WARN": "warn", "INFO": "info"}
+_CASE_CLS = {"PASS": "pass", "FAIL": "fail", "AMBIGUOUS": "warn"}
 
 
 def _esc(s) -> str:
     return _html.escape("" if s is None else str(s), quote=True)
 
 
-# ---------------------------------------------------------------- fontes ----
-
-def _font_data_uri(asset: str) -> str:
-    b64 = (_ASSETS / asset).read_text(encoding="utf-8").strip().replace("\n", "")
-    return f"data:font/woff2;base64,{b64}"
+_ISO_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})")
+_DUMP_DIR_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})$")
 
 
-def _font_faces() -> str:
-    """@font-face embutidos: Inter variável (100–900) + Share Tech Mono (rótulos técnicos)."""
-    inter = _font_data_uri("inter.woff2.b64")
-    mono = _font_data_uri("share_tech_mono.woff2.b64")
-    return (
-        "@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;"
-        f"font-display:swap;src:url({inter}) format('woff2');}}\n"
-        "@font-face{font-family:'Share Tech Mono';font-style:normal;font-weight:400;"
-        f"font-display:swap;src:url({mono}) format('woff2');}}"
-    )
+def _fmt_extracted(out: Path, fallback) -> str:
+    """Data de extração: nome da pasta do dump (igual ao dashboard) ou ISO do manifest."""
+    m = _DUMP_DIR_RE.match(out.parent.name)
+    if m:
+        return f"{m.group(1)} {m.group(2)}:{m.group(3)}"
+    m = _ISO_RE.match(str(fallback or ""))
+    return f"{m.group(1)} {m.group(2)}:{m.group(3)}" if m else str(fallback or "")
 
 
 # ------------------------------------------------------------------- CSS ----
-# Sem chaves de .format aqui — injetado como valor.
-_CSS = """
-:root{
-  --bg:#060606; --fg:#fff; --mut:rgba(255,255,255,.55); --line:rgba(255,255,255,.12);
-  --ifg:#060606; --imut:rgba(6,6,6,.55); --iline:rgba(6,6,6,.15); --ifaint:rgba(6,6,6,.45);
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{background:var(--bg)}
-body{background:var(--bg);color:var(--fg);
-  font-family:'Inter',"Helvetica Neue",Arial,sans-serif;
-  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.mono{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:11px;
-  text-transform:uppercase;letter-spacing:.08em}
-section{padding:96px 40px}
-.inner{max-width:1180px;margin:0 auto}
-/* topo */
-header{border-bottom:1px solid var(--line)}
-.topbar{max-width:1180px;margin:0 auto;padding:20px 40px;
-  display:flex;justify-content:space-between;align-items:baseline;gap:16px}
-.wordmark{font-size:14px;font-weight:600}
-.topmeta{color:var(--mut)}
-/* hero */
-.hero h1{font-size:clamp(56px,9vw,100px);font-weight:400;letter-spacing:-.03em;line-height:.98}
-.hero h1 span{display:block}
-.lede{max-width:520px;margin-top:28px;color:var(--mut)}
-/* faixa de stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;
-  border-top:1px solid var(--line);padding-top:40px}
-.num{font-size:72px;font-weight:400;letter-spacing:-.02em;line-height:1.1}
-.cap{color:var(--mut);margin-top:8px}
-/* seções */
-section.light{background:#fff;color:var(--ifg)}
-.label{padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:56px;color:var(--mut)}
-section.light .label{border-color:var(--iline);color:var(--imut)}
-h2{font-size:60px;font-weight:400;letter-spacing:-.03em;line-height:1.05;margin-bottom:48px}
-/* tags */
-.tag{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;
-  letter-spacing:.1em;padding:4px 10px;display:inline-block;justify-self:start}
-.t-error,.t-pass{background:#060606;color:#fff}
-.t-warn,.t-fail{border:1px solid #060606;color:#060606;background:transparent}
-.t-info,.t-amb{color:var(--ifaint)}
-/* camada 1 — achados */
-.frow{display:grid;grid-template-columns:110px 220px 260px 1fr;gap:24px;align-items:baseline;
-  padding:18px 0;border-top:1px solid var(--iline)}
-.flist{border-bottom:1px solid var(--iline)}
-.frow .rule{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:12px}
-.frow .wfn{font-size:15px}
-.frow .det{font-size:13px;color:var(--imut)}
-.row-none{padding:18px 0;border-top:1px solid var(--iline);border-bottom:1px solid var(--iline);
-  font-size:13px;color:var(--imut)}
-section.dark .row-none{border-color:var(--line);color:var(--mut)}
-/* camada 2 — workflows */
-details.wf{border-top:1px solid var(--line)}
-.wflist{border-bottom:1px solid var(--line)}
-details.wf summary{display:flex;align-items:center;gap:18px;padding:22px 0;cursor:pointer;list-style:none}
+# Complementos da página sobre o tema Carbon. Sem chaves de .format aqui —
+# injetado como VALOR no template (padrão do projeto).
+_PAGE_CSS = """
+/* ===== tiles-resumo das 3 camadas ===== */
+.triage.val3{grid-template-columns:repeat(3,1fr)}
+a.ttile,a.ttile:hover{color:inherit;text-decoration:none}
+.ttile .tk{font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+/* mini-barra de distribuição por severidade + swatches (como no demo) */
+.vbar{display:flex;height:8px;background:var(--gray-tint);margin:10px 0 8px;overflow:hidden}
+.vbar i{display:block;height:100%}
+.vstats{display:flex;gap:14px;font-size:12px;color:var(--ink-2);flex-wrap:wrap}
+.vstats b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.vstats .sq{display:inline-block;width:8px;height:8px;margin-right:5px}
+/* ===== cabeçalho de seção (16px 600 + régua, label numerado em mono) ===== */
+.vsec{margin-top:40px}
+.vsec-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.vsec h2{font-size:16px;font-weight:600;letter-spacing:0;padding-bottom:8px;
+  margin-bottom:16px;border-bottom:1px solid var(--border)}
+.vsec thead th{cursor:default}
+.vsec thead th:hover{background:var(--border)}
+td.fdet{color:var(--ink-2);font-size:12.5px;white-space:normal}
+/* ===== camada 2: lista de workflows com <details> nativo ===== */
+.wflist{background:var(--panel);border:1px solid var(--border)}
+details.wf+details.wf{border-top:1px solid var(--border)}
+details.wf summary{display:flex;align-items:center;gap:12px;padding:10px 16px;
+  cursor:pointer;list-style:none;color:var(--ink);font-family:var(--sans);font-size:13px}
 details.wf summary::-webkit-details-marker{display:none}
-.wfname{font-size:18px;font-weight:600;flex:1 1 auto;min-width:0}
-.wfmeta{display:flex;align-items:center;gap:14px;flex:0 0 auto}
-.wfmeta .mono{color:var(--mut)}
-.stag{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;
-  letter-spacing:.1em;padding:4px 10px}
-.stag.pub{border:1px solid #fff;color:#fff}
-.stag.drf{color:var(--mut)}
-.plus{width:20px;text-align:center;font-size:20px;font-weight:400;color:var(--mut)}
-.plus::before{content:"+"}
-details[open] .plus::before{content:"\\2212"}
-.tree{padding:2px 0 28px}
-.tree ul{list-style:none;padding-left:20px;border-left:1px solid var(--line)}
+details.wf summary:hover{background:var(--gray-tint);color:var(--ink)}
+details.wf[open]>summary{background:var(--bg);border-bottom:1px solid var(--border)}
+.wf-name{font-weight:500;flex:1 1 auto;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.wf-n{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
+.wf-caret{font-family:var(--mono);font-size:13px;color:var(--ink-3);
+  width:14px;text-align:center;flex:none}
+.wf-caret::before{content:"+"}
+details[open] .wf-caret::before{content:"\\2212"}
+/* árvore: indentação por hairline vertical */
+.tree{padding:12px 16px 16px}
+.tree ul{list-style:none;padding-left:18px;border-left:1px solid var(--border)}
 .tree>ul{padding-left:0;border-left:none}
-.tree li{padding:4px 0;font-size:13px;color:var(--mut)}
-.tree .bl{color:#fff;font-weight:600}
-.term{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em}
-/* camada 3 — contratos */
-.crow{display:grid;grid-template-columns:110px 280px 220px 1fr;gap:24px;align-items:baseline;
-  padding:18px 0;border-top:1px solid var(--iline)}
-.clist{border-bottom:1px solid var(--iline)}
-.crow .cname{font-size:15px}
-.crow .cwf{font-family:'Share Tech Mono',ui-monospace,monospace;font-size:12px}
-.crow .cmot{font-size:13px;color:var(--imut)}
-/* rodapé */
-footer{border-top:1px solid var(--line);padding:96px 0 32px;overflow:hidden}
-.giant{font-size:17.4vw;font-weight:600;letter-spacing:-.04em;line-height:.9;color:#fff;
-  white-space:nowrap;padding:0;margin-left:-.04em}
-.footline{color:var(--mut);max-width:1180px;margin:0 auto;padding:28px 40px 0}
-@media(max-width:760px){
-  .frow,.crow,.stats{grid-template-columns:1fr;gap:8px}
-  section{padding:64px 24px}
-}
+.tree li{padding:3px 0;font-size:12.5px;color:var(--ink-2);line-height:1.45}
+.tree .bl{color:var(--ink);font-weight:600}
+.term{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.term.loop{color:var(--amber-ink);background:var(--amber-tint);padding:0 4px}
+/* tags complementares (INFO cinza informativo) */
+.tag.info{background:var(--gray-tint);color:var(--gray-ink)}
+@media(max-width:900px){.triage.val3{grid-template-columns:1fr}}
 """
 
 _TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AUTOMASTER // VALIDAÇÃO {title}</title>
-<style>{fonts}
-{css}</style>
+{head_assets}
+<style>{page_css}</style>
 </head><body>
-<header><div class="topbar">
-  <span class="wordmark">automaster</span>
-  <span class="topmeta mono">{loc} · {extracted} · {n_wf} workflows</span>
-</div></header>
-<section class="hero dark"><div class="inner">
-  <h1><span>Validação</span><span>3 camadas</span></h1>
-  <p class="lede">Auditoria estática, enumeração de caminhos e teste de contrato sobre o dump {loc}.</p>
-</div></section>
-<section class="dark"><div class="inner"><div class="stats">{stats}</div></div></section>
+{topbar}
+{sidebar}
+<main class="main">
+<div class="crumb">{loc} / <b>Validação</b></div>
+<h1>Validação</h1>
+<div class="h1-sub">3 camadas · {n_wf} workflows · extração {extracted}</div>
+<div class="sec-label">Resumo · 3 camadas de validação</div>
+<div class="triage val3">{tiles}</div>
 {sec1}
 {sec2}
 {sec3}
-<footer>
-  <div class="giant">automaster</div>
-  <div class="footline mono">automaster-audit validation · {extracted}</div>
-</footer>
+</main>
 </body></html>"""
 
 
-# ----------------------------------------------------------------- stats ----
+# ----------------------------------------------------------------- tiles ----
 
-def _stat(num, caption: str) -> str:
-    return (f'<div class="stat"><div class="num">{_esc(num)}</div>'
-            f'<div class="cap mono">{_esc(caption)}</div></div>')
+_GRAY_SEG = "#a8a8a8"  # segmento INFO (cinza informativo, como no demo)
 
 
-def _stats(data: dict) -> str:
+def _bar(segs: list[tuple[int, str]], empty: str = "var(--green)") -> str:
+    """Mini-barra horizontal de 8px com segmentos proporcionais por severidade."""
+    total = sum(n for n, _ in segs)
+    if total <= 0:
+        return f'<div class="vbar"><i style="width:100%;background:{empty}"></i></div>'
+    parts = "".join(
+        f'<i style="width:{n / total * 100:.1f}%;background:{color}"></i>'
+        for n, color in segs if n > 0
+    )
+    return f'<div class="vbar">{parts}</div>'
+
+
+def _stats(items: list[tuple[str | None, object, str]]) -> str:
+    """Linha de estatísticas com swatch de 8px antes de cada contagem."""
+    spans = []
+    for color, num, label in items:
+        sq = f'<span class="sq" style="background:{color}"></span>' if color else ""
+        spans.append(f"<span>{sq}<b>{_esc(num)}</b> {_esc(label)}</span>")
+    return f'<div class="vstats">{"".join(spans)}</div>'
+
+
+def _tile(href: str, kicker: str, num, label: str, body: str, sev: str) -> str:
+    cls = f"ttile {sev}".strip()
+    return (
+        f'<a class="{cls}" href="{href}">'
+        f'<div class="tk">{_esc(kicker)}</div>'
+        f'<div class="n">{_esc(num)}</div>'
+        f'<div class="lbl">{_esc(label)}</div>'
+        f'<div class="det">{body}</div>'
+        f'<div class="go">ver →</div></a>'
+    )
+
+
+def _tiles(data: dict) -> str:
     c1, c2, c3 = data["camada1"]["counts"], data["camada2"], data["camada3"]
-    s1 = _stat(c1["ERROR"], f"ERROS · {c1['WARN']} WARN · {c1['INFO']} INFO")
-    s2 = _stat(c2["total_paths"],
-               f"CAMINHOS · {len(c2['workflows'])} WORKFLOWS · {c2['truncated']} TRUNCADOS")
+    sev1 = "sev-err" if c1["ERROR"] else ("sev-warn" if c1["WARN"] else "sev-ok")
+    body1 = _bar([(c1["ERROR"], "var(--red)"), (c1["WARN"], "var(--amber)"),
+                  (c1["INFO"], _GRAY_SEG)]) + _stats([
+        ("var(--red)", c1["ERROR"], "ERROR"),
+        ("var(--amber)", c1["WARN"], "WARN"),
+        (_GRAY_SEG, c1["INFO"], "INFO"),
+    ])
+    t1 = _tile("#camada1", "Camada 1", sum(c1.values()), "Auditoria estática", body1, sev1)
+
+    sev2 = "sev-warn" if c2["truncated"] else "sev-ok"
+    n_wf2 = len(c2["workflows"])
+    stats2 = [(None, c2["total_paths"], "caminhos mapeados"), (None, n_wf2, "workflows")]
+    if c2["truncated"]:
+        stats2.append(("var(--amber)", c2["truncated"], "truncados"))
+    body2 = _bar([(c2["truncated"], "var(--amber)"),
+                  (max(n_wf2 - c2["truncated"], 0), "var(--green)")]) + _stats(stats2)
+    t2 = _tile("#camada2", "Camada 2", c2["total_paths"], "Caminhos de execução", body2, sev2)
+
     if c3.get("disponivel"):
         n3 = c3["counts"]
-        s3 = _stat(n3["PASS"], f"CONTRATOS PASS · {n3['FAIL']} FAIL · {n3['AMBIGUOUS']} AMBIGUOUS")
+        sev3 = "sev-err" if n3["FAIL"] else ("sev-warn" if n3["AMBIGUOUS"] else "sev-ok")
+        body3 = _bar([(n3["FAIL"], "var(--red)"), (n3["AMBIGUOUS"], "var(--amber)"),
+                      (n3["PASS"], "var(--green)")]) + _stats([
+            ("var(--green)", n3["PASS"], "PASS"),
+            ("var(--red)", n3["FAIL"], "FAIL"),
+            ("var(--amber)", n3["AMBIGUOUS"], "AMBIGUOUS"),
+        ])
+        t3 = _tile("#camada3", "Camada 3", sum(n3.values()), "Testes de contrato", body3, sev3)
     else:
-        s3 = _stat("—", "SEM CONTRATOS")
-    return s1 + s2 + s3
+        t3 = _tile("#camada3", "Camada 3", "—", "Testes de contrato",
+                   _esc("nenhum contrato disponível"), "")
+    return t1 + t2 + t3
+
+
+# ---------------------------------------------------------------- seções ----
+
+def _section(num: str, anchor: str, label: str, title: str, body: str) -> str:
+    return (
+        f'<section class="vsec" id="{anchor}">'
+        f'<div class="vsec-label">{num} / {label}</div>'
+        f"<h2>{_esc(title)}</h2>{body}</section>"
+    )
 
 
 # -------------------------------------------------------------- camada 1 ----
 
 def _sec_camada1(c1: dict) -> str:
     if not c1["achados"]:
-        body = '<div class="row-none">nenhum achado</div>'
+        body = '<div class="tbl-card"><div class="empty">nenhum achado</div></div>'
     else:
         rows = "".join(
-            f'<div class="frow">'
-            f'<span class="tag {_SEV_CLS.get(a["severity"], "t-info")}">{_esc(a["severity"])}</span>'
-            f'<span class="rule">{_esc(a["rule"])}</span>'
-            f'<span class="wfn">{_esc(a["workflow_name"]) or "—"}</span>'
-            f'<span class="det">{_esc(a["detail"])}</span></div>'
+            "<tr>"
+            f'<td><span class="tag {_SEV_CLS.get(a["severity"], "info")}">{_esc(a["severity"])}</span></td>'
+            f'<td class="cell-mono">{_esc(a["rule"])}</td>'
+            f'<td>{_esc(a["workflow_name"]) or "—"}</td>'
+            f'<td class="fdet">{_esc(a["detail"])}</td>'
+            "</tr>"
             for a in c1["achados"]
         )
-        body = f'<div class="flist">{rows}</div>'
-    return ('<section class="light"><div class="inner">'
-            '<div class="label mono">// CAMADA 1 — AUDITORIA ESTÁTICA</div>'
-            f'<h2>Achados</h2>{body}</div></section>')
+        body = (
+            '<div class="tbl-card"><div class="tbl-wrap"><table>'
+            '<thead><tr><th style="width:110px">Severidade</th>'
+            '<th style="width:240px">Regra</th><th style="width:280px">Workflow</th>'
+            "<th>Detalhe</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></div></div>"
+        )
+    return _section("01", "camada1", "CAMADA 1 — AUDITORIA ESTÁTICA",
+                    "Auditoria estática", body)
 
 
 # -------------------------------------------------------------- camada 2 ----
@@ -220,7 +242,9 @@ def _leaf_html(text: str) -> str:
     head, term = _split_terminal(text)
     if not term:
         return _esc(text)
-    span = f'<span class="term">{_esc(_term_display(term))}</span>'
+    disp = _term_display(term)
+    cls = "term loop" if disp.startswith("loop") else "term"
+    span = f'<span class="{cls}">{_esc(disp)}</span>'
     return f"{_esc(head)} {span}" if head else span
 
 
@@ -239,25 +263,23 @@ def _sec_camada2(c2: dict) -> str:
     parts: list[str] = []
     for w in c2["workflows"]:
         status = str(w["status"] or "")
-        scls = "pub" if status.lower() == "published" else "drf"
+        scls = "pub" if status.lower() == "published" else "draft"
         n = w["n_paths"]
-        meta = [f'<span class="mono">{n} caminho{"" if n == 1 else "s"}</span>',
-                f'<span class="stag {scls}">{_esc(status.upper())}</span>']
+        meta = [f'<span class="wf-n">{n} caminho{"" if n == 1 else "s"}</span>']
         if w["truncated"]:
-            meta.append('<span class="mono">⚠ truncado</span>')
-        tree = _tree_html(w["tree"]) or '<div class="mono" style="color:var(--mut)">sem steps</div>'
+            meta.append('<span class="tag warn">truncado</span>')
+        meta.append(f'<span class="tag {scls}">{_esc(status.upper()) or "—"}</span>')
+        tree = _tree_html(w["tree"]) or '<span class="muted mono">sem steps</span>'
         parts.append(
             f'<details class="wf"><summary>'
-            f'<span class="wfname">{_esc(w["name"])}</span>'
-            f'<span class="wfmeta">{"".join(meta)}</span>'
-            f'<span class="plus"></span>'
+            f'<span class="wf-name">{_esc(w["name"])}</span>'
+            f'{"".join(meta)}<span class="wf-caret"></span>'
             f'</summary><div class="tree">{tree}</div></details>'
         )
     body = (f'<div class="wflist">{"".join(parts)}</div>' if parts
-            else '<div class="row-none">nenhum workflow no dump</div>')
-    return ('<section class="dark"><div class="inner">'
-            '<div class="label mono">// CAMADA 2 — CAMINHOS DE EXECUÇÃO</div>'
-            f'<h2>O que cada workflow faz</h2>{body}</div></section>')
+            else '<div class="tbl-card"><div class="empty">nenhum workflow no dump</div></div>')
+    return _section("02", "camada2", "CAMADA 2 — CAMINHOS DE EXECUÇÃO",
+                    "Caminhos de execução", body)
 
 
 # -------------------------------------------------------------- camada 3 ----
@@ -265,22 +287,28 @@ def _sec_camada2(c2: dict) -> str:
 def _sec_camada3(c3: dict) -> str:
     if not c3.get("disponivel"):
         motivo = f' ({_esc(c3["erro"])})' if c3.get("erro") else ""
-        body = f'<div class="row-none">nenhum contrato disponível{motivo}</div>'
+        body = f'<div class="tbl-card"><div class="empty">nenhum contrato disponível{motivo}</div></div>'
     elif not c3["casos"]:
-        body = '<div class="row-none">nenhum caso declarado</div>'
+        body = '<div class="tbl-card"><div class="empty">nenhum caso declarado</div></div>'
     else:
         rows = "".join(
-            f'<div class="crow">'
-            f'<span class="tag {_CASE_CLS.get(c["status"], "t-amb")}">{_esc(c["status"])}</span>'
-            f'<span class="cname">{_esc(c["caso"])}</span>'
-            f'<span class="cwf">{_esc(c["workflow"])}</span>'
-            f'<span class="cmot">{_esc(c["motivo"])}</span></div>'
+            "<tr>"
+            f'<td><span class="tag {_CASE_CLS.get(c["status"], "warn")}">{_esc(c["status"])}</span></td>'
+            f'<td>{_esc(c["caso"])}</td>'
+            f'<td class="cell-mono">{_esc(c["workflow"])}</td>'
+            f'<td class="fdet">{_esc(c["motivo"])}</td>'
+            "</tr>"
             for c in c3["casos"]
         )
-        body = f'<div class="clist">{rows}</div>'
-    return ('<section class="light"><div class="inner">'
-            '<div class="label mono">// CAMADA 3 — TESTE DE CONTRATO</div>'
-            f'<h2>Contratos</h2>{body}</div></section>')
+        body = (
+            '<div class="tbl-card"><div class="tbl-wrap"><table>'
+            '<thead><tr><th style="width:110px">Status</th>'
+            '<th style="width:300px">Caso</th><th style="width:240px">Workflow</th>'
+            "<th>Motivo</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></div></div>"
+        )
+    return _section("03", "camada3", "CAMADA 3 — TESTE DE CONTRATO",
+                    "Contratos", body)
 
 
 # ------------------------------------------------------------------ main ----
@@ -288,14 +316,19 @@ def _sec_camada3(c3: dict) -> str:
 def write_validation_html(data: dict, out: Path, title: str = "") -> Path:
     out = Path(out)
     meta = data["meta"]
+    loc = str(meta.get("locationId") or title or "dump")
+    extracted = _fmt_extracted(out, meta.get("extractedAt"))
+    shell = shell_meta(out.parent)  # mesmos contadores da sidebar do dashboard
     html = _TEMPLATE.format(
-        title=_esc(title or meta.get("locationId") or "dump"),
-        fonts=_font_faces(),
-        css=_CSS,
-        loc=_esc(meta.get("locationId")),
-        extracted=_esc(meta.get("extractedAt")),
+        title=_esc(title or loc),
+        head_assets=head_assets(),
+        page_css=_PAGE_CSS,
+        topbar=topbar(loc, extracted, schema=shell["schema"]),
+        sidebar=sidebar("validation", counts=shell["counts"]),
+        loc=_esc(loc),
         n_wf=meta.get("n_workflows", 0),
-        stats=_stats(data),
+        extracted=_esc(extracted),
+        tiles=_tiles(data),
         sec1=_sec_camada1(data["camada1"]),
         sec2=_sec_camada2(data["camada2"]),
         sec3=_sec_camada3(data["camada3"]),
