@@ -1,5 +1,5 @@
 """Testes do motor da árvore de jornada do contato."""
-from automaster_audit.journey import TriggerIndex
+from automaster_audit.journey import TriggerIndex, build_journey
 from automaster_audit.loader import load_dump
 from conftest import wf
 
@@ -50,3 +50,50 @@ def test_unknown_trigger_type_counted_not_crashed(make_dump):
     path = make_dump(workflows=[wf(id="a", triggers=[t])])
     idx = TriggerIndex(load_dump(path))
     assert idx.ignored.get("form_submitted") == 1
+
+
+def step(id, type="sms", name=None, next=None, parent=None, attrs=None):
+    s = {"id": id, "type": type, "name": name or id, "attributes": attrs or {}}
+    if next is not None:
+        s["next"] = next
+    if parent is not None:
+        s["parent"] = parent
+    return s
+
+
+def test_contact_created_cascade_with_effects_and_neutrals(make_dump):
+    steps = [
+        step("s1", "add_contact_tag", next="s2", attrs={"tags": ["quente"]}),
+        step("s2", "wait", next="s3", parent="s1"),
+        step("s3", "wait", next="s4", parent="s2"),
+        step("s4", "sms", parent="s3"),  # sem next = terminal
+    ]
+    w = wf(id="a", name="Boas-vindas", steps=steps,
+           triggers=[trig("contact_created", "a", name="Contato criado")])
+    data = build_journey(load_dump(make_dump(workflows=[w])))
+    assert len(data["criacao"]) == 1
+    ev = data["criacao"][0]
+    assert ev["kind"] == "event"
+    wnode = ev["children"][0]
+    assert wnode["kind"] == "workflow" and wnode["label"] == "Boas-vindas"
+    kinds = [c["kind"] for c in wnode["children"]]
+    # TAG+ , "+2 steps neutros", MSG, [fim]
+    assert kinds == ["effect", "neutral_group", "effect", "terminal"]
+    assert wnode["children"][1]["label"] == "+2 steps neutros"
+    assert len(wnode["children"][1]["children"]) == 2
+
+
+def test_branch_container_forks_with_labels(make_dump):
+    steps = [
+        step("c", "if_else", next=["b1", "b2"],
+             attrs={"branches": [{"id": "b1", "name": "Respondeu"}, {"id": "b2", "name": "ELSE"}]}),
+        step("b1", "if_else", parent="c", next="x1", attrs={"if": {}}),
+        step("b2", "if_else", parent="c", attrs={"else": True}),  # ramo vazio → sai
+        step("x1", "sms", parent="b1"),
+    ]
+    w = wf(id="a", steps=steps, triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[w])))
+    wnode = data["criacao"][0]["children"][0]
+    branches = [c for c in wnode["children"] if c["kind"] == "branch"]
+    assert [b["label"] for b in branches] == ["Respondeu", "ELSE"]
+    assert branches[1]["children"][0]["kind"] == "terminal"
