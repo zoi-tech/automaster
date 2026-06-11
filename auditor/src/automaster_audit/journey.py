@@ -291,8 +291,26 @@ class _Walker:
         return out
 
     def _events_for_effect(self, s: dict, w, wf_stack: frozenset, depth: int) -> list[dict]:
-        """Eventos externos ancorados neste efeito (Tasks 3-4 preenchem)."""
-        return []
+        """Eventos externos ancorados neste efeito (regra de ancoragem da spec)."""
+        out: list[dict] = []
+        stype = s.get("type")
+        a = s.get("attributes") or {}
+
+        if stype == "add_contact_tag":
+            for tag in a.get("tags") or []:
+                for t in self.idx.for_tag(tag):
+                    out.append(self._event_node(
+                        f"tag “{tag}” adicionada dispara", t, wf_stack, depth))
+        return out
+
+    def _event_node(self, label: str, t: dict, wf_stack: frozenset, depth: int) -> dict:
+        """Nó de evento → workflow alvo do trigger. Conds restantes viram chips."""
+        self.stats["eventos_externos"] += 1
+        flags = [] if t.get("active", True) else ["inactive"]
+        conds = [_cond_summary(c) for c in t.get("rest", t.get("conditions") or [])]
+        ev = _node("event", label, detail=t.get("name") or "", flags=flags, conds=conds)
+        ev["children"] = [self.workflow_node(t["target"], wf_stack, depth + 1)]
+        return ev
 
 
 def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH,

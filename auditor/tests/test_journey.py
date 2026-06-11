@@ -97,3 +97,51 @@ def test_branch_container_forks_with_labels(make_dump):
     branches = [c for c in wnode["children"] if c["kind"] == "branch"]
     assert [b["label"] for b in branches] == ["Respondeu", "ELSE"]
     assert branches[1]["children"][0]["kind"] == "terminal"
+
+
+def test_tag_added_cascades_into_triggered_workflow(make_dump):
+    a = wf(id="a", name="A", steps=[step("s1", "add_contact_tag", attrs={"tags": ["quente"]})],
+           triggers=[trig("contact_created", "a")])
+    b = wf(id="b", name="B", steps=[step("s2", "sms")],
+           triggers=[trig("contact_tag", "b", conditions=[tag_cond("quente")], tid="tb")])
+    data = build_journey(load_dump(make_dump(workflows=[a, b], tags=["quente"])))
+    eff = data["criacao"][0]["children"][0]["children"][0]
+    assert eff["kind"] == "effect" and eff["label"] == "adiciona tag"
+    ev = eff["children"][0]
+    assert ev["kind"] == "event" and "quente" in ev["label"]
+    assert ev["children"][0]["label"] == "B"
+
+
+def test_workflow_cycle_marks_loop_not_infinite(make_dump):
+    a = wf(id="a", name="A", steps=[step("s1", "add_contact_tag", attrs={"tags": ["t1"]})],
+           triggers=[trig("contact_created", "a"),
+                     trig("contact_tag", "a", conditions=[tag_cond("t2")], tid="ta2")])
+    b = wf(id="b", name="B", steps=[step("s2", "add_contact_tag", attrs={"tags": ["t2"]})],
+           triggers=[trig("contact_tag", "b", conditions=[tag_cond("t1")], tid="tb")])
+    data = build_journey(load_dump(make_dump(workflows=[a, b], tags=["t1", "t2"])))
+    # A → tag t1 → B → tag t2 → A (loop)
+    ev_b = data["criacao"][0]["children"][0]["children"][0]["children"][0]
+    wf_b = ev_b["children"][0]
+    ev_a = wf_b["children"][0]["children"][0]
+    assert ev_a["children"][0]["kind"] == "loop"
+    assert data["stats"]["loops"] >= 1
+
+
+def test_node_cap_produces_truncated_flag(make_dump):
+    a = wf(id="a", name="A",
+           steps=[step(f"s{i}", "sms", next=f"s{i+1}" if i < 30 else None,
+                       parent=f"s{i-1}" if i > 0 else None) for i in range(31)],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])), max_nodes=5)
+    assert data["truncated"] is True
+    flat = str(data)
+    assert "truncated" in flat and "✂" in flat
+
+
+def test_inactive_trigger_and_draft_workflow_flagged(make_dump):
+    a = wf(id="a", name="A", status="draft", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a", active=False)])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    ev = data["criacao"][0]
+    assert "inactive" in ev["flags"]
+    assert "draft" in ev["children"][0]["flags"]
