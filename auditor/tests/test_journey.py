@@ -145,3 +145,68 @@ def test_inactive_trigger_and_draft_workflow_flagged(make_dump):
     ev = data["criacao"][0]
     assert "inactive" in ev["flags"]
     assert "draft" in ev["children"][0]["flags"]
+
+
+def wf_id_cond(wf_id):
+    return {"operator": "==", "field": "workflow.id", "value": wf_id,
+            "title": "In Workflow", "type": "select"}
+
+
+def test_reply_anchors_only_in_scoped_workflow(make_dump):
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
+    b = wf(id="b", name="B", steps=[step("s2", "sms")], triggers=[])
+    r = wf(id="r", name="Resposta", steps=[step("s3", "sms")],
+           triggers=[trig("customer_reply", "r", conditions=[wf_id_cond("a")], tid="tr-r")])
+    data = build_journey(load_dump(make_dump(workflows=[a, b, r])))
+    wf_a = data["criacao"][0]["children"][0]
+    msg = wf_a["children"][0]
+    assert msg["label"].startswith("mensagem")
+    reply_ev = [c for c in msg["children"] if c["kind"] == "event"]
+    assert len(reply_ev) == 1 and "se responder" in reply_ev[0]["label"]
+    assert reply_ev[0]["children"][0]["label"] == "Resposta"
+
+
+def test_reply_with_message_condition_becomes_chip(make_dump):
+    cond = {"operator": "string-contains-any-of", "field": "message.body",
+            "value": ["oi"], "title": "Contains phrase", "type": "string"}
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
+    r = wf(id="r", name="R", steps=[step("s2", "sms")],
+           triggers=[trig("customer_reply", "r", conditions=[cond], tid="tr-r")])
+    data = build_journey(load_dump(make_dump(workflows=[a, r])))
+    msg = data["criacao"][0]["children"][0]["children"][0]
+    ev = [c for c in msg["children"] if c["kind"] == "event"][0]
+    assert any("Contains phrase" in c for c in ev["conds"])
+
+
+def test_opportunity_created_anchors_by_pipeline(make_dump):
+    pipe_cond = {"operator": "==", "field": "opportunity.pipelineId", "value": "P1",
+                 "title": "In pipeline", "type": "select"}
+    create = step("s1", "internal_create_opportunity",
+                  attrs={"pipelineId": "P1",
+                         "__customInputFields__": [{"filterField": "pipelineStageId", "value": "S1"}]})
+    a = wf(id="a", name="A", steps=[create], triggers=[trig("contact_created", "a")])
+    o = wf(id="o", name="Opp", steps=[step("s2", "sms")],
+           triggers=[trig("opportunity_created", "o", conditions=[pipe_cond], tid="t-o")])
+    other = wf(id="x", name="Outro", steps=[step("s3", "sms")],
+               triggers=[trig("opportunity_created", "x",
+                              conditions=[{**pipe_cond, "value": "P2"}], tid="t-x")])
+    data = build_journey(load_dump(make_dump(
+        workflows=[a, o, other],
+        pipelines=[{"id": "P1", "name": "Vendas", "stages": [{"id": "S1", "name": "Novo"}]}])))
+    opp = data["criacao"][0]["children"][0]["children"][0]
+    assert opp["label"] == "cria oportunidade"
+    evs = [c for c in opp["children"] if c["kind"] == "event"]
+    assert len(evs) == 1 and evs[0]["children"][0]["label"] == "Opp"
+
+
+def test_call_disposition_becomes_event_label(make_dump):
+    disp = {"operator": "contains-any", "field": "custom_disposition",
+            "value": ["Desqualificado"], "title": "Custom Disposition", "type": "multiselect"}
+    a = wf(id="a", name="A", steps=[step("s1", "manual-call")],
+           triggers=[trig("contact_created", "a")])
+    c = wf(id="c", name="PosCall", steps=[step("s2", "sms")],
+           triggers=[trig("call_status", "c", conditions=[wf_id_cond("a"), disp], tid="t-c")])
+    data = build_journey(load_dump(make_dump(workflows=[a, c])))
+    call = data["criacao"][0]["children"][0]["children"][0]
+    evs = [x for x in call["children"] if x["kind"] == "event"]
+    assert len(evs) == 1 and "Desqualificado" in evs[0]["label"]

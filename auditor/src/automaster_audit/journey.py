@@ -100,6 +100,46 @@ class TriggerIndex:
                 out.append({**t, "rest": others})
         return out
 
+    def _scoped(self, ttype: str, wf_id: str, scope_field: str) -> list[dict]:
+        """Triggers do tipo, restritos por condição scope_field==wf_id quando presente."""
+        out = []
+        for t in self.of_type(ttype):
+            scope = [c for c in t["conditions"] if _cond_field(c) == scope_field]
+            others = [c for c in t["conditions"] if _cond_field(c) != scope_field]
+            if scope and not any(str(c.get("value")) == wf_id for c in scope):
+                continue
+            out.append({**t, "rest": others})
+        return out
+
+    def for_reply(self, wf_id: str) -> list[dict]:
+        return self._scoped("customer_reply", wf_id, "workflow.id")
+
+    def for_call(self, wf_id: str) -> list[dict]:
+        return self._scoped("call_status", wf_id, "workflow.id")
+
+    def for_opportunity_created(self, pipeline_id: str) -> list[dict]:
+        out = []
+        for t in self.of_type("opportunity_created"):
+            pconds = [c for c in t["conditions"] if _cond_field(c) == "opportunity.pipelineId"]
+            others = [c for c in t["conditions"] if _cond_field(c) != "opportunity.pipelineId"]
+            if pconds and not any(str(c.get("value")) == pipeline_id for c in pconds):
+                continue
+            out.append({**t, "rest": others})
+        return out
+
+    def for_decay(self, pipeline_id: str) -> list[dict]:
+        out = []
+        for t in self.of_type("opportunity_decay"):
+            pconds = [c for c in t["conditions"] if "pipeline" in _cond_field(c).lower()]
+            others = [c for c in t["conditions"] if "pipeline" not in _cond_field(c).lower()]
+            if pconds and not any(str(c.get("value")) == pipeline_id for c in pconds):
+                continue
+            out.append({**t, "rest": others})
+        return out
+
+    def for_field_change(self) -> list[dict]:
+        return [{**t, "rest": t["conditions"]} for t in self.of_type("contact_changed")]
+
 
 # rótulos por tipo de efeito (prefixo mono fica no HTML; aqui só semântica)
 def _effect_label(ctx: DumpContext, s: dict) -> tuple[str, str]:
@@ -301,6 +341,36 @@ class _Walker:
                 for t in self.idx.for_tag(tag):
                     out.append(self._event_node(
                         f"tag “{tag}” adicionada dispara", t, wf_stack, depth))
+
+        elif stype in MESSAGE_TYPES:
+            for t in self.idx.for_reply(w.id):
+                out.append(self._event_node("se responder", t, wf_stack, depth))
+
+        elif stype == "manual-call":
+            for t in self.idx.for_call(w.id):
+                disp = [c for c in t.get("rest", []) if _cond_field(c) == "custom_disposition"]
+                rest = [c for c in t.get("rest", []) if _cond_field(c) != "custom_disposition"]
+                if disp:
+                    vals = []
+                    for c in disp:
+                        v = c.get("value")
+                        vals.extend(v if isinstance(v, list) else [v])
+                    label = "ligação: " + ", ".join(str(v) for v in vals)
+                else:
+                    label = "após a ligação"
+                out.append(self._event_node(label, {**t, "rest": rest}, wf_stack, depth))
+
+        elif stype == "internal_create_opportunity":
+            pid = a.get("pipelineId") or ""
+            for t in self.idx.for_opportunity_created(pid):
+                out.append(self._event_node("oportunidade criada dispara", t, wf_stack, depth))
+            for t in self.idx.for_decay(pid):
+                out.append(self._event_node("se a oportunidade estagnar (decay)", t, wf_stack, depth))
+
+        elif stype == "update_contact_field":
+            for t in self.idx.for_field_change():
+                out.append(self._event_node("campo alterado dispara", t, wf_stack, depth))
+
         return out
 
     def _event_node(self, label: str, t: dict, wf_stack: frozenset, depth: int) -> dict:
