@@ -210,3 +210,26 @@ def test_call_disposition_becomes_event_label(make_dump):
     call = data["criacao"][0]["children"][0]["children"][0]
     evs = [x for x in call["children"] if x["kind"] == "event"]
     assert len(evs) == 1 and "Desqualificado" in evs[0]["label"]
+
+
+def test_manual_tag_trigger_goes_to_anytime(make_dump):
+    # ninguém adiciona "vip" por step → trigger é manual → anytime
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
+    v = wf(id="v", name="VIP", steps=[step("s2", "sms")],
+           triggers=[trig("contact_tag", "v", conditions=[tag_cond("vip")], tid="t-v")])
+    data = build_journey(load_dump(make_dump(workflows=[a, v], tags=["vip"])))
+    labels = [n["label"] for n in data["anytime"]]
+    assert any("vip" in l for l in labels)
+    vip = next(n for n in data["anytime"] if "vip" in n["label"])
+    assert vip["children"][0]["label"] == "VIP"
+
+
+def test_birthday_always_anytime_and_stats(make_dump):
+    a = wf(id="a", name="A", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a"), trig("birthday_reminder", "a", tid="t-b")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    assert any(n["detail"] == "birthday_reminder" or "anivers" in n["label"].lower()
+               for n in data["anytime"])
+    s = data["stats"]
+    assert s["workflows_alcancaveis"] >= 1
+    assert "triggers_ignorados" in s

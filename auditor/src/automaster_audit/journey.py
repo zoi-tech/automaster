@@ -383,6 +383,97 @@ class _Walker:
         return ev
 
 
+_ANYTIME_LABELS = {
+    "birthday_reminder": "Aniversário do contato",
+    "appointment": "Agendamento",
+    "customer_reply": "Contato responde (sem âncora)",
+    "call_status": "Resultado de ligação (sem âncora)",
+    "contact_changed": "Campo do contato alterado (manual)",
+    "opportunity_decay": "Oportunidade estagnada (decay)",
+}
+
+
+def _build_anytime(ctx: DumpContext, idx: TriggerIndex, walker: _Walker) -> list[dict]:
+    """Eventos que nenhum step do sistema causa → grupo na raiz.
+
+    Regra de ancoragem invertida: o trigger entra aqui quando seu causador
+    interno não existe (tag que ninguém adiciona, pipeline que ninguém cria,
+    reply/call com workflow.id que não manda mensagem/liga, ou tipos
+    intrinsecamente externos: birthday/appointment).
+    """
+    # capacidades internas do sistema (o que os steps conseguem causar)
+    tags_addable: set[str] = set()
+    pipes_creatable: set[str] = set()
+    wfs_messaging: set[str] = set()
+    wfs_calling: set[str] = set()
+    any_field_update = False
+    for w in ctx.workflows:
+        for s in w.steps:
+            a = s.get("attributes") or {}
+            t = s.get("type")
+            if t == "add_contact_tag":
+                tags_addable.update(x.strip().lower() for x in a.get("tags") or [])
+            elif t == "internal_create_opportunity" and a.get("pipelineId"):
+                pipes_creatable.add(a["pipelineId"])
+            elif t in MESSAGE_TYPES:
+                wfs_messaging.add(w.id)
+            elif t == "manual-call":
+                wfs_calling.add(w.id)
+            elif t == "update_contact_field":
+                any_field_update = True
+
+    out: list[dict] = []
+
+    def add(label: str, t: dict):
+        out.append(walker._event_node(label, {**t, "rest": t["conditions"]}, frozenset(), 1))
+
+    for t in idx.of_type("contact_tag"):
+        tag_conds = [c for c in t["conditions"] if _cond_field(c) == "tagsAdded"]
+        if not tag_conds:
+            continue  # "qualquer tag" já ancora em todo add_contact_tag
+        vals = {str(c.get("value") or "").strip().lower() for c in tag_conds}
+        if not (vals & tags_addable):
+            add(f"tag “{', '.join(sorted(vals))}” adicionada manualmente", t)
+
+    for t in idx.of_type("opportunity_created"):
+        pconds = [c for c in t["conditions"] if _cond_field(c) == "opportunity.pipelineId"]
+        vals = {str(c.get("value")) for c in pconds}
+        if pconds and not (vals & pipes_creatable):
+            add("oportunidade criada manualmente", t)
+        elif not pconds and not pipes_creatable:
+            add("oportunidade criada manualmente", t)
+
+    for t in idx.of_type("customer_reply"):
+        scope = [c for c in t["conditions"] if _cond_field(c) == "workflow.id"]
+        vals = {str(c.get("value")) for c in scope}
+        if scope and not (vals & wfs_messaging):
+            add(_ANYTIME_LABELS["customer_reply"], t)
+        elif not scope and not wfs_messaging:
+            add(_ANYTIME_LABELS["customer_reply"], t)
+
+    for t in idx.of_type("call_status"):
+        scope = [c for c in t["conditions"] if _cond_field(c) == "workflow.id"]
+        vals = {str(c.get("value")) for c in scope}
+        if scope and not (vals & wfs_calling):
+            add(_ANYTIME_LABELS["call_status"], t)
+        elif not scope and not wfs_calling:
+            add(_ANYTIME_LABELS["call_status"], t)
+
+    if not any_field_update:
+        for t in idx.of_type("contact_changed"):
+            add(_ANYTIME_LABELS["contact_changed"], t)
+
+    if not pipes_creatable:
+        for t in idx.of_type("opportunity_decay"):
+            add(_ANYTIME_LABELS["opportunity_decay"], t)
+
+    for ttype in ("birthday_reminder", "appointment"):
+        for t in idx.of_type(ttype):
+            add(_ANYTIME_LABELS[ttype], t)
+
+    return out
+
+
 def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH,
                   max_nodes: int = DEFAULT_MAX_NODES) -> dict:
     idx = TriggerIndex(ctx)
@@ -398,7 +489,7 @@ def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH,
         ev["children"] = [walker.workflow_node(t["target"], frozenset(), 1)]
         criacao.append(ev)
 
-    anytime: list[dict] = []  # Task 5
+    anytime = _build_anytime(ctx, idx, walker)
 
     stats["workflows_alcancaveis"] = len(stats.pop("_wf_seen"))
     return {
