@@ -104,3 +104,18 @@ def test_cli_journey_subcommand(make_dump, capsys):
     assert (path / "journey.html").exists()
     outtxt = capsys.readouterr().out
     assert "jornada" in outtxt.lower()
+
+
+def test_cli_journey_cap_flags(make_dump, capsys):
+    from automaster_audit.cli import main
+    steps = [step(f"s{i}", "sms",
+                  next=f"s{i+1}" if i < 20 else None,
+                  parent=f"s{i-1}" if i > 0 else None) for i in range(21)]
+    a = wf(id="a", name="A", steps=steps, triggers=[trig("contact_created", "a")])
+    path = make_dump(workflows=[a])
+    rc = main(["journey", str(path), "--max-nodes", "5"])
+    assert rc == 0
+    assert "truncada" in capsys.readouterr().err
+    rc = main(["journey", str(path), "--max-nodes", "100000", "--max-depth", "20"])
+    assert rc == 0
+    assert "truncada" not in capsys.readouterr().err

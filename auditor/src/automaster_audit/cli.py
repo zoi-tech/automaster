@@ -13,7 +13,7 @@ from .finding import ERROR, INFO, WARN
 from .flow import enumerate_paths
 from .graph import build_graph
 from .graph_html import write_graph_html
-from .journey import build_journey
+from .journey import DEFAULT_MAX_DEPTH, DEFAULT_MAX_NODES, build_journey
 from .journey_html import write_journey_html
 from .loader import DumpError, load_dump
 from .path_report import write_paths_report
@@ -139,7 +139,7 @@ def run_journey(args: argparse.Namespace) -> int:
     except DumpError as e:
         print(f"erro: {e}", file=sys.stderr)
         return 2
-    data = build_journey(ctx)
+    data = build_journey(ctx, max_depth=args.max_depth, max_nodes=args.max_nodes)
     out = args.output or (Path(args.dump_path) / "journey.html")
     write_journey_html(data, out, title=ctx.manifest.get("locationId", ""))
     s = data["stats"]
@@ -188,6 +188,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_journey = sub.add_parser("journey", help="gera árvore de jornada do contato (HTML)")
     p_journey.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_journey.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH,
+                           help=f"níveis máx. de cascata entre workflows (default: {DEFAULT_MAX_DEPTH})")
+    p_journey.add_argument("--max-nodes", type=int, default=DEFAULT_MAX_NODES,
+                           help=f"nós máx. por raiz antes de truncar (default: {DEFAULT_MAX_NODES})")
     p_journey.add_argument("-o", "--output", type=Path,
                            help="arquivo HTML de saída (default: <dump>/journey.html)")
     p_journey.set_defaults(func=run_journey)
