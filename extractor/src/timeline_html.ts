@@ -2,14 +2,22 @@ import type { AuditLog } from "./api/audit.js";
 
 /** Renderiza a linha do tempo de um contato como HTML efêmero (gravar em /tmp).
  *
- * Layout: timeline HORIZONTAL — trilho central, cronológica esquerda→direita,
- * cards alternando acima/abaixo do trilho, scroll horizontal (roda do mouse).
+ * Layout: timeline horizontal CONDENSADA — todos os eventos são pontos no
+ * trilho; hover num ponto expande popover com o detalhe (clique fixa/solta).
  * Visual "Sala de Controle" (IBM Carbon), fontes de sistema (página descartável,
- * não entra em dumps/). Todo dado do CRM passa por esc().
+ * não entra em dumps/). Dados viram JSON embutido (escape anti-</script>) e o
+ * popover é montado só com textContent — XSS-safe.
  */
 
 const esc = (s: unknown): string =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+const safeJson = (obj: unknown): string =>
+  JSON.stringify(obj)
+    .replace(/<\//g, "<\\/")
+    .replace(/<!--/g, "<\\!--")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 
 const TYPE_LABEL: Record<string, string> = {
   TAG_ADDED: "+ tag",
@@ -19,23 +27,21 @@ const TYPE_LABEL: Record<string, string> = {
   DELETED: "deletado",
 };
 
-function sourceChip(log: AuditLog, wfNames: Map<string, string>): string {
+function sourceText(log: AuditLog, wfNames: Map<string, string>): string {
   const src = String(log.source ?? "");
   if (src === "WORKFLOW_NEW" || src === "WORKFLOW") {
-    const name = wfNames.get(String(log.sourceId ?? "")) ?? String(log.sourceId ?? "workflow");
-    return `<span class="chip wf">wf: ${esc(name)}</span>`;
+    return "workflow: " + (wfNames.get(String(log.sourceId ?? "")) ?? String(log.sourceId ?? ""));
   }
-  if (src === "WEB_USER") return `<span class="chip user">${esc(log.sourceName ?? "usuário")}</span>`;
-  if (src) return `<span class="chip">${esc(src.toLowerCase())}</span>`;
-  return "";
+  if (src === "WEB_USER") return "usuário: " + String(log.sourceName ?? "app");
+  return src.toLowerCase();
 }
 
-function summary(log: AuditLog): string {
+function summaryText(log: AuditLog): string {
   const t = String(log.type ?? "");
   const after = (log.after ?? {}) as Record<string, unknown>;
-  if (t === "TAG_ADDED") return (after.tagsAdded as string[] | undefined)?.map(esc).join(", ") ?? "";
-  if (t === "TAG_REMOVED") return (after.tagsRemoved as string[] | undefined)?.map(esc).join(", ") ?? "";
-  return (log.changedFields ?? []).map(esc).join(", ");
+  if (t === "TAG_ADDED") return ((after.tagsAdded as string[]) ?? []).join(", ");
+  if (t === "TAG_REMOVED") return ((after.tagsRemoved as string[]) ?? []).join(", ");
+  return (log.changedFields ?? []).join(", ");
 }
 
 export function renderTimelineHtml(
@@ -43,33 +49,34 @@ export function renderTimelineHtml(
   opts: { locationId: string; id: string; days: number; wfNames: Map<string, string> },
 ): string {
   const name = logs.find((l) => l.documentName)?.documentName ?? opts.id;
-  // cronológico: mais antigo à esquerda
   const sorted = [...logs].sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")));
 
+  // dados do popover (montado client-side com textContent)
+  const events = sorted.map((log) => {
+    const dt = new Date(String(log.createdAt ?? ""));
+    const t = String(log.type ?? "");
+    return {
+      time: dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      day: dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }),
+      type: TYPE_LABEL[t] ?? t.toLowerCase(),
+      cls: t === "TAG_ADDED" ? "add" : t === "TAG_REMOVED" ? "rm" : "upd",
+      sum: summaryText(log),
+      src: sourceText(log, opts.wfNames),
+      detail: JSON.stringify({ before: log.before, after: log.after }, null, 2),
+    };
+  });
+
+  // trilho: marcador de dia + pontos
   let lastDay = "";
-  const cols: string[] = [];
+  const marks: string[] = [];
   sorted.forEach((log, i) => {
     const dt = new Date(String(log.createdAt ?? ""));
     const day = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
     if (day !== lastDay) {
-      cols.push(`<div class="daycol"><span class="daylbl">${esc(day)}</span></div>`);
+      marks.push(`<span class="daylbl">${esc(day)}</span>`);
       lastDay = day;
     }
-    const time = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const t = String(log.type ?? "");
-    const cls = t === "TAG_ADDED" ? "add" : t === "TAG_REMOVED" ? "rm" : "upd";
-    const side = i % 2 === 0 ? "top" : "bot";
-    const detail = esc(JSON.stringify({ before: log.before, after: log.after }, null, 2));
-    cols.push(
-      `<div class="evcol ${side}">` +
-        `<div class="card" tabindex="0">` +
-        `<div class="row1"><span class="badge ${cls}">${esc(TYPE_LABEL[t] ?? t.toLowerCase())}</span>` +
-        `<span class="time">${esc(time)}</span></div>` +
-        `<div class="sum">${summary(log) || "—"}</div>` +
-        `<div class="row3">${sourceChip(log, opts.wfNames)}</div>` +
-        `<pre class="detail">${detail}</pre>` +
-        `</div><span class="dot ${cls}"></span><span class="stem"></span></div>`,
-    );
+    marks.push(`<span class="dot ${esc(events[i].cls)}" data-i="${i}" tabindex="0"></span>`);
   });
 
   return `<!DOCTYPE html>
@@ -87,57 +94,39 @@ header{background:#161616;color:#fff;padding:12px 24px;display:flex;justify-cont
   align-items:baseline;flex:none}
 header .brand{font-family:ui-monospace,monospace;font-weight:600}
 header .meta{font-family:ui-monospace,monospace;font-size:12px;color:#c6c6c6}
-.titlebar{padding:16px 24px 8px;flex:none;display:flex;align-items:baseline;gap:16px}
+.titlebar{padding:16px 24px;flex:none;display:flex;align-items:baseline;gap:16px}
 h1{font-size:22px;font-weight:400}
 .sub{font-family:ui-monospace,monospace;font-size:12px;color:var(--ink2)}
 .hint{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink3);margin-left:auto}
-/* ===== faixa horizontal ===== */
-.strip{flex:1;overflow-x:auto;overflow-y:hidden;position:relative;display:flex;align-items:stretch}
-.track{display:flex;align-items:stretch;padding:0 48px;position:relative;min-width:100%}
+/* ===== trilho condensado ===== */
+.strip{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:center;position:relative}
+.track{display:flex;align-items:center;gap:6px;padding:0 48px;position:relative;min-width:100%;height:120px}
 .track::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#c6c6c6}
-/* coluna de dia */
-.daycol{flex:none;width:84px;position:relative;display:flex;align-items:center;justify-content:center}
-.daycol::before{content:"";position:absolute;top:18%;bottom:18%;left:50%;width:1px;
-  background:var(--border)}
-.daylbl{font-family:ui-monospace,monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--ink2);background:var(--bg);padding:4px 6px;position:relative;z-index:2}
-/* coluna de evento */
-.evcol{flex:none;width:240px;position:relative;display:flex;justify-content:center}
-.evcol .dot{position:absolute;top:50%;left:50%;width:10px;height:10px;transform:translate(-50%,-50%);
-  background:var(--panel);border:2px solid var(--ink3);z-index:2}
-.evcol .dot.add{border-color:var(--green)}
-.evcol .dot.rm{border-color:var(--red)}
-.evcol .dot.upd{border-color:var(--ink2)}
-.evcol .stem{position:absolute;left:50%;width:1px;background:#c6c6c6;z-index:1}
-.evcol.top .stem{top:calc(50% - 38px);height:38px}
-.evcol.bot .stem{top:50%;height:38px}
-.card{position:absolute;width:216px;background:var(--panel);border:1px solid var(--border);
-  padding:8px 10px;cursor:pointer;z-index:3}
-.evcol.top .card{bottom:calc(50% + 38px)}
-.evcol.bot .card{top:calc(50% + 38px)}
-.card:hover,.card:focus{border-color:var(--blue);outline:none}
-.row1{display:flex;align-items:baseline;gap:8px}
-.badge{font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
-  padding:1px 7px;border:1px solid var(--border);flex:none}
-.badge.add{background:#defbe6;color:#0e6027;border-color:var(--green)}
-.badge.rm{background:#fff1f1;color:#a2191f;border-color:var(--red)}
-.badge.upd{background:#e8e8e8;color:#393939}
-.time{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink3)}
-.sum{font-size:12.5px;margin-top:5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
-  -webkit-line-clamp:2;-webkit-box-orient:vertical}
-.row3{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
-.chip{font-family:ui-monospace,monospace;font-size:10px;padding:1px 7px;border:1px solid #c6c6c6;
-  background:#e8e8e8;color:#393939;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chip.wf{background:#edf5ff;color:var(--blue);border-color:var(--blue)}
-.chip.user{background:#fcf4d6;color:#684e00;border-color:var(--amber)}
-/* detalhe expandido (clique) */
-.detail{display:none;font:10.5px/1.5 ui-monospace,monospace;background:#fafafa;
-  border-top:1px solid var(--border);margin-top:8px;padding:8px;max-height:240px;overflow:auto;
-  white-space:pre-wrap;word-break:break-word}
-.card.open{width:380px;z-index:5}
-.card.open .detail{display:block}
-.card.open .sum{-webkit-line-clamp:unset}
-::-webkit-scrollbar{height:10px}
+.daylbl{font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink2);background:var(--bg);border:1px solid var(--border);padding:2px 6px;
+  position:relative;z-index:2;flex:none;margin:0 6px}
+.dot{width:11px;height:11px;background:var(--panel);border:2px solid var(--ink3);
+  position:relative;z-index:2;flex:none;cursor:pointer;transition:transform .08s}
+.dot.add{border-color:var(--green)}
+.dot.rm{border-color:var(--red)}
+.dot.upd{border-color:var(--ink2)}
+.dot:hover,.dot:focus,.dot.pin{transform:scale(1.7);background:var(--ink);outline:none;z-index:3}
+/* ===== popover ===== */
+#pop{position:fixed;display:none;width:360px;max-height:55vh;overflow:auto;background:var(--panel);
+  border:1px solid var(--ink);z-index:10;box-shadow:none}
+#pop.show{display:block}
+#pop .p-head{display:flex;align-items:baseline;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)}
+#pop .p-badge{font-family:ui-monospace,monospace;font-size:10px;text-transform:uppercase;
+  letter-spacing:.08em;padding:1px 7px;border:1px solid var(--border)}
+#pop .p-badge.add{background:#defbe6;color:#0e6027;border-color:var(--green)}
+#pop .p-badge.rm{background:#fff1f1;color:#a2191f;border-color:var(--red)}
+#pop .p-badge.upd{background:#e8e8e8;color:#393939}
+#pop .p-when{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink3)}
+#pop .p-sum{padding:8px 12px;font-size:13px}
+#pop .p-src{padding:0 12px 8px;font-family:ui-monospace,monospace;font-size:11px;color:var(--blue)}
+#pop pre{font:10.5px/1.5 ui-monospace,monospace;background:#fafafa;border-top:1px solid var(--border);
+  padding:10px 12px;white-space:pre-wrap;word-break:break-word}
+::-webkit-scrollbar{height:10px;width:10px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:#c6c6c6}
 ::-webkit-scrollbar-thumb:hover{background:#8d8d8d}
@@ -147,27 +136,63 @@ h1{font-size:22px;font-weight:400}
 <div class="titlebar">
   <h1>${esc(name)}</h1>
   <span class="sub">${esc(opts.id)} · ${sorted.length} eventos · últimos ${opts.days} dias</span>
-  <span class="hint">scroll/roda = navegar · clique no card = before/after · Home/End = extremos</span>
+  <span class="hint">hover no ponto = expande · clique = fixa · roda = navegar</span>
 </div>
 <div class="strip" id="strip"><div class="track">
-${cols.join("\n") || '<div class="daycol"><span class="daylbl">sem eventos</span></div>'}
+${marks.join("\n") || '<span class="daylbl">sem eventos</span>'}
 </div></div>
+<div id="pop"></div>
 <script>
+const EVENTS = ${safeJson(events)};
 const strip = document.getElementById('strip');
+const pop = document.getElementById('pop');
+let pinned = null;
+
+function fill(i) {
+  const e = EVENTS[i];
+  pop.textContent = '';
+  const head = document.createElement('div'); head.className = 'p-head';
+  const badge = document.createElement('span'); badge.className = 'p-badge ' + e.cls; badge.textContent = e.type;
+  const when = document.createElement('span'); when.className = 'p-when'; when.textContent = e.day + ' · ' + e.time;
+  head.append(badge, when);
+  const sum = document.createElement('div'); sum.className = 'p-sum'; sum.textContent = e.sum || '—';
+  const src = document.createElement('div'); src.className = 'p-src'; src.textContent = e.src;
+  const pre = document.createElement('pre'); pre.textContent = e.detail;
+  pop.append(head, sum, src, pre);
+}
+function place(dot) {
+  const r = dot.getBoundingClientRect();
+  const w = 360, margin = 12;
+  let x = r.left + r.width / 2 - w / 2;
+  x = Math.max(margin, Math.min(x, window.innerWidth - w - margin));
+  pop.style.left = x + 'px';
+  pop.style.top = '';
+  pop.style.bottom = '';
+  if (r.top > window.innerHeight / 2) { pop.style.bottom = (window.innerHeight - r.top + 10) + 'px'; }
+  else { pop.style.top = (r.bottom + 10) + 'px'; }
+}
+function show(dot) { fill(+dot.dataset.i); place(dot); pop.classList.add('show'); }
+function hide() { if (!pinned) pop.classList.remove('show'); }
+
+document.querySelectorAll('.dot').forEach(d => {
+  d.addEventListener('mouseenter', () => { if (!pinned) show(d); });
+  d.addEventListener('focus', () => { if (!pinned) show(d); });
+  d.addEventListener('mouseleave', hide);
+  d.addEventListener('blur', hide);
+  d.addEventListener('click', () => {
+    if (pinned === d) { pinned = null; d.classList.remove('pin'); pop.classList.remove('show'); return; }
+    if (pinned) pinned.classList.remove('pin');
+    pinned = d; d.classList.add('pin'); show(d);
+  });
+});
 strip.addEventListener('wheel', e => {
   if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { strip.scrollLeft += e.deltaY; e.preventDefault(); }
 }, { passive: false });
 document.addEventListener('keydown', e => {
   if (e.key === 'Home') strip.scrollLeft = 0;
   if (e.key === 'End') strip.scrollLeft = strip.scrollWidth;
+  if (e.key === 'Escape' && pinned) { pinned.classList.remove('pin'); pinned = null; pop.classList.remove('show'); }
 });
-document.querySelectorAll('.card').forEach(c => {
-  c.addEventListener('click', () => {
-    document.querySelectorAll('.card.open').forEach(o => { if (o !== c) o.classList.remove('open'); });
-    c.classList.toggle('open');
-  });
-});
-strip.scrollLeft = strip.scrollWidth; // começa no mais recente (direita)
 </script>
 </body></html>`;
 }
