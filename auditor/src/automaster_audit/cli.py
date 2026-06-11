@@ -9,9 +9,11 @@ from . import rules
 from .dashboard import build_dashboard
 from .dashboard_html import write_dashboard_html
 from .finding import ERROR, INFO, WARN
+from .flow import enumerate_paths
 from .graph import build_graph
 from .graph_html import write_graph_html
 from .loader import DumpError, load_dump
+from .path_report import write_paths_report
 from .report import write_reports
 
 
@@ -67,6 +69,27 @@ def run_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_paths(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    out = args.output or (Path(args.dump_path) / "paths.md")
+    write_paths_report(ctx, out)
+    n_paths = 0
+    n_trunc = 0
+    for wf in ctx.workflows:
+        paths, truncated = enumerate_paths(wf)
+        n_paths += len(paths)
+        n_trunc += 1 if truncated else 0
+    print(f"{len(ctx.workflows)} workflows, {n_paths} caminhos enumerados.")
+    if n_trunc:
+        print(f"atenção: {n_trunc} workflow(s) truncado(s) no cap de caminhos", file=sys.stderr)
+    print(f"relatório: {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -83,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_dash.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_dash.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/dashboard.html)")
     p_dash.set_defaults(func=run_dashboard)
+
+    p_paths = sub.add_parser("paths", help="enumera caminhos de execução por workflow (Markdown)")
+    p_paths.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_paths.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <dump>/paths.md)")
+    p_paths.set_defaults(func=run_paths)
     return parser
 
 
@@ -90,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)
