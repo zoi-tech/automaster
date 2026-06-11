@@ -86,3 +86,16 @@ GET services.leadconnectorhq.com/locations/<locationId>/tags/search
 - Rate limit: 0,2s entre chamadas funcionou para 21 workflows × 3 req sem 429. Manter conservador.
 - Todos os 21 detalhes + steps retornaram 200/200 (até workflow de 50 steps).
 - Token expira no meio de sessão longa → 401. Renovar recapturando os dois JWTs.
+
+## Audit logs (linha do tempo de um registro) — validado 2026-06-11
+
+```
+GET services.leadconnectorhq.com/audit/search/v2
+    ?page=1&pageSize=100&startAt=<ISO>&endAt=<ISO>&id=<recordId>&locationId=<locationId>
+```
+- Resposta: `{ logs: [...] }`. Paginar por `page` até batch < pageSize.
+- Evento: `type` (`TAG_ADDED`/`TAG_REMOVED`/`UPDATED`/...), `before`/`after`, `changedFields`,
+  `documentName` (nome do contato), `createdAt`, e **`source`** (`WORKFLOW_NEW` com
+  `sourceId` = id do workflow causador; `WEB_USER` com `sourceName`; `INTEGRATION`; etc.).
+- Uso no projeto: `npm run timeline -- --location <loc> --id <recordId> [--days 60]`
+  (sob demanda, HTML efêmero em /tmp — POR DESIGN não grava em dumps/).

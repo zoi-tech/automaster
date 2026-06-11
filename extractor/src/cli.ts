@@ -13,6 +13,11 @@ import {
   fetchCustomValues,
 } from "./api/entities.js";
 import { DumpWriter, stampNow } from "./dump/writer.js";
+import { fetchAuditLogs } from "./api/audit.js";
+import { renderTimelineHtml } from "./timeline_html.js";
+import fs from "node:fs";
+import os from "node:os";
+import { execFile } from "node:child_process";
 
 const DUMPS_DIR = path.resolve(process.cwd(), "..", "dumps");
 
@@ -86,6 +91,57 @@ async function runDiscover(opts: { location: string }): Promise<void> {
   await context.close();
 }
 
+/** id → nome dos workflows do dump mais recente da subconta (melhor esforço). */
+function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
+  const names = new Map<string, string>();
+  try {
+    const base = path.join(DUMPS_DIR, locationId);
+    const latest = fs.readdirSync(base).sort().at(-1);
+    if (!latest) return names;
+    const wfDir = path.join(base, latest, "workflows");
+    for (const f of fs.readdirSync(wfDir)) {
+      const wf = JSON.parse(fs.readFileSync(path.join(wfDir, f), "utf-8"));
+      if (wf.id && wf.name) names.set(wf.id, wf.name);
+    }
+  } catch {
+    /* sem dump local — timeline mostra o id cru */
+  }
+  return names;
+}
+
+async function runTimeline(opts: { location: string; id: string; days: string }): Promise<void> {
+  const locationId = opts.location;
+  const days = Number(opts.days) || 60;
+  const { context, page } = await openSession();
+  try {
+    console.log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
+    let tokens = await captureTokens(page, locationId);
+    const refresh = async (): Promise<Tokens> => {
+      await page.reload({ waitUntil: "domcontentloaded" });
+      tokens = await captureTokens(page, locationId);
+      return tokens;
+    };
+    const client = new GhlClient(context, tokens, refresh);
+
+    console.log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
+    const logs = await fetchAuditLogs(client, locationId, opts.id, days);
+    console.log(`${logs.length} eventos.`);
+
+    const html = renderTimelineHtml(logs, {
+      locationId,
+      id: opts.id,
+      days,
+      wfNames: workflowNamesFromLatestDump(locationId),
+    });
+    const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
+    fs.writeFileSync(out, html, "utf-8");
+    console.log(`timeline (efêmera): ${out}`);
+    if (process.platform === "darwin") execFile("open", [out]);
+  } finally {
+    await context.close();
+  }
+}
+
 const program = new Command();
 program.name("automaster-extract").description("Extrai workflows GHL via API interna");
 
@@ -94,6 +150,14 @@ program
   .description("Extrai todos os workflows + entidades de uma subconta")
   .requiredOption("-l, --location <id>", "locationId da subconta")
   .action(runExtract);
+
+program
+  .command("timeline")
+  .description("Linha do tempo (audit log) de um contato — sob demanda, sem gravar em dumps/")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("-i, --id <id>", "id do contato/registro")
+  .option("-d, --days <n>", "janela em dias", "60")
+  .action(runTimeline);
 
 program
   .command("discover")
