@@ -90,7 +90,7 @@ def test_validation_html_safe_and_selfcontained(make_dump, tmp_path):
     # auto-contido: sem recurso externo; fonte vai como data: URI
     assert 'src="http' not in html and 'href="http' not in html and "@import" not in html
     assert "unpkg" not in html
-    assert "Validação — 3 Camadas" in html and "Camada 2" in html
+    assert "Validação" in html and "CAMADA 2" in html
 
 
 def test_cli_validation_subcommand(make_dump, tmp_path, capsys):
