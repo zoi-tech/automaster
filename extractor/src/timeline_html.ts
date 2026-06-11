@@ -40,8 +40,15 @@ const short = (v: unknown, max = 160): string => {
 
 export function renderTimelineHtml(
   logs: AuditLog[],
-  opts: { locationId: string; id: string; days: number; wfNames: Map<string, string> },
+  opts: {
+    locationId: string;
+    id: string;
+    days: number;
+    wfNames: Map<string, string>;
+    userNames?: Map<string, string>;
+  },
 ): string {
+  const userNames = opts.userNames ?? new Map<string, string>();
   const name = logs.find((l) => l.documentName)?.documentName ?? opts.id;
   const sorted = [...logs].sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")));
 
@@ -67,7 +74,24 @@ export function renderTimelineHtml(
       t === "TAG_ADDED" ? ((after.tagsAdded as string[]) ?? []).join(", ")
       : t === "TAG_REMOVED" ? ((after.tagsRemoved as string[]) ?? []).join(", ")
       : (log.changedFields ?? []).filter((f) => f !== "lastUpdatedBy").join(", ");
+
+    // marco = ponto de controle da história do contato (frase humana)
+    const changedSet = new Set(log.changedFields ?? []);
+    const docType = String(log.documentType ?? "CONTACT");
+    let phrase = "";
+    if (t === "CREATED") phrase = "Contato criado";
+    else if (t === "DELETED") phrase = "Contato deletado";
+    else if (t === "TAG_ADDED") phrase = `+ ${sum}`;
+    else if (t === "TAG_REMOVED") phrase = `− ${sum}`;
+    else if (changedSet.has("assignedTo")) {
+      const to = after.assignedTo;
+      phrase = to ? `Atribuído a ${userNames.get(String(to)) ?? String(to)}` : "Atribuição removida";
+    } else if (changedSet.has("dnd") || changedSet.has("dndSettings")) phrase = "Preferências (DND) alteradas";
+    else if (docType !== "CONTACT") phrase = `${docType.toLowerCase()}: ${t.toLowerCase()}`;
+
     return {
+      milestone: phrase !== "",
+      phrase,
       ts: dt.getTime(),
       dayKey: dt.toISOString().slice(0, 10),
       time: dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -136,6 +160,26 @@ export function renderTimelineHtml(
     }
   });
 
+  // ----- marcos: a história do contato em pontos de controle -----
+  const marcos = events
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => e.milestone)
+    .map(({ e, i }) => {
+      const dt = new Date(e.ts);
+      const when = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + " · " +
+        dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return (
+        `<div class="marco" data-i="${i}" tabindex="0">` +
+        `<span class="m-dot ${esc(e.cls)}"></span>` +
+        `<div class="m-when">${esc(when)}</div>` +
+        `<div class="m-phrase">${esc(e.phrase)}</div>` +
+        `<div class="m-src">${esc(e.srcLabel)}</div></div>`
+      );
+    });
+  const marcosHtml = marcos.length
+    ? marcos.join("")
+    : '<div class="m-src" style="padding:12px 0">nenhum marco no período</div>';
+
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -168,6 +212,28 @@ header.top{padding:18px 32px 0;display:flex;justify-content:space-between;align-
 h1{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .idbox{font-size:11px;border:1px solid var(--ink);padding:2px 9px;letter-spacing:.08em}
 .sub{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+/* marcos — a história em pontos de controle */
+.marcos{flex:none;padding:18px 32px 14px;border-bottom:1px solid var(--line);position:relative;
+  background:var(--panel)}
+.marcos::before{content:"MARCOS / HISTÓRIA DO CONTATO";position:absolute;top:6px;left:32px;
+  font-size:9px;letter-spacing:.16em;color:var(--ink3)}
+.m-rail{display:flex;gap:0;overflow-x:auto;padding-top:14px;position:relative}
+.m-rail::before{content:"";position:absolute;left:0;right:0;top:calc(14px + 6px);height:1px;
+  background:var(--line2)}
+.marco{flex:none;min-width:150px;max-width:220px;padding:0 18px 2px 0;cursor:pointer;
+  position:relative}
+.marco:hover .m-phrase,.marco:focus .m-phrase{color:var(--grn-ink)}
+.marco:focus{outline:none}
+.m-dot{display:block;width:13px;height:13px;background:var(--panel);border:2px solid var(--ink);
+  position:relative;z-index:1;margin-bottom:8px}
+.m-dot.add,.m-dot.new{background:var(--grn);border-color:var(--grn)}
+.m-dot.rm{background:var(--ink);border-color:var(--ink)}
+.m-when{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.m-phrase{font-size:12px;font-weight:600;letter-spacing:.01em;margin:2px 0;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical}
+.m-src{font-size:9.5px;letter-spacing:.04em;color:var(--ink3);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
 /* filtros */
 .filters{padding:12px 32px 14px;flex:none;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
   border-bottom:1px solid var(--line)}
@@ -295,6 +361,7 @@ h1{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.06em;t
   <span class="sub">${events.length} eventos \\\\ últimos ${opts.days} dias</span>
   <span class="sub" style="margin-left:auto;color:var(--ink3)">hover=espiar · clique=detalhe · ←/→ · esc</span>
 </div>
+<div class="marcos"><div class="m-rail">${marcosHtml}</div></div>
 <div class="filters" id="filters"></div>
 <div class="density">
   <div class="dens-bars" id="dens"></div>
@@ -509,6 +576,10 @@ document.querySelectorAll('.clx').forEach(x => {
   x.addEventListener('click', () => {
     const g = x.parentElement; g.hidden = true; g.previousElementSibling.style.display = '';
   });
+});
+document.querySelectorAll('.marco').forEach(m => {
+  m.addEventListener('click', () => openPanel(+m.dataset.i));
+  m.addEventListener('keydown', e => { if (e.key === 'Enter') openPanel(+m.dataset.i); });
 });
 const strip = $('strip');
 strip.addEventListener('wheel', e => {

@@ -109,6 +109,24 @@ function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
   return names;
 }
 
+/** id → nome dos usuários do dump mais recente da subconta (melhor esforço). */
+function userNamesFromLatestDump(locationId: string): Map<string, string> {
+  const names = new Map<string, string>();
+  try {
+    const base = path.join(DUMPS_DIR, locationId);
+    const latest = fs.readdirSync(base).sort().at(-1);
+    if (!latest) return names;
+    const obj = JSON.parse(fs.readFileSync(path.join(base, latest, "users.json"), "utf-8"));
+    for (const u of obj?.raw?.users ?? []) {
+      const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(" ");
+      if (u.id && name) names.set(u.id, name);
+    }
+  } catch {
+    /* sem users no dump — mostra id cru */
+  }
+  return names;
+}
+
 async function runTimeline(opts: { location: string; id: string; days: string }): Promise<void> {
   const locationId = opts.location;
   const days = Number(opts.days) || 60;
@@ -132,6 +150,7 @@ async function runTimeline(opts: { location: string; id: string; days: string })
       id: opts.id,
       days,
       wfNames: workflowNamesFromLatestDump(locationId),
+      userNames: userNamesFromLatestDump(locationId),
     });
     const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
     fs.writeFileSync(out, html, "utf-8");
