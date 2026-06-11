@@ -16,6 +16,8 @@ from .graph_html import write_graph_html
 from .loader import DumpError, load_dump
 from .path_report import write_paths_report
 from .report import write_reports
+from .validation import build_validation
+from .validation_html import write_validation_html
 
 
 def run_audit(args: argparse.Namespace) -> int:
@@ -106,6 +108,29 @@ def run_verify_contracts(args: argparse.Namespace) -> int:
     return 1 if any(r.status == "FAIL" for r in results) else 0
 
 
+def run_validation(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    data = build_validation(ctx, contracts_dir=args.contracts)
+    out = args.output or (Path(args.dump_path) / "validation.html")
+    write_validation_html(data, out, title=ctx.manifest.get("locationId", ""))
+    c1, c2, c3 = data["camada1"]["counts"], data["camada2"], data["camada3"]
+    print(f"camada 1: {c1['ERROR']} ERROR, {c1['WARN']} WARN, {c1['INFO']} INFO")
+    trunc = f" — {c2['truncated']} truncado(s)" if c2["truncated"] else ""
+    print(f"camada 2: {c2['total_paths']} caminhos em {data['meta']['n_workflows']} workflows{trunc}")
+    if c3.get("disponivel"):
+        n = c3["counts"]
+        print(f"camada 3: {n['PASS']} PASS, {n['FAIL']} FAIL, {n['AMBIGUOUS']} AMBIGUOUS")
+    else:
+        erro = f" ({c3['erro']})" if c3.get("erro") else ""
+        print(f"camada 3: nenhum contrato disponível{erro}")
+    print(f"abra no browser: {out}")
+    return 0  # relatório, não gate — sempre 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -132,6 +157,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_vc.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_vc.add_argument("--contracts", type=Path, default=Path("contracts"), help="dir dos contratos *.json (default: contracts/)")
     p_vc.set_defaults(func=run_verify_contracts)
+
+    p_val = sub.add_parser("validation", help="gera página HTML das 3 camadas de validação")
+    p_val.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_val.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/validation.html)")
+    p_val.add_argument("--contracts", type=Path, default=Path("contracts"),
+                       help="dir dos contratos *.json (default: contracts/; ausente → camada 3 indisponível)")
+    p_val.set_defaults(func=run_validation)
     return parser
 
 
@@ -139,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

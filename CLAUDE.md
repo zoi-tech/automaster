@@ -16,11 +16,12 @@ Docs-chave (leia antes de mudança estrutural):
 Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `dumps/`:
 
 - **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar (página fica aberta durante a extração). Tokens nunca vão para disco. Extrai workflows + 6 entidades: pipelines, tags, custom_fields, **users, calendars, custom_values**.
-- **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 4 saídas na pasta do dump:
+- **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 5 saídas na pasta do dump:
   - `report.md`/`report.json` — auditoria (`automaster-audit audit`)
   - `graph.html` — grafo interativo de conexões, tema Tron (`automaster-audit graph`)
   - `dashboard.html` — inventário navegável, tema Tron (`automaster-audit dashboard`)
   - `paths.md` — árvore de caminhos de execução por workflow, camada 2 (`automaster-audit paths`)
+  - `validation.html` — painel visual das 3 camadas de validação, tema Tron (`automaster-audit validation`)
 
 Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `theme.py` (CSS Tron + fonte Share Tech Mono embutida em `assets/`).
 
@@ -44,7 +45,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit dashboard dumps/<loc>/<ts>/    # dashboard.html
 .venv/bin/automaster-audit paths dumps/<loc>/<ts>/        # paths.md (árvore de caminhos)
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
-.venv/bin/python -m pytest -q                             # suíte (77 testes)
+.venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
+.venv/bin/python -m pytest -q                             # suíte (82 testes)
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
