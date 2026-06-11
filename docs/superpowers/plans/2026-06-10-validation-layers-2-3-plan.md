@@ -8,7 +8,7 @@
 
 - **Camada 1 — lógica sã (estática):** ✅ entregue (commit `2e59368`). Ver `auditor/src/automaster_audit/flow.py` + regras `unreachable_step`, `broken_goto`, `workflow_call_cycle`, `uncovered_condition`.
 - **Camada 2 — enumeração de caminhos (abordagem A):** ✅ entregue (commits `dd609ba`, `04f6f1f`, `e8e57e4`; plano de execução: `2026-06-10-camada-2-implementation-plan.md`). Lista TODOS os caminhos de execução de cada workflow, com as ações de cada rota e onde termina, usando os rótulos legíveis dos ramos. **Sem avaliar condição** → zero risco semântico. Responde "o que esse workflow faz?" tornando a lógica legível.
-- **Camada 3 — teste de contrato (funde a abordagem B):** usuário declara cenário + resultado esperado; a ferramenta avalia o subconjunto documentado de condições, escolhe o caminho e compara com o esperado. Condições não suportadas → marcar "ambíguo", não falhar silenciosamente.
+- **Camada 3 — teste de contrato (funde a abordagem B):** ✅ entregue (commits `ab2664c`, `bdda91f`, `e5be89c`; plano de execução: `2026-06-10-camada-3-implementation-plan.md`; atenção — condições vivem no container em `attributes.branches[].segments[].conditions[]`, não em `attributes.if` do nó-branch). Usuário declara cenário + resultado esperado; a ferramenta avalia o subconjunto documentado de condições, escolhe o caminho e compara com o esperado. Condições não suportadas → marcar "ambíguo", não falhar silenciosamente.
 - **NÃO fazer:** teste ao vivo no GHL (escreve em produção).
 
 ## Modelo do grafo de execução (reverso-engenheirado — NÃO re-derivar)
@@ -80,5 +80,5 @@ Nó-branch `attributes.if` / `attributes.branches[].segments[].conditions[]`. Ca
 - **extractor/** (TS): extrai workflows + 6 entidades (pipelines, tags, custom_fields, users, calendars, custom_values). Endpoints em `docs/endpoints.md` + `docs/endpoints-extras.md` (a criar; por ora os de users/calendars/custom_values estão no commit `021b7f3`).
 - **auditor/** (Python): `loader.py` (DumpContext), `flow.py` (grafo), `rules/` (13 regras, registry pkgutil), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `theme.py` (Tron). Saídas: `report.md/json`, `graph.html`, `dashboard.html`.
 - **Comandos:** `automaster-audit {audit|graph|dashboard} <dump>`. Camada 2 add `paths`; Camada 3 add `verify-contracts`.
-- **Testes:** `cd auditor && .venv/bin/python -m pytest` (44 verdes). Fixtures via `conftest.make_dump(...)` (aceita workflows/tags/pipelines/fields/users/custom_values/calendars).
+- **Testes:** `cd auditor && .venv/bin/python -m pytest` (77 verdes). Fixtures via `conftest.make_dump(...)` (aceita workflows/tags/pipelines/fields/users/custom_values/calendars).
 - **Dump de validação:** `dumps/WPIUKW3L4lDyMhLhKYKG/<ts>/` (gitignored; re-extrair com `cd extractor && npm run extract -- --location WPIUKW3L4lDyMhLhKYKG`, sessão Chrome persistente já logada).
