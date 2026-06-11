@@ -82,24 +82,58 @@ export function renderTimelineHtml(
     };
   });
 
-  // ----- trilho: separador de dia + classes de intervalo -----
+  // ----- clustering: mesmo tipo+campo+causador, gap<=10min, >=3 seguidos -----
+  const CLUSTER_GAP = 600_000;
+  const CLUSTER_MIN = 3;
+  // chave SEM o causador: rajada de "atualizado customFields" por N workflows
+  // diferentes é, para o leitor, um único acontecimento condensável.
+  const key = (e: (typeof events)[number]) => `${e.cls}|${e.sum}`;
+  type Seg = { kind: "run"; start: number; len: number } | { kind: "one"; i: number };
+  const segs: Seg[] = [];
+  for (let i = 0; i < events.length; ) {
+    let j = i + 1;
+    while (
+      j < events.length &&
+      key(events[j]) === key(events[i]) &&
+      events[j].dayKey === events[i].dayKey &&
+      events[j].ts - events[j - 1].ts <= CLUSTER_GAP
+    ) j++;
+    if (j - i >= CLUSTER_MIN) segs.push({ kind: "run", start: i, len: j - i });
+    else for (let k = i; k < j; k++) segs.push({ kind: "one", i: k });
+    i = j;
+  }
+
+  // ----- trilho: separador de dia + classes de intervalo + clusters -----
+  const dotHtml = (i: number) =>
+    `<span class="dot ${esc(events[i].cls)}" data-i="${i}" data-day="${esc(events[i].dayKey)}" tabindex="0"></span>`;
   const marks: string[] = [];
-  let prev: (typeof events)[number] | null = null;
-  events.forEach((e, i) => {
-    if (!prev || prev.dayKey !== e.dayKey) {
-      const dt = new Date(e.ts);
+  let prevEv: (typeof events)[number] | null = null;
+  segs.forEach((s) => {
+    const first = events[s.kind === "run" ? s.start : s.i];
+    if (!prevEv || prevEv.dayKey !== first.dayKey) {
+      const dt = new Date(first.ts);
       marks.push(
-        `<span class="daylbl" data-day="${esc(e.dayKey)}">${esc(
+        `<span class="daylbl" data-day="${esc(first.dayKey)}">${esc(
           dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
         )}</span>`,
       );
     } else {
-      const gap = e.ts - prev.ts;
+      const gap = first.ts - prevEv.ts;
       if (gap > 3_600_000) marks.push('<span class="gap"></span>');
       else if (gap > 60_000) marks.push('<span class="midgap"></span>');
     }
-    marks.push(`<span class="dot ${esc(e.cls)}" data-i="${i}" data-day="${esc(e.dayKey)}" tabindex="0"></span>`);
-    prev = e;
+    if (s.kind === "one") {
+      marks.push(dotHtml(s.i));
+      prevEv = events[s.i];
+    } else {
+      const inner = Array.from({ length: s.len }, (_, k) => dotHtml(s.start + k)).join("");
+      marks.push(
+        `<span class="cl ${esc(events[s.start].cls)}" data-from="${s.start}" data-n="${s.len}" tabindex="0">` +
+          `×${s.len}</span>` +
+        `<span class="clgrp" hidden><span class="clx" data-n="${s.len}" title="recolher">«</span>${inner}</span>`,
+      );
+      prevEv = events[s.start + s.len - 1];
+    }
   });
 
   return `<!DOCTYPE html>
@@ -180,6 +214,21 @@ h1{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.06em;t
 .dot:hover,.dot:focus{transform:scale(1.65);outline:none;z-index:3}
 .dot.sel{transform:scale(1.65);background:var(--ink);border-color:var(--grn);z-index:3}
 .dot.dim{opacity:.15;pointer-events:none}
+/* cluster: bloco ×N (mesmo tipo+campo+causador em rajada) */
+.cl{font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:2px 7px;
+  background:var(--panel);border:2px solid var(--ink3);position:relative;z-index:2;
+  flex:none;cursor:pointer;user-select:none}
+.cl.add{border-color:var(--grn)}
+.cl.rm{border-color:var(--ink);background:var(--ink);color:#fff}
+.cl.upd{border-color:var(--line2)}
+.cl:hover,.cl:focus{border-color:var(--ink);outline:none;z-index:3}
+.cl.dim{opacity:.15;pointer-events:none}
+.clgrp{display:inline-flex;align-items:center;gap:5px;padding:4px 6px;position:relative;z-index:2;
+  border:1px dashed var(--grn);background:var(--grn-tint)}
+.clgrp[hidden]{display:none}
+.clx{font-family:var(--mono);font-size:11px;color:var(--grn-ink);cursor:pointer;
+  padding:0 4px;flex:none;user-select:none}
+.clx:hover{color:var(--ink)}
 /* tooltip leve */
 #tip{position:fixed;display:none;background:var(--panel);color:var(--ink);padding:7px 11px;z-index:20;
   font-size:11px;max-width:340px;pointer-events:none;border:1px solid var(--ink);
@@ -325,6 +374,9 @@ function applyFilter() {
     const e = EVENTS[+d.dataset.i];
     d.classList.toggle('dim', !visible(e));
   });
+  document.querySelectorAll('.cl').forEach(c => {
+    c.classList.toggle('dim', !visible(EVENTS[+c.dataset.from]));
+  });
 }
 
 /* ===== densidade ===== */
@@ -396,7 +448,11 @@ function openPanel(i) {
   $('pj').textContent = e.raw;
   panel.classList.add('open');
   const dot = dots.find(d => +d.dataset.i === i);
-  if (dot) dot.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  if (dot) {
+    const grp = dot.closest('.clgrp');
+    if (grp && grp.hidden) { grp.hidden = false; grp.previousElementSibling.style.display = 'none'; }
+    dot.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
 }
 function closePanel() {
   panel.classList.remove('open'); sel = -1;
@@ -419,6 +475,40 @@ dots.forEach(d => {
   d.addEventListener('focus', () => showTip(d));
   d.addEventListener('blur', hideTip);
   d.addEventListener('click', () => { hideTip(); openPanel(+d.dataset.i); });
+});
+
+/* clusters: tooltip com faixa de horário, clique expande, « recolhe */
+function showClTip(c) {
+  const from = +c.dataset.from, n = +c.dataset.n;
+  const a = EVENTS[from], z = EVENTS[from + n - 1];
+  tip.textContent = '';
+  const w = document.createElement('div'); w.className = 't-when';
+  w.textContent = a.day + ' · ' + a.time + ' – ' + z.time;
+  const s = document.createElement('div');
+  s.textContent = n + '× ' + a.type + (a.sum ? ' · ' + a.sum : '');
+  const srcs = [...new Set(EVENTS.slice(from, from + n).map(e => e.srcLabel))];
+  const o = document.createElement('div'); o.className = 't-when';
+  o.textContent = srcs.slice(0, 3).join(' · ') + (srcs.length > 3 ? ' +' + (srcs.length - 3) : '');
+  tip.append(w, s, o);
+  const r = c.getBoundingClientRect();
+  tip.classList.add('show');
+  const tw = tip.offsetWidth;
+  tip.style.left = Math.max(8, Math.min(r.left + r.width / 2 - tw / 2, innerWidth - tw - 8)) + 'px';
+  tip.style.top = (r.top - tip.offsetHeight - 10) + 'px';
+}
+document.querySelectorAll('.cl').forEach(c => {
+  c.addEventListener('mouseenter', () => showClTip(c));
+  c.addEventListener('mouseleave', hideTip);
+  c.addEventListener('focus', () => showClTip(c));
+  c.addEventListener('blur', hideTip);
+  c.addEventListener('click', () => {
+    hideTip(); c.style.display = 'none'; c.nextElementSibling.hidden = false;
+  });
+});
+document.querySelectorAll('.clx').forEach(x => {
+  x.addEventListener('click', () => {
+    const g = x.parentElement; g.hidden = true; g.previousElementSibling.style.display = '';
+  });
 });
 const strip = $('strip');
 strip.addEventListener('wheel', e => {
