@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from . import rules
+from .contract import ContractError, format_results, run_contracts
 from .dashboard import build_dashboard
 from .dashboard_html import write_dashboard_html
 from .finding import ERROR, INFO, WARN
@@ -90,6 +91,21 @@ def run_paths(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_verify_contracts(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    try:
+        results = run_contracts(ctx, args.contracts)
+    except ContractError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    print(format_results(results))
+    return 1 if any(r.status == "FAIL" for r in results) else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -111,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_paths.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_paths.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <dump>/paths.md)")
     p_paths.set_defaults(func=run_paths)
+
+    p_vc = sub.add_parser("verify-contracts", help="roda contratos de teste contra o dump (PASS/FAIL/AMBIGUOUS)")
+    p_vc.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_vc.add_argument("--contracts", type=Path, default=Path("contracts"), help="dir dos contratos *.json (default: contracts/)")
+    p_vc.set_defaults(func=run_verify_contracts)
     return parser
 
 
@@ -118,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

@@ -43,7 +43,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit graph dumps/<loc>/<ts>/        # graph.html
 .venv/bin/automaster-audit dashboard dumps/<loc>/<ts>/    # dashboard.html
 .venv/bin/automaster-audit paths dumps/<loc>/<ts>/        # paths.md (árvore de caminhos)
-.venv/bin/python -m pytest -q                             # suíte (58 testes)
+.venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
+.venv/bin/python -m pytest -q                             # suíte (77 testes)
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
