@@ -1,3 +1,5 @@
+import re
+
 from automaster_audit.journey import build_journey
 from automaster_audit.journey_html import write_journey_html
 from automaster_audit.loader import load_dump
@@ -32,6 +34,48 @@ def test_journey_html_renders_tree_and_stats(make_dump, tmp_path):
     assert "Contato criado" in html and "A qualquer momento" in html
     assert "<details" in html and "TAG+" in html
     assert "data-jfilter" in html  # input de filtro presente
+
+
+def test_view_switcher_present(make_dump, tmp_path):
+    a = wf(id="a", name="A", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    out = write_journey_html(data, tmp_path / "j.html", title="T")
+    html = out.read_text(encoding="utf-8")
+    for v in ("lista", "flux", "metro"):
+        assert f'data-jview="{v}"' in html
+    assert "const JOURNEY" in html
+
+
+def test_journey_json_embed_is_safe(make_dump, tmp_path):
+    evil = '</script><img src=x>'
+    a = wf(id="a", name=evil, steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    out = write_journey_html(data, tmp_path / "j.html", title="T")
+    html = out.read_text(encoding="utf-8")
+    m = re.search(r"const JOURNEY = (.+);", html)
+    assert m, "bloco JSON embutido ausente"
+    blob = m.group(1)
+    assert "</script" not in blob          # fechamento escapado
+    assert "<\\/script" in blob            # ...com <\/
+    # auto-contido: nenhum recurso externo além dos 4 links relativos do sidebar
+    stripped = (html.replace('href="dashboard.html', "")
+                    .replace('href="graph.html', "")
+                    .replace('href="validation.html', "")
+                    .replace('href="journey.html', ""))
+    assert 'src="http' not in stripped and 'href="http' not in stripped
+    assert "unpkg" not in html and "fonts.googleapis" not in html
+
+
+def test_views_lazy_containers(make_dump, tmp_path):
+    a = wf(id="a", name="A", steps=[step("s1", "sms")],
+           triggers=[trig("contact_created", "a")])
+    data = build_journey(load_dump(make_dump(workflows=[a])))
+    out = write_journey_html(data, tmp_path / "j.html", title="T")
+    html = out.read_text(encoding="utf-8")
+    assert '<div id="view-flux"></div>' in html
+    assert '<div id="view-metro"></div>' in html
 
 
 def test_cli_journey_subcommand(make_dump, capsys):
