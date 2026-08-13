@@ -12,3 +12,9 @@ build/
 dist/
 spike/realdump/
 .DS_Store
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+_temp/
+*.png
