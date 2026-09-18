@@ -174,6 +174,14 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 - [x] 114 testes do auditor verdes, mais os novos das fases 1 e 2.
 - [x] `npx tsc --noEmit` limpo no extractor.
-- [ ] As quatro perguntas do mapa respondidas numa sessão real, comparadas com os
+- [x] As quatro perguntas do mapa respondidas numa sessão real, comparadas com os
   transcripts de `docs/wayfinder/prototipo-007-a-sessao-ideal.md`.
+  **Feito em 2026-09-18** com `claude -p` (sonnet) e o plugin instalado: tag `recuperacao-reativacao`
+  explicada com papel `dispara` e ciclo lido como desenho (9 turnos, US$0,28); auditoria separou os
+  20 ERROR do ruído (7 turnos, US$0,26); documentação em 10 linhas só com `summary` + `achados`
+  (7 turnos, US$0,28); contato ao vivo diagnosticado em 31 s (5 turnos, US$0,22).
+  Achado no caminho: **`${CLAUDE_PLUGIN_ROOT}` não é expandido no bloco `env` do `.mcp.json`**
+  (chega literal ao processo); só `command`/`args` expandem. O shim agora deriva a raiz da própria
+  posição e exporta `CLAUDE_PLUGIN_ROOT` e `PYTHONPATH`. O processo MCP também pode vir com PATH
+  magro: `contato` chama `node_modules/.bin/tsx` direto e acrescenta Homebrew e nvm ao PATH.
 - [x] `dashboard.html` regenerado sem as seis tags-gatilho na lista de órfãs.

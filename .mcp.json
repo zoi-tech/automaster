@@ -4,11 +4,7 @@
       "type": "stdio",
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/automaster-python.sh",
       "args": ["-m", "automaster_audit.mcp_server"],
-      "env": {
-        "AUTOMASTER_DUMPS": "${HOME}/.automaster/dumps",
-        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}/auditor/src",
-        "CLAUDE_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
-      }
+      "env": { "AUTOMASTER_DUMPS": "${HOME}/.automaster/dumps" }
     }
   }
 }

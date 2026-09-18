@@ -120,7 +120,7 @@ a subconta vem por argumento
 **Código:** `${CLAUDE_PLUGIN_ROOT}`. O repositório original não precisa existir na máquina
 ([002](../../wayfinder/tickets/002-anatomia-plugin.md)).
 
-**Python:** um shim descobre o interpretador — testa `python3.14`, `python3.13`,
+**Python:** um shim descobre o interpretador e a raiz do plugin (pela própria posição: `${CLAUDE_PLUGIN_ROOT}` só expande em `command`/`args`, não em `env`) — testa `python3.14`, `python3.13`,
 `python3.12`, `python3`, confere `sys.version_info >= (3,12)` e faz `exec`. **Não há venv
 para provisionar:** `auditor/pyproject.toml` não declara nenhuma dependência e tudo é
 stdlib. O piso importa: o `/usr/bin/python3` do macOS é 3.9.6 e quebra no `str | None` de

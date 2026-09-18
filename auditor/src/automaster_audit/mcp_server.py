@@ -216,12 +216,16 @@ def jornada(loc: str, caminho: list[int] | None = None, profundidade: int = 1,
 
 def _run_timeline(loc: str, id: str, days: int) -> dict:
     """Chama o extractor ao vivo (abre Chrome; espera segundos). Só o stdout é JSON."""
-    if not (EXTRACTOR_DIR / "node_modules").is_dir() or not shutil.which("npx"):
+    tsx = EXTRACTOR_DIR / "node_modules" / ".bin" / "tsx"
+    if not tsx.is_file():
         raise ToolError("extractor não provisionado: rode /automaster-extract uma vez "
                         f"(npm ci + npx playwright install chromium em {EXTRACTOR_DIR})")
-    cmd = ["npx", "tsx", "src/cli.ts", "timeline", "-l", loc, "-i", id, "-d", str(days), "--json"]
-    r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600,
-                       env={**os.environ, "AUTOMASTER_DUMPS": str(_root())})
+    # o processo MCP pode vir com PATH magro (app GUI): node do Homebrew e do nvm entram aqui
+    extra = [str(p) for p in ("/opt/homebrew/bin", "/usr/local/bin", *Path.home().glob(".nvm/versions/node/*/bin"))]
+    env = {**os.environ, "AUTOMASTER_DUMPS": str(_root()),
+           "PATH": os.pathsep.join([os.environ.get("PATH", ""), *extra])}
+    cmd = [str(tsx), "src/cli.ts", "timeline", "-l", loc, "-i", id, "-d", str(days), "--json"]
+    r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env)
     if r.returncode != 0 or not r.stdout.strip():
         raise ToolError(f"timeline falhou (código {r.returncode}): {r.stderr.strip()[-600:]}")
     return json.loads(r.stdout.strip().splitlines()[-1])
