@@ -258,14 +258,41 @@ export function resolveFieldIds(fields: { id: string; name?: string; fieldKey?: 
   return out;
 }
 
+/**
+ * `contact.*` STANDARD_FIELD → chave camelCase do corpo do PUT (`docs/endpoints.md` §Escrita).
+ * Mapa explícito e fechado: fieldKey padrão fora daqui é erro, nunca fallback silencioso
+ * (o `.replace(/^contact\./, "")` anterior gerava snake_case, a API ignorava a chave e a
+ * escrita se perdia em silêncio com HTTP 200).
+ */
+const STANDARD_FIELD_BODY_KEY: Record<string, string> = {
+  "contact.first_name": "firstName",
+  "contact.last_name": "lastName",
+  "contact.email": "email",
+  "contact.website": "website",
+  "contact.phone": "phone",
+  "contact.company_name": "companyName",
+  "contact.source": "source",
+  "contact.date_of_birth": "dateOfBirth",
+  "contact.type": "type",
+  "contact.address1": "address1",
+  "contact.city": "city",
+  "contact.country": "country",
+  "contact.state": "state",
+  "contact.postal_code": "postalCode",
+  "contact.timezone": "timezone",
+};
+
 /** Corpo do PUT de campos: padrão vai cru no topo, custom em `customFields: [{id, value}]` (API interna — não `field_value`). */
 function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<string, string>, fields: any[]): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   const custom: unknown[] = [];
   for (const [name, value] of sets) {
     const f = fields.find((x) => x.id === ids.get(name));
-    if (f?.dataType === "STANDARD_FIELD") body[String(f.fieldKey).replace(/^contact\./, "")] = value;
-    else custom.push({ id: ids.get(name), value });
+    if (f?.dataType === "STANDARD_FIELD") {
+      const bodyKey = STANDARD_FIELD_BODY_KEY[String(f.fieldKey)];
+      if (!bodyKey) throw new Error(`campo padrão ${JSON.stringify(f.fieldKey)} sem mapeamento conhecido para o corpo do PUT; adicione em STANDARD_FIELD_BODY_KEY antes de usar`);
+      body[bodyKey] = value;
+    } else custom.push({ id: ids.get(name), value });
   }
   if (custom.length) body.customFields = custom;
   return body;
@@ -279,9 +306,13 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
   if (!fieldsRaw || !tagsRaw) throw new Error(`sem dump de ${loc} em ${DUMPS_DIR}; rode extract primeiro`);
 
   const sets = opts.set.map((s) => { const i = s.indexOf("="); if (i < 1) throw new Error(`--set espera nome=valor, veio ${JSON.stringify(s)}`); return [s.slice(0, i), s.slice(i + 1)] as const; });
-  const fieldIds = resolveFieldIds(fieldsRaw.customFields ?? [], sets.map(([n]) => n));
+  // `customFields` mistura model contact|business|opportunity (homônimos: email, phone, city, state,
+  // country, website, postal code); sem esse filtro os campos mais óbvios do contato caem em "ambíguo".
+  const contactFields = (fieldsRaw.customFields ?? []).filter((f: any) => f.model === "contact");
+  const fieldIds = resolveFieldIds(contactFields, sets.map(([n]) => n));
   const tagNames = new Map((tagsRaw.tags ?? []).map((t: any) => [String(t.name).toLowerCase(), String(t.name)]));
   const resolveTag = (t: string) => { const n = tagNames.get(t.trim().toLowerCase()); if (!n) throw new Error(`tag ${JSON.stringify(t)} não existe; a tool não cria tags`); return n; };
+  for (const t of opts.tag) if (!t.startsWith("+") && !t.startsWith("-")) throw new Error(`--tag espera +nome (adicionar) ou -nome (remover), veio ${JSON.stringify(t)}`);
   const tagsAdd = opts.tag.filter((t) => t.startsWith("+")).map((t) => resolveTag(t.slice(1)));
   const tagsDel = opts.tag.filter((t) => t.startsWith("-")).map((t) => resolveTag(t.slice(1)));
   if (sets.length + tagsAdd.length + tagsDel.length === 0) throw new Error("nada a fazer: passe --set e/ou --tag");
@@ -290,20 +321,27 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
     const antes = await getContact(client, loc, id);
     const snapDir = path.join(DUMPS_DIR, "_contatos", loc, id);
     fs.mkdirSync(snapDir, { recursive: true });
-    const snapPath = path.join(snapDir, `${stampNow()}${new Date().getSeconds().toString().padStart(2, "0")}.json`);
+    const now = new Date();
+    const snapPath = path.join(snapDir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
     const snap: any = { fetchedAt: new Date().toISOString(), pedido: { set: Object.fromEntries(sets), tagsAdd, tagsDel }, raw: antes, escrito: false, aplicado: [] as string[] };
     fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2));
     log(`snapshot: ${snapPath}`);
 
     const marca = (o: string) => { snap.escrito = true; snap.aplicado.push(o); fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2)); };
     if (sets.length) {
-      const body = buildFieldsBody(sets, fieldIds, fieldsRaw.customFields ?? []);
+      const body = buildFieldsBody(sets, fieldIds, contactFields);
       await updateContactFields(client, loc, id, body); marca("set");
     }
     if (tagsAdd.length) { await addContactTags(client, loc, id, tagsAdd); marca("tagsAdd"); }
     if (tagsDel.length) { await removeContactTags(client, loc, id, tagsDel); marca("tagsDel"); }
 
-    const depois = await getContact(client, loc, id);
+    let depois: unknown;
+    try {
+      depois = await getContact(client, loc, id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`escrita aplicada (${snap.aplicado.join(", ") || "nada"}), mas o GET final falhou: ${msg}. snapshot em ${snapPath}`);
+    }
     const out = { locationId: loc, id, snapshot: snapPath, antes, depois,
       mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
     if (opts.json) process.stdout.write(JSON.stringify(out) + "\n");
