@@ -126,16 +126,20 @@ def build_paths_report(ctx: DumpContext, cap: int = 500) -> str:
         "",
     ]
     for wf in ctx.workflows:
-        paths, truncated = enumerate_paths(wf, cap=cap)
-        lines += [f"## {wf.name or wf.id}", ""]
-        if truncated:
-            lines += [f"⚠ truncado em {cap} caminhos", ""]
-        if not paths:
-            lines += ["(sem steps)", ""]
-            continue
-        _render(_trie(paths), [], 0, lines, index_steps(wf), ctx)
-        lines.append("")
+        lines += [f"## {wf.name or wf.id}", "", *workflow_paths_lines(wf, ctx, cap=cap), ""]
     return "\n".join(lines)
+
+
+def workflow_paths_lines(wf, ctx: DumpContext, cap: int = 500) -> list[str]:
+    """Árvore de caminhos de um workflow, em linhas Markdown (sem o título)."""
+    paths, truncated = enumerate_paths(wf, cap=cap)
+    lines: list[str] = []
+    if truncated:
+        lines += [f"⚠ truncado em {cap} caminhos", ""]
+    if not paths:
+        return lines + ["(sem steps)"]
+    _render(_trie(paths), [], 0, lines, index_steps(wf), ctx)
+    return lines
 
 
 def write_paths_report(ctx: DumpContext, out: Path, cap: int = 500) -> Path:

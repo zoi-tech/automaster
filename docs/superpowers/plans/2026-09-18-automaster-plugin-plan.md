@@ -64,34 +64,36 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ### Task 2.1: servidor e `dumps`
 
-- [ ] **Step 1:** `mcp_server.py` com transporte stdio e a raiz vinda de
+- [x] **Step 1:** `mcp_server.py` com transporte stdio e a raiz vinda de
   `AUTOMASTER_DUMPS`. Falha ao subir escreve em stderr e sai com código 1 — o servidor que
   falha calado é o modo de erro que o 002 mediu.
-- [ ] **Step 2:** `dumps()` lista subcontas, nome, snapshots e `extractedAt`.
-- [ ] **Step 3:** helper `_snapshot(loc, snapshot?)` que resolve o mais recente e devolve o
+- [x] **Step 2:** `dumps()` lista subcontas, nome, snapshots e `extractedAt`.
+- [x] **Step 3:** helper `_snapshot(loc, snapshot?)` que resolve o mais recente e devolve o
   bloco `{"extractedAt", "idade_dias"}` **anexado a toda resposta de toda tool**.
 
 ### Task 2.2: `inventario`, `workflow`, `achados`, `buscar`
 
-- [ ] **Step 1: testes de contrato.** Cada tool tem um teste que fixa a forma da resposta e
+- [x] **Step 1: testes de contrato.** Cada tool tem um teste que fixa a forma da resposta e
   um que fixa o teto.
-- [ ] **Step 2:** `inventario(loc, fatia?)` — `summary` por default (82 tok), fatias
+- [x] **Step 2:** `inventario(loc, fatia?)` — `summary` por default (82 tok), fatias
   (`workflows`, `tags`, `fields`, …) sob demanda.
-- [ ] **Step 3:** `workflow(loc, id)` — meta (155 tok), achados do workflow, e a árvore de
+- [x] **Step 3:** `workflow(loc, id)` — meta (155 tok), achados do workflow, e a árvore de
   caminhos **com teto**; acima do teto, resumo mais flag de truncagem.
-- [ ] **Step 4:** `achados(loc, severidade?)` — agrupa por `(rule, workflow, detail)` com
+- [x] **Step 4:** `achados(loc, severidade?)` — agrupa por `(rule, workflow, detail)` com
   contagem, e devolve `counts` completo mesmo com filtro.
-- [ ] **Step 5:** `buscar(loc, termo)` — usa o papel da Fase 1; procura em tags, campos,
+- [x] **Step 5:** `buscar(loc, termo)` — usa o papel da Fase 1; procura em tags, campos,
   pipelines, usuários, custom values e nomes de workflow.
 
 ### Task 2.3: `jornada`
 
-- [ ] **Step 1: teste** de que a resposta de um nível nunca traz a subárvore inteira.
-- [ ] **Step 2:** `jornada(loc, caminho?, profundidade=1)` com endereço por **caminho
+- [x] **Step 1: teste** de que a resposta de um nível nunca traz a subárvore inteira.
+- [x] **Step 2:** `jornada(loc, caminho?, profundidade=1)` com endereço por **caminho
   posicional** (`[0,3,1]`), sem tocar em `journey.py`. Cada nó devolve `kind`, `label`,
   `detail`, `flags`, `conds` e `n_filhos` — nunca `children` cheio.
-- [ ] **Step 3: verificar no dump real** que a raiz custa ~61 tokens por nó, contra os
+- [x] **Step 3: verificar no dump real** que a raiz custa ~61 tokens por nó, contra os
   215.372 da árvore inteira.
+  **Medido:** raiz 805 tok para 18 nós (44/nó); `inventario` summary 133; `achados` ERROR
+  1.007; maior workflow 1.793 com truncagem; `dumps` 740 para 11 subcontas.
 
 ---
 
