@@ -21,6 +21,7 @@ import {
   type AuditLog,
 } from "./api/audit.js";
 import { renderTimelineHtml } from "./timeline_html.js";
+import { getContact, updateContactFields, addContactTags, removeContactTags } from "./api/contacts.js";
 import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
@@ -243,6 +244,73 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
   });
 }
 
+/** nome ou id → id de custom field (a lista do dump mistura padrão e custom). */
+export function resolveFieldIds(fields: { id: string; name?: string; fieldKey?: string }[], wanted: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const w of wanted) {
+    const key = w.trim().toLowerCase();
+    const hits = fields.filter((f) => f.id === w || f.name?.toLowerCase() === key || f.fieldKey?.toLowerCase() === key
+      || f.fieldKey?.toLowerCase().replace(/^contact\./, "") === key);
+    if (hits.length === 0) throw new Error(`campo ${JSON.stringify(w)} não existe no dump; confira em inventario(fatia=fields) ou passe o id`);
+    if (new Set(hits.map((h) => h.id)).size > 1) throw new Error(`campo ${JSON.stringify(w)} é ambíguo: ${hits.map((h) => h.id).join(", ")}; passe o id`);
+    out.set(w, hits[0].id);
+  }
+  return out;
+}
+
+/** Corpo do PUT de campos: padrão vai cru no topo, custom em `customFields: [{id, value}]` (API interna — não `field_value`). */
+function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<string, string>, fields: any[]): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  const custom: unknown[] = [];
+  for (const [name, value] of sets) {
+    const f = fields.find((x) => x.id === ids.get(name));
+    if (f?.dataType === "STANDARD_FIELD") body[String(f.fieldKey).replace(/^contact\./, "")] = value;
+    else custom.push({ id: ids.get(name), value });
+  }
+  if (custom.length) body.customFields = custom;
+  return body;
+}
+
+async function runContatoEditar(opts: { location: string; id: string; set: string[]; tag: string[]; json?: boolean }): Promise<void> {
+  const loc = opts.location, id = opts.id;
+  const log = opts.json ? console.error : console.log;
+  const fieldsRaw = latestDumpEntity(loc, "custom_fields") as { customFields?: any[] } | undefined;
+  const tagsRaw = latestDumpEntity(loc, "tags") as { tags?: any[] } | undefined;
+  if (!fieldsRaw || !tagsRaw) throw new Error(`sem dump de ${loc} em ${DUMPS_DIR}; rode extract primeiro`);
+
+  const sets = opts.set.map((s) => { const i = s.indexOf("="); if (i < 1) throw new Error(`--set espera nome=valor, veio ${JSON.stringify(s)}`); return [s.slice(0, i), s.slice(i + 1)] as const; });
+  const fieldIds = resolveFieldIds(fieldsRaw.customFields ?? [], sets.map(([n]) => n));
+  const tagNames = new Map((tagsRaw.tags ?? []).map((t: any) => [String(t.name).toLowerCase(), String(t.name)]));
+  const resolveTag = (t: string) => { const n = tagNames.get(t.trim().toLowerCase()); if (!n) throw new Error(`tag ${JSON.stringify(t)} não existe; a tool não cria tags`); return n; };
+  const tagsAdd = opts.tag.filter((t) => t.startsWith("+")).map((t) => resolveTag(t.slice(1)));
+  const tagsDel = opts.tag.filter((t) => t.startsWith("-")).map((t) => resolveTag(t.slice(1)));
+  if (sets.length + tagsAdd.length + tagsDel.length === 0) throw new Error("nada a fazer: passe --set e/ou --tag");
+
+  await withClient(loc, log, async (client) => {
+    const antes = await getContact(client, loc, id);
+    const snapDir = path.join(DUMPS_DIR, "_contatos", loc, id);
+    fs.mkdirSync(snapDir, { recursive: true });
+    const snapPath = path.join(snapDir, `${stampNow()}${new Date().getSeconds().toString().padStart(2, "0")}.json`);
+    const snap: any = { fetchedAt: new Date().toISOString(), pedido: { set: Object.fromEntries(sets), tagsAdd, tagsDel }, raw: antes, escrito: false, aplicado: [] as string[] };
+    fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2));
+    log(`snapshot: ${snapPath}`);
+
+    const marca = (o: string) => { snap.escrito = true; snap.aplicado.push(o); fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2)); };
+    if (sets.length) {
+      const body = buildFieldsBody(sets, fieldIds, fieldsRaw.customFields ?? []);
+      await updateContactFields(client, loc, id, body); marca("set");
+    }
+    if (tagsAdd.length) { await addContactTags(client, loc, id, tagsAdd); marca("tagsAdd"); }
+    if (tagsDel.length) { await removeContactTags(client, loc, id, tagsDel); marca("tagsDel"); }
+
+    const depois = await getContact(client, loc, id);
+    const out = { locationId: loc, id, snapshot: snapPath, antes, depois,
+      mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
+    if (opts.json) process.stdout.write(JSON.stringify(out) + "\n");
+    else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);
+  });
+}
+
 const program = new Command();
 program.name("automaster-extract").description("Extrai workflows GHL via API interna");
 
@@ -267,5 +335,15 @@ program
   .requiredOption("-l, --location <id>", "locationId da subconta")
   .option("--area <area>", "workflows | contatos", "workflows")
   .action(runDiscover);
+
+program
+  .command("contato-editar")
+  .description("ESCREVE: altera campos/tags de um contato via API interna, com snapshot antes")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("-i, --id <id>", "id do contato")
+  .option("--set <nome=valor>", "campo (nome, fieldKey ou id) = valor; repetível", (v: string, acc: string[]) => [...acc, v], [])
+  .option("--tag <+nome|-nome>", "adiciona (+) ou remove (-) tag; repetível", (v: string, acc: string[]) => [...acc, v], [])
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runContatoEditar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program.parseAsync(process.argv);

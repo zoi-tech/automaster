@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "extract": "tsx src/cli.ts extract",
     "discover": "tsx src/cli.ts discover",
-    "timeline": "tsx src/cli.ts timeline"
+    "timeline": "tsx src/cli.ts timeline",
+    "contato-editar": "tsx src/cli.ts contato-editar"
   },
   "dependencies": {
     "commander": "^12.1.0",
