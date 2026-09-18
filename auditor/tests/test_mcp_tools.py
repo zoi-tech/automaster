@@ -37,7 +37,9 @@ def test_run_extractor_failure_keeps_snapshot_head_despite_long_stderr(monkeypat
     tsx = tmp_path / "node_modules" / ".bin" / "tsx"
     tsx.parent.mkdir(parents=True); tsx.write_text("")
     monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
-    err = "snapshot: /x/y.json\n" + "\n".join(f"    at frame{i} ................................" for i in range(200))
+    err = ("Capturando tokens (faça login na janela do Chrome, se pedido)...\n"
+           "401 — recapturando tokens...\n401 — recapturando tokens...\nsnapshot: /x/y.json\n"
+           + "\n".join(f"    at frame{i} ................................" for i in range(200)))
     monkeypatch.setattr(srv.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr=err))
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
         srv._run_extractor("contato-editar")

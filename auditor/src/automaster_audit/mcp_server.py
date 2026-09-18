@@ -214,14 +214,20 @@ def jornada(loc: str, caminho: list[int] | None = None, profundidade: int = 1,
             "filhos": [_slim(c, profundidade) for c in node.get("children") or []], "_snapshot": meta}
 
 
-def _head_tail(err: str | None, head: int = 3, tail: int = 600) -> str:
-    """Começo + cauda do stderr: o `snapshot: <caminho>` é impresso ANTES das escritas
-    e não pode sumir no truncamento de um stack trace longo."""
+def _head_tail(err: str | None, head: int = 2, tail: int = 600) -> str:
+    """Linhas do `snapshot:` + começo + cauda do stderr.
+
+    O `snapshot: <caminho>` é impresso ANTES das escritas e não pode sumir no
+    truncamento de um stack trace longo. Contar linhas não basta: antes dele vêm
+    "Capturando tokens..." e uma linha por refresh de token (cli.ts), então a
+    posição varia — as linhas com `snapshot:` são preservadas por conteúdo."""
     lines = (err or "").strip().splitlines()
     if not lines:
         return "(stderr vazio)"
-    inicio = "\n".join(lines[:head])
-    resto = "\n".join(lines[head:])
+    guardadas = [l for l in lines[:head] if "snapshot:" not in l]
+    guardadas += [l for l in lines if "snapshot:" in l]
+    resto = "\n".join(l for l in lines if l not in guardadas)
+    inicio = "\n".join(guardadas)
     return inicio if not resto else f"{inicio}\n[...]\n{resto[-tail:]}"
 
 

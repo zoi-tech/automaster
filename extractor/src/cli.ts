@@ -316,7 +316,7 @@ function diffAvisos(antes: unknown, depois: unknown, esperado: Map<string, strin
       avisos.push(`possível PUT destrutivo: ${k} tinha valor antes e está vazio/ausente depois`);
   for (const [k, v] of esperado)
     if (String(d[k] ?? "") !== v)
-      avisos.push(`escrita possivelmente ignorada: ${k} deveria ser ${JSON.stringify(v)}, veio ${JSON.stringify(d[k])}`);
+      avisos.push(`escrita possivelmente ignorada: ${k} deveria ser ${JSON.stringify(v)}, veio ${JSON.stringify(d[k])} — compare os valores antes de concluir: o GHL normaliza (telefone em E.164, data em ISO), e valor equivalente com outra grafia significa que a escrita passou`);
   return avisos;
 }
 
