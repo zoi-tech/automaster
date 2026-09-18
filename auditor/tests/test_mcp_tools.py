@@ -144,3 +144,34 @@ def test_rpc_roundtrip(root, capsys):
     body = json.loads(resps[2]["result"]["content"][0]["text"])
     assert body["summary"]["workflows"] == 1
     assert resps[3]["result"]["isError"] is True
+
+
+def _ev(i):
+    return {"id": f"e{i}", "type": "TAG", "createdAt": f"2026-06-{10 - i:02d}T00:00:00.000Z",
+            "sourceId": "wf1", "sourceWorkflowName": "Boas-vindas"}
+
+
+def test_contato_returns_events_and_snapshot(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [_ev(0), _ev(1)]})
+    out = srv.contato(LOC, "c1")
+    assert [e["id"] for e in out["eventos"]] == ["e0", "e1"]
+    assert out["truncado"] is False and "_snapshot" in out
+
+
+def test_contato_ceiling_pages_by_time(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [_ev(i) for i in range(9)]})
+    monkeypatch.setattr(srv, "CONTATO_MAX_CHARS", 400)
+    out = srv.contato(LOC, "c1")
+    assert out["truncado"] is True and len(out["eventos"]) < 9
+    assert out["proximo_ate"] == out["eventos"][-1]["createdAt"]
+    page2 = srv.contato(LOC, "c1", ate=out["proximo_ate"])
+    assert page2["eventos"][0]["createdAt"] < out["proximo_ate"]
+
+
+def test_contato_without_setup_teaches(root, monkeypatch, tmp_path):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path / "nao-existe")
+    with pytest.raises(srv.ToolError, match="automaster-extract"):
+        srv.contato(LOC, "c1")

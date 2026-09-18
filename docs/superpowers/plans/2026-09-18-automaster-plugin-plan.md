@@ -101,27 +101,27 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ### Task 3.1: `--json` no extractor
 
-- [ ] **Step 1:** flag `--json` em `timeline` que imprime os eventos em stdout em vez de
+- [x] **Step 1:** flag `--json` em `timeline` que imprime os eventos em stdout em vez de
   renderizar HTML. O array já existe montado antes da renderização.
-- [ ] **Step 2:** resolver `sourceId` para nome de workflow na saída, usando o dump mais
+- [x] **Step 2:** resolver `sourceId` para nome de workflow na saída, usando o dump mais
   recente — é o campo que costura esta tool às outras seis.
-- [ ] **Step 3:** `npx tsc --noEmit` limpo.
+- [x] **Step 3:** `npx tsc --noEmit` limpo.
 
 ### Task 3.2: `contato`
 
 - [ ] **Step 1: medir primeiro.** Rodar `timeline --json` num contato real e anotar tokens
   e segundos. **É a lacuna que o mapa fechou sem preencher**; sem esse número o teto da tool
   é chute. Anotar no plano antes de seguir.
-- [ ] **Step 2:** `contato(loc, id, days?)` chama o extractor como subprocesso e devolve o
+- [x] **Step 2:** `contato(loc, id, days?)` chama o extractor como subprocesso e devolve o
   JSON, com teto e paginação por janela de tempo.
-- [ ] **Step 3:** quando o setup do extractor falta, a tool devolve erro que **ensina** o
+- [x] **Step 3:** quando o setup do extractor falta, a tool devolve erro que **ensina** o
   comando de setup, em vez de falhar seco.
 
 ---
 
 ## Fase 4 — A casa dos dumps
 
-- [ ] **Step 1:** raiz de dumps por env no extractor, substituindo o `path.resolve(process.cwd(), "..", "dumps")` de `extractor/src/cli.ts:27`. `dump/writer.ts` já recebe `baseDir` por parâmetro e não muda.
+- [x] **Step 1:** raiz de dumps por env no extractor, substituindo o `path.resolve(process.cwd(), "..", "dumps")` de `extractor/src/cli.ts:27`. `dump/writer.ts` já recebe `baseDir` por parâmetro e não muda.
 - [ ] **Step 2:** mover `dumps/` para `~/.automaster/dumps/`. **Atenção ao symlink**
   `dumps/6ICT3KsGLmamzMUI7VQS` → `dumps/clientec Odontologia/`, que existe porque o comando
   `timeline` procura por locationId: ele precisa sobreviver.

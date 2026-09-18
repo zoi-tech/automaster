@@ -24,7 +24,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
 
-const DUMPS_DIR = path.resolve(process.cwd(), "..", "dumps");
+const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
@@ -154,12 +154,14 @@ function userNamesFromLatestDump(locationId: string): Map<string, string> {
   return names;
 }
 
-async function runTimeline(opts: { location: string; id: string; days: string }): Promise<void> {
+async function runTimeline(opts: { location: string; id: string; days: string; json?: boolean }): Promise<void> {
   const locationId = opts.location;
   const days = Number(opts.days) || 60;
+  // em --json o stdout é só o payload; progresso vai para stderr
+  const log = opts.json ? console.error : console.log;
   const { context, page } = await openSession();
   try {
-    console.log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
+    log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
     let tokens = await captureTokens(page, locationId);
     const refresh = async (): Promise<Tokens> => {
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -168,9 +170,9 @@ async function runTimeline(opts: { location: string; id: string; days: string })
     };
     const client = new GhlClient(context, tokens, refresh);
 
-    console.log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
+    log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
     const logs = await fetchAuditLogs(client, locationId, opts.id, days);
-    console.log(`${logs.length} eventos do contato.`);
+    log(`${logs.length} eventos do contato.`);
 
     // oportunidades associadas → audit log de cada uma (criação, stage, status)
     let oppLogs: AuditLog[] = [];
@@ -180,7 +182,7 @@ async function runTimeline(opts: { location: string; id: string; days: string })
         const ol = await fetchAuditLogs(client, locationId, oid, days);
         oppLogs = oppLogs.concat(ol.map((l) => ({ ...l, documentType: l.documentType || "OPPORTUNITY" })));
       }
-      console.log(`${oppIds.length} oportunidade(s), ${oppLogs.length} eventos.`);
+      log(`${oppIds.length} oportunidade(s), ${oppLogs.length} eventos.`);
     } catch (e) {
       console.warn(`aviso: oportunidades indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
     }
@@ -199,24 +201,34 @@ async function runTimeline(opts: { location: string; id: string; days: string })
         changedFields: [],
         source: String((a as { createdBy?: { source?: string } }).createdBy?.source ?? ""),
       }));
-      console.log(`${apptLogs.length} agendamento(s).`);
+      log(`${apptLogs.length} agendamento(s).`);
     } catch (e) {
       console.warn(`aviso: agendamentos indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
     }
 
     const { pipelines, stages } = stageNamesFromLatestDump(locationId);
-    const html = renderTimelineHtml([...logs, ...oppLogs, ...apptLogs], {
+    const wfNames = workflowNamesFromLatestDump(locationId);
+    const events = [...logs, ...oppLogs, ...apptLogs];
+    if (opts.json) {
+      // sourceId → nome do workflow: o campo que costura a timeline às tools do dump
+      const withNames = events.map((l) =>
+        l.sourceId && wfNames.has(String(l.sourceId)) ? { ...l, sourceWorkflowName: wfNames.get(String(l.sourceId)) } : l,
+      );
+      process.stdout.write(JSON.stringify({ locationId, id: opts.id, days, events: withNames }) + "\n");
+      return;
+    }
+    const html = renderTimelineHtml(events, {
       locationId,
       id: opts.id,
       days,
-      wfNames: workflowNamesFromLatestDump(locationId),
+      wfNames,
       userNames: userNamesFromLatestDump(locationId),
       pipelineNames: pipelines,
       stageNames: stages,
     });
     const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
     fs.writeFileSync(out, html, "utf-8");
-    console.log(`timeline (efêmera): ${out}`);
+    log(`timeline (efêmera): ${out}`);
     if (process.platform === "darwin") execFile("open", [out]);
   } finally {
     await context.close();
@@ -238,6 +250,7 @@ program
   .requiredOption("-l, --location <id>", "locationId da subconta")
   .requiredOption("-i, --id <id>", "id do contato/registro")
   .option("-d, --days <n>", "janela em dias", "60")
+  .option("--json", "imprime os eventos em JSON no stdout em vez de renderizar HTML")
   .action(runTimeline);
 
 program

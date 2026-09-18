@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -21,6 +23,8 @@ from .path_report import workflow_paths_lines
 
 PROTOCOL = "2025-06-18"
 PATHS_MAX_CHARS = 6000  # ~1.500 tokens; a mediana do paths.md é 173 tok, o maior 18.665
+CONTATO_MAX_CHARS = 40000  # ~10k tokens; ponytail: chute até medir num contato real (Fase 3.2)
+EXTRACTOR_DIR = Path(os.environ.get("CLAUDE_PLUGIN_ROOT") or Path(__file__).resolve().parents[3]) / "extractor"
 FATIAS = ("workflows", "tags", "fields", "pipelines", "users", "calendars", "custom_values")
 
 
@@ -208,6 +212,36 @@ def jornada(loc: str, caminho: list[int] | None = None, profundidade: int = 1,
             "filhos": [_slim(c, profundidade) for c in node.get("children") or []], "_snapshot": meta}
 
 
+def _run_timeline(loc: str, id: str, days: int) -> dict:
+    """Chama o extractor ao vivo (abre Chrome; espera segundos). Só o stdout é JSON."""
+    if not (EXTRACTOR_DIR / "node_modules").is_dir() or not shutil.which("npx"):
+        raise ToolError("extractor não provisionado: rode /automaster-extract uma vez "
+                        f"(npm ci + npx playwright install chromium em {EXTRACTOR_DIR})")
+    cmd = ["npx", "tsx", "src/cli.ts", "timeline", "-l", loc, "-i", id, "-d", str(days), "--json"]
+    r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600,
+                       env={**os.environ, "AUTOMASTER_DUMPS": str(_root())})
+    if r.returncode != 0 or not r.stdout.strip():
+        raise ToolError(f"timeline falhou (código {r.returncode}): {r.stderr.strip()[-600:]}")
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot: str | None = None) -> dict:
+    _, meta = _load(loc, snapshot)
+    events = _run_timeline(loc, id, int(days))["events"]
+    events.sort(key=lambda e: str(e.get("createdAt", "")), reverse=True)
+    if ate:
+        events = [e for e in events if str(e.get("createdAt", "")) < ate]
+    kept, size = [], 0
+    for e in events:
+        size += len(json.dumps(e, ensure_ascii=False))
+        if kept and size > CONTATO_MAX_CHARS:
+            break
+        kept.append(e)
+    truncated = len(kept) < len(events)
+    return {"id": id, "days": days, "n_total": len(events), "eventos": kept, "truncado": truncated,
+            "proximo_ate": kept[-1].get("createdAt") if truncated else None, "_snapshot": meta}
+
+
 # ---------------------------------------------------------------- protocolo
 
 _LOC = {"type": "string", "description": "locationId da subconta"}
@@ -228,6 +262,13 @@ TOOLS = {
                 "ex. [0,3,1], sobre criacao+anytime; profundidade expande filhos.",
                 {"loc": _LOC, "caminho": {"type": "array", "items": {"type": "integer"}},
                  "profundidade": {"type": "integer", "default": 1}, "snapshot": _SNAP}, ["loc"]),
+    "contato": (contato, "AO VIVO: abre Chrome e pagina o audit log do contato (segundos, exige setup do "
+                "extractor). Eventos mais recentes primeiro, sourceWorkflowName resolvido; teto ~10k tokens, "
+                "pagine com ate=proximo_ate.",
+                {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                 "days": {"type": "integer", "default": 60},
+                 "ate": {"type": "string", "description": "só eventos antes deste ISO (paginação)"}, "snapshot": _SNAP},
+                ["loc", "id"]),
 }
 
 
