@@ -45,16 +45,18 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ### Task 1.1: papel nas referências
 
-- [ ] **Step 1: teste falhando.** Em `auditor/tests/test_refs_papel.py`, fixture com um
+- [x] **Step 1: teste falhando.** Em `auditor/tests/test_refs_papel.py`, fixture com um
   workflow cujo trigger `contact_tag` tem condição `tagsAdded == "x"` e nenhum step que use
   `"x"`. Espera-se `papel == "dispara"` e **não** `orphan`.
-- [ ] **Step 2:** `_wf_refs` passa a devolver, por entidade, uma lista de papéis:
+- [x] **Step 2:** `_wf_refs` passa a devolver, por entidade, uma lista de papéis:
   `dispara` (trigger), `adiciona` (`add_contact_tag`), `remove` (`remove_contact_tag`),
   `condicao` (condição de trigger ou de branch). Tag só citada em trigger deixa de ser órfã.
-- [ ] **Step 3: verificar no dump real.** As seis tags-gatilho param de aparecer como
+- [x] **Step 3: verificar no dump real.** As seis tags-gatilho param de aparecer como
   órfãs: `form-custom-site`, `gestor de follow up`, `ia manual`, `ia-teste`,
   `indicacao-rodrigo`, `recuperacao-reativacao`. O total de órfãs cai de 59 para 53.
-- [ ] **Step 4:** `dashboard.html` regenerado mostra o papel. Testes verdes.
+  **Medido: caiu para 48** — as condições de branch (`contact_detail/tags`) e de trigger
+  (`contact.tags`) recuperam mais 5 além das 6 tags-gatilho.
+- [x] **Step 4:** `dashboard.html` regenerado mostra o papel. Testes verdes.
 
 ---
 

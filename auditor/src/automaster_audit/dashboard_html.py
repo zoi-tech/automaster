@@ -107,6 +107,7 @@ function columns(key){
     const orf = key==='tags' ? 'órfã' : 'órfão';
     return [
       {h:'Nome', f:r=>esc(r.name)+(r.orphan?` <span class="tag warn">${orf}</span>`:''), v:r=>String(r.name||'').toLowerCase()},
+      ...(key==='tags'?[{h:'Papel', w:'170px', f:r=>r.papeis.length?`<span class="cell-mono">${r.papeis.map(esc).join(', ')}</span>`:'<span class="muted">—</span>', v:r=>r.papeis.join(',')}]:[]),
       {h:'Usada por', w:'100px', cls:'num', f:r=>r.used_by.length, v:r=>r.used_by.length},
       {h:'Workflows', f:r=>drill(r.used_by)},
     ];

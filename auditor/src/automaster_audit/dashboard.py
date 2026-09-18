@@ -17,9 +17,40 @@ CHANNEL_TYPES = ("sms", "email", "whatsapp", "internal_notification", "webhook",
 _CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")
 
 
+def _cond_tags(obj) -> set[str]:
+    """Tags citadas em condições de branch (contact_detail/tags), em qualquer profundidade."""
+    out: set[str] = set()
+    if isinstance(obj, dict):
+        if obj.get("conditionType") == "contact_detail" and obj.get("conditionSubType") == "tags":
+            v = obj.get("conditionValue")
+            out.update(x for x in (v if isinstance(v, list) else [v]) if isinstance(x, str))
+        for v in obj.values():
+            out |= _cond_tags(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            out |= _cond_tags(v)
+    return out
+
+
 def _wf_refs(wf: Workflow) -> dict:
-    """Extrai tags, fields, pipelines, chamadas, canais, usuários e custom values."""
-    tags: set[str] = set()
+    """Extrai tags (nome -> papéis), fields, pipelines, chamadas, canais, usuários e custom values.
+
+    Papéis de tag: dispara (trigger contact_tag), adiciona, remove, condicao (branch ou trigger).
+    """
+    tags: dict[str, set[str]] = {}
+
+    def tag(name, papel):
+        tags.setdefault(name, set()).add(papel)
+
+    for t in wf.triggers:
+        for c in t.get("conditions", []) or []:
+            if c.get("field") == "tagsAdded" and isinstance(c.get("value"), str):
+                tag(c["value"], "dispara")
+            elif c.get("field") == "contact.tags":
+                v = c.get("value")
+                for x in (v if isinstance(v, list) else [v]):
+                    if isinstance(x, str):
+                        tag(x, "condicao")
     fields: set[str] = set()
     pipelines: set[str] = set()
     calls: set[str] = set()
@@ -32,8 +63,11 @@ def _wf_refs(wf: Workflow) -> dict:
         if t in CHANNEL_TYPES:
             channels[t] += 1
         if t in ("add_contact_tag", "remove_contact_tag"):
-            for tag in a.get("tags", []) or []:
-                tags.add(tag)
+            for name in a.get("tags", []) or []:
+                tag(name, "adiciona" if t == "add_contact_tag" else "remove")
+        elif t == "if_else":
+            for name in _cond_tags(a):
+                tag(name, "condicao")
         elif t == "update_contact_field":
             for f in a.get("fields", []) or []:
                 if f.get("field"):
@@ -64,6 +98,7 @@ def build_dashboard(ctx: DumpContext) -> dict:
 
     # índice reverso entidade -> workflows
     tag_users: dict[str, list[str]] = {}
+    tag_papeis: dict[str, set[str]] = {}
     field_users: dict[str, list[str]] = {}
     pipe_users: dict[str, list[str]] = {}
     called_by: dict[str, list[str]] = {}
@@ -71,8 +106,10 @@ def build_dashboard(ctx: DumpContext) -> dict:
     cv_users: dict[str, list[str]] = {}
     for wf in ctx.workflows:
         r = refs[wf.id]
-        for tag in r["tags"]:
-            tag_users.setdefault(tag.strip().lower(), []).append(wf.name)
+        for tag, papeis in r["tags"].items():
+            key = tag.strip().lower()
+            tag_users.setdefault(key, []).append(wf.name)
+            tag_papeis.setdefault(key, set()).update(papeis)
         for fid in r["fields"]:
             field_users.setdefault(fid, []).append(wf.name)
         for pid in r["pipelines"]:
@@ -103,7 +140,8 @@ def build_dashboard(ctx: DumpContext) -> dict:
 
     # entidades: todas as existentes + flag órfã
     tags = [
-        {"name": name, "used_by": sorted(tag_users.get(name, [])), "orphan": name not in tag_users}
+        {"name": name, "used_by": sorted(tag_users.get(name, [])), "orphan": name not in tag_users,
+         "papeis": sorted(tag_papeis.get(name, ()))}
         for name in sorted(ctx.tag_names)
     ]
     fields = [
