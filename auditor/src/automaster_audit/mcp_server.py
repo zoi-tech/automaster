@@ -214,6 +214,17 @@ def jornada(loc: str, caminho: list[int] | None = None, profundidade: int = 1,
             "filhos": [_slim(c, profundidade) for c in node.get("children") or []], "_snapshot": meta}
 
 
+def _head_tail(err: str | None, head: int = 3, tail: int = 600) -> str:
+    """Começo + cauda do stderr: o `snapshot: <caminho>` é impresso ANTES das escritas
+    e não pode sumir no truncamento de um stack trace longo."""
+    lines = (err or "").strip().splitlines()
+    if not lines:
+        return "(stderr vazio)"
+    inicio = "\n".join(lines[:head])
+    resto = "\n".join(lines[head:])
+    return inicio if not resto else f"{inicio}\n[...]\n{resto[-tail:]}"
+
+
 def _run_extractor(*args: str) -> dict:
     """Roda `tsx src/cli.ts <args>` no extractor (abre Chrome; espera segundos). Só a última linha do stdout é JSON."""
     tsx = EXTRACTOR_DIR / "node_modules" / ".bin" / "tsx"
@@ -225,9 +236,19 @@ def _run_extractor(*args: str) -> dict:
     env = {**os.environ, "AUTOMASTER_DUMPS": str(_root()),
            "PATH": os.pathsep.join([os.environ.get("PATH", ""), *extra])}
     cmd = [str(tsx), "src/cli.ts", *args]
-    r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env)
+    try:
+        r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env)
+    except subprocess.TimeoutExpired as e:
+        raise ToolError(
+            f"{args[0]} estourou 600 s e foi morto — provável login manual pendente na janela do Chrome. "
+            "A escrita PODE ter sido aplicada (o processo pode ter morrido entre o PUT e a marcação do "
+            "snapshot): confira o estado atual com a tool `contato`. "
+            + _head_tail(e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace"))
+        ) from e
     if r.returncode != 0 or not r.stdout.strip():
-        raise ToolError(f"{args[0]} falhou (código {r.returncode}): {r.stderr.strip()[-600:]}")
+        dica = (" A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `contato`."
+                if args[0] == "contato-editar" else "")
+        raise ToolError(f"{args[0]} falhou (código {r.returncode}): {_head_tail(r.stderr)}{dica}")
     return json.loads(r.stdout.strip().splitlines()[-1])
 
 
@@ -268,10 +289,12 @@ def editar(loc: str, id: str, set: dict | None = None, tags_adicionar: list | No
 
     idx = TriggerIndex(ctx)
     hits = [t for tag in tags_adicionar for t in idx.for_tag(tag)]
+    hits += [t for tag in tags_remover for t in idx.for_tag(tag, "tagsRemoved")]
     if set:
         hits += idx.for_field_change()
-    names = {w.id: w.name for w in ctx.workflows}
-    dispara = sorted({(t["target"], names.get(t["target"], ""), t["name"]) for t in hits})
+    # só publicado: rascunho não roda, avisar sobre ele é ruído
+    names = {w.id: w.name for w in ctx.workflows if w.status == "published"}
+    dispara = sorted({(t["target"], names[t["target"]], t["name"]) for t in hits if t["target"] in names})
     out["dispara"] = [{"workflow": w, "nome": n, "trigger": tr} for w, n, tr in dispara]
     return out | {"_snapshot": meta}
 

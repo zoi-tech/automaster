@@ -148,6 +148,14 @@ PUT backend.leadconnectorhq.com/contacts/<contactId>?version=14-05-22
 - Corpo, pelo código do app: campo padrão (`phone`, `companyName`, `email`, ...) vai cru
   no topo do corpo, como no GET; custom field vai em `customFields: [{ id, value }]`.
 - Resposta: não observada ainda.
+- ⚠️ `contact.source` foi removido do `STANDARD_FIELD_BODY_KEY` (`extractor/src/cli.ts`):
+  `source` era a única chave do mapa que não aparece nas chaves de topo do GET acima, então
+  escrever nela seria escrever no vazio. `--set` nesse campo agora falha explícito; reponha
+  a entrada só depois de confirmar `source` ao vivo num contato real.
+- ⚠️ Não se sabe se o PUT parcial é merge ou replace. Por isso o `contato-editar` compara
+  o GET de antes com o de depois e emite `avisos` (stderr + campo do JSON) para chave que
+  sumiu (replace destrutivo) e para valor pedido que não mudou (escrita ignorada — o GHL
+  responde 200 para chave desconhecida).
 - ⚠️ **Perigo não confirmado nem negado na interna:** na API pública v2 do GHL, mandar
   `tags` dentro do PUT de campos do contato **sobrescreve a lista inteira de tags**. Por
   isso, aqui, tag nunca vai por esse PUT — sempre pelos endpoints granulares abaixo.

@@ -31,6 +31,30 @@ def test_run_extractor_failure_carries_stderr(monkeypatch, tmp_path):
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json"):
         srv._run_extractor("contato-editar")
 
+
+def test_run_extractor_failure_keeps_snapshot_head_despite_long_stderr(monkeypatch, tmp_path):
+    """O `snapshot:` sai ANTES das escritas: não pode sumir na cauda de um stack trace longo."""
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True); tsx.write_text("")
+    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    err = "snapshot: /x/y.json\n" + "\n".join(f"    at frame{i} ................................" for i in range(200))
+    monkeypatch.setattr(srv.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr=err))
+    with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
+        srv._run_extractor("contato-editar")
+    assert "frame199" in str(e.value) and "tool `contato`" in str(e.value)
+
+
+def test_run_extractor_timeout_becomes_tool_error(monkeypatch, tmp_path):
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True); tsx.write_text("")
+    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    def boom(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd, 600, stderr="snapshot: /x/y.json\n")
+    monkeypatch.setattr(srv.subprocess, "run", boom)
+    with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
+        srv._run_extractor("contato-editar")
+    assert "tool `contato`" in str(e.value)
+
 LOC = "TESTLOC"
 
 
@@ -221,6 +245,32 @@ def test_editar_calls_extractor_and_lists_triggered_workflows(root, monkeypatch)
     assert "--set" in seen["args"] and "phone=+55" in seen["args"] and "+quente" in seen["args"]
     assert {d["workflow"] for d in out["dispara"]} == {"a", "b"}
     assert out["snapshot"] == "/s.json" and "_snapshot" in out
+
+
+def _fake_extractor(monkeypatch):
+    monkeypatch.setattr(srv, "_run_extractor",
+                        lambda *a: {"id": "c1", "snapshot": "/s.json", "antes": {}, "depois": {}, "mudancas": {}})
+
+
+def test_editar_tags_remover_dispara(root, monkeypatch):
+    """Remoção de tag também avisa: trigger contact_tag com condição tagsRemoved."""
+    rem = {"operator": "index-of-true", "id": "tag-removed", "value": "quente",
+           "title": "Tag Removed", "type": "select", "field": "tagsRemoved"}
+    root(workflows=[wf(id="a", name="Saiu quente", triggers=[trig("contact_tag", "a", conditions=[rem])]),
+                    wf(id="b", name="Entrou quente",
+                       triggers=[trig("contact_tag", "b", conditions=[tag_cond("quente")], tid="tr2")])],
+         tags=["quente"])
+    _fake_extractor(monkeypatch)
+    out = srv.editar(LOC, "c1", tags_remover=["quente"])
+    assert {d["workflow"] for d in out["dispara"]} == {"a"}
+
+
+def test_editar_ignores_draft_workflows(root, monkeypatch):
+    root(workflows=[wf(id="a", name="Rascunho", status="draft",
+                       triggers=[trig("contact_tag", "a", conditions=[tag_cond("quente")])])],
+         tags=["quente"])
+    _fake_extractor(monkeypatch)
+    assert srv.editar(LOC, "c1", tags_adicionar=["quente"])["dispara"] == []
 
 
 def test_editar_requires_something_to_change(root):

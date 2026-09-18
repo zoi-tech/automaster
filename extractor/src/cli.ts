@@ -271,7 +271,6 @@ const STANDARD_FIELD_BODY_KEY: Record<string, string> = {
   "contact.website": "website",
   "contact.phone": "phone",
   "contact.company_name": "companyName",
-  "contact.source": "source",
   "contact.date_of_birth": "dateOfBirth",
   "contact.type": "type",
   "contact.address1": "address1",
@@ -296,6 +295,29 @@ function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<
   }
   if (custom.length) body.customFields = custom;
   return body;
+}
+
+/** `contact` do envelope do GET, com os custom fields achatados em `cf:<id>`. */
+function flatContact(r: any): Record<string, unknown> {
+  const c = r?.contact ?? r ?? {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(c)) if (k !== "customFields") out[k] = v;
+  for (const f of (c.customFields ?? []) as any[]) out[`cf:${f.id}`] = f.value ?? f.field_value ?? f.fieldValue;
+  return out;
+}
+
+/** Avisos do antes/depois: chave que sumiu (PUT replace destrutivo?) e valor pedido que não mudou (escrita ignorada — o GHL responde 200 para chave desconhecida). */
+function diffAvisos(antes: unknown, depois: unknown, esperado: Map<string, string>, ignorar: Set<string>): string[] {
+  const a = flatContact(antes), d = flatContact(depois);
+  const vazio = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  const avisos: string[] = [];
+  for (const [k, v] of Object.entries(a))
+    if (!vazio(v) && vazio(d[k]) && !esperado.has(k) && !ignorar.has(k))
+      avisos.push(`possível PUT destrutivo: ${k} tinha valor antes e está vazio/ausente depois`);
+  for (const [k, v] of esperado)
+    if (String(d[k] ?? "") !== v)
+      avisos.push(`escrita possivelmente ignorada: ${k} deveria ser ${JSON.stringify(v)}, veio ${JSON.stringify(d[k])}`);
+  return avisos;
 }
 
 async function runContatoEditar(opts: { location: string; id: string; set: string[]; tag: string[]; json?: boolean }): Promise<void> {
@@ -328,8 +350,11 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
     log(`snapshot: ${snapPath}`);
 
     const marca = (o: string) => { snap.escrito = true; snap.aplicado.push(o); fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2)); };
+    const esperado = new Map<string, string>();
     if (sets.length) {
       const body = buildFieldsBody(sets, fieldIds, contactFields);
+      for (const [k, v] of Object.entries(body)) if (k !== "customFields") esperado.set(k, String(v));
+      for (const f of (body.customFields as any[] ?? [])) esperado.set(`cf:${f.id}`, String(f.value));
       await updateContactFields(client, loc, id, body); marca("set");
     }
     if (tagsAdd.length) { await addContactTags(client, loc, id, tagsAdd); marca("tagsAdd"); }
@@ -342,7 +367,9 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`escrita aplicada (${snap.aplicado.join(", ") || "nada"}), mas o GET final falhou: ${msg}. snapshot em ${snapPath}`);
     }
-    const out = { locationId: loc, id, snapshot: snapPath, antes, depois,
+    const avisos = diffAvisos(antes, depois, esperado, new Set(tagsDel.length ? ["tags"] : []));
+    for (const a of avisos) console.error(`AVISO: ${a}`);
+    const out = { locationId: loc, id, snapshot: snapPath, antes, depois, avisos,
       mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
     if (opts.json) process.stdout.write(JSON.stringify(out) + "\n");
     else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);

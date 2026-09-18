@@ -86,13 +86,20 @@ class TriggerIndex:
 
     # --- matching por evento (devolve (trigger, conds_restantes) embutido) ---
 
-    def for_tag(self, tag: str) -> list[dict]:
-        """contact_tag cujo filtro de tag casa (ou sem filtro = qualquer tag)."""
+    def for_tag(self, tag: str, field: str = "tagsAdded") -> list[dict]:
+        """contact_tag cujo filtro de tag casa (ou sem filtro = qualquer tag).
+
+        field="tagsRemoved" casa remoção de tag. Trigger que filtra só o outro
+        evento (ex.: tagsAdded, quando se pergunta por remoção) não casa.
+        """
+        other = "tagsRemoved" if field == "tagsAdded" else "tagsAdded"
         out = []
         for t in self.of_type("contact_tag"):
-            tag_conds = [c for c in t["conditions"] if _cond_field(c) == "tagsAdded"]
-            others = [c for c in t["conditions"] if _cond_field(c) != "tagsAdded"]
+            tag_conds = [c for c in t["conditions"] if _cond_field(c) == field]
+            others = [c for c in t["conditions"] if _cond_field(c) != field]
             if not tag_conds:
+                if any(_cond_field(c) == other for c in others):
+                    continue
                 out.append({**t, "rest": others})
                 continue
             wanted = {str(c.get("value") or "").strip().lower() for c in tag_conds}
