@@ -142,8 +142,13 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
   o Python e aponta para o setup quando falta.
 - [x] **Step 4:** comandos `/automaster-extract` e `/automaster-audit`. O extract provisiona
   `npm ci` e `npx playwright install chromium` (~410 MB) na primeira chamada, avisando antes.
-- [ ] **Step 5: instalar numa máquina limpa** e confirmar que as sete tools sobem. É o único
+- [x] **Step 5: instalar numa máquina limpa** e confirmar que as sete tools sobem. É o único
   teste que pega o modo de falha mudo.
+  **Feito nesta máquina** (`claude plugin marketplace add ./` + `install automaster@zoi`): `claude mcp list`
+  mostra `plugin:automaster:automaster ✔ Connected` e as 7 tools respondem. Atenção: a instalação
+  copia a árvore inteira do repo para `~/.claude/plugins/cache/zoi/automaster/<versão>/`, inclusive
+  arquivos não versionados (`node_modules`, `_temp`, screenshots). Máquina limpa de verdade ainda
+  não testada.
 
 ---
 

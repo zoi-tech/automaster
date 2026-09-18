@@ -1,6 +1,7 @@
 {
   "name": "zoi",
   "owner": { "name": "ZOI" },
+  "description": "Plugins internos da ZOI",
   "plugins": [
     { "name": "automaster", "source": "./", "description": "Backup e auditoria de automações GoHighLevel" }
   ]
