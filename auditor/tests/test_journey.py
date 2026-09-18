@@ -1,22 +1,7 @@
 """Testes do motor da árvore de jornada do contato."""
 from automaster_audit.journey import TriggerIndex, build_journey
 from automaster_audit.loader import load_dump
-from conftest import wf
-
-
-def trig(ttype, target_wf, name="T", conditions=None, active=True, deleted=False, tid="tr1"):
-    """Trigger com o shape real do dump (actions = add_to_workflow)."""
-    return {
-        "id": tid, "type": ttype, "name": name, "active": active, "deleted": deleted,
-        "workflow_id": target_wf,
-        "actions": [{"workflow_id": target_wf, "type": "add_to_workflow"}],
-        "conditions": conditions or [],
-    }
-
-
-def tag_cond(value):
-    return {"operator": "index-of-true", "id": "tag-added", "value": value,
-            "title": "Tag Added", "type": "select", "field": "tagsAdded"}
+from conftest import tag_cond, trig, wf
 
 
 def test_trigger_index_groups_by_type_and_respects_inactive(make_dump):

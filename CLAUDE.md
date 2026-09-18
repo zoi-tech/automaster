@@ -26,7 +26,7 @@ Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** 
 
   As 4 saídas HTML compartilham o design system **"Sala de Controle"** (IBM Carbon): tema claro `#f4f4f4`/painéis brancos, IBM Plex Sans/Mono embutidas como data-URI, radius zero, shell unificado (topbar escura 48px + sidebar 256px com links relativos entre `dashboard.html`/`graph.html`/`validation.html`/`journey.html`). Acento azul `#0f62fe` só em link/ativo; severidade só em status (`#da1e28`/`#f1c21b`/`#24a148`); vermelho reservado a referência quebrada.
 
-Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`. O servidor `mcp_server.py` expõe sete tools (`dumps`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`.
+Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`. O servidor `mcp_server.py` expõe oito tools (`dumps`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `editar`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`.
 
 Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`).
 
@@ -43,6 +43,7 @@ O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-D
 npm install && npx playwright install chromium
 npm run extract -- --location <locationId>    # extração completa (abre Chrome p/ login 1x)
 npm run timeline -- -l <loc> -i <contactId> --json  # eventos do contato em JSON (stdout)
+npm run contato-editar -- -l <loc> -i <contactId> --set campo=valor --tag +x --json  # edita campos/tags do contato
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 

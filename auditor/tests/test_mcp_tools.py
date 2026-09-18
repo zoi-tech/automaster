@@ -6,7 +6,7 @@ import subprocess
 import pytest
 
 from automaster_audit import mcp_server as srv
-from conftest import wf
+from conftest import tag_cond, trig, wf
 
 
 def test_run_extractor_builds_cmd_and_parses_last_line(monkeypatch, tmp_path):
@@ -208,3 +208,22 @@ def test_contato_without_setup_teaches(root, monkeypatch, tmp_path):
     monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path / "nao-existe")
     with pytest.raises(srv.ToolError, match="automaster-extract"):
         srv.contato(LOC, "c1")
+
+
+def test_editar_calls_extractor_and_lists_triggered_workflows(root, monkeypatch):
+    root(workflows=[wf(id="a", name="Tag quente", triggers=[trig("contact_tag", "a", conditions=[tag_cond("quente")])]),
+                    wf(id="b", name="Campo mudou", triggers=[trig("contact_changed", "b")])],
+         tags=["quente"])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.setdefault("args", a) and {"id": "c1", "snapshot": "/s.json", "antes": {}, "depois": {}, "mudancas": {}})
+    out = srv.editar(LOC, "c1", set={"phone": "+55"}, tags_adicionar=["quente"])
+    assert seen["args"][:5] == ("contato-editar", "-l", LOC, "-i", "c1")
+    assert "--set" in seen["args"] and "phone=+55" in seen["args"] and "+quente" in seen["args"]
+    assert {d["workflow"] for d in out["dispara"]} == {"a", "b"}
+    assert out["snapshot"] == "/s.json" and "_snapshot" in out
+
+
+def test_editar_requires_something_to_change(root):
+    root(workflows=[wf()])
+    with pytest.raises(srv.ToolError, match="set"):
+        srv.editar(LOC, "c1")

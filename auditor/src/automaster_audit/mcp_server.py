@@ -17,7 +17,7 @@ from pathlib import Path
 
 from . import rules
 from .dashboard import build_dashboard
-from .journey import build_journey
+from .journey import TriggerIndex, build_journey
 from .loader import DumpContext, DumpError, load_dump
 from .path_report import workflow_paths_lines
 
@@ -253,6 +253,29 @@ def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot:
             "proximo_ate": kept[-1].get("createdAt") if truncated else None, "_snapshot": meta}
 
 
+def editar(loc: str, id: str, set: dict | None = None, tags_adicionar: list | None = None,
+           tags_remover: list | None = None, snapshot: str | None = None) -> dict:
+    set, tags_adicionar, tags_remover = set or {}, tags_adicionar or [], tags_remover or []
+    if not (set or tags_adicionar or tags_remover):
+        raise ToolError("nada a fazer: passe set={campo: valor} e/ou tags_adicionar/tags_remover")
+    ctx, meta = _load(loc, snapshot)
+    args = ["contato-editar", "-l", loc, "-i", id]
+    for k, v in set.items():
+        args += ["--set", f"{k}={v}"]
+    args += [x for t in tags_adicionar for x in ("--tag", f"+{t}")]
+    args += [x for t in tags_remover for x in ("--tag", f"-{t}")]
+    out = _run_extractor(*args, "--json")
+
+    idx = TriggerIndex(ctx)
+    hits = [t for tag in tags_adicionar for t in idx.for_tag(tag)]
+    if set:
+        hits += idx.for_field_change()
+    names = {w.id: w.name for w in ctx.workflows}
+    dispara = sorted({(t["target"], names.get(t["target"], ""), t["name"]) for t in hits})
+    out["dispara"] = [{"workflow": w, "nome": n, "trigger": tr} for w, n, tr in dispara]
+    return out | {"_snapshot": meta}
+
+
 # ---------------------------------------------------------------- protocolo
 
 _LOC = {"type": "string", "description": "locationId da subconta"}
@@ -280,6 +303,14 @@ TOOLS = {
                  "days": {"type": "integer", "default": 60},
                  "ate": {"type": "string", "description": "só eventos antes deste ISO (paginação)"}, "snapshot": _SNAP},
                 ["loc", "id"]),
+    "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
+               "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
+               "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",
+               {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                "set": {"type": "object", "description": "campo (nome, fieldKey ou id) → valor"},
+                "tags_adicionar": {"type": "array", "items": {"type": "string"}},
+                "tags_remover": {"type": "array", "items": {"type": "string"}}, "snapshot": _SNAP},
+               ["loc", "id"]),
 }
 
 

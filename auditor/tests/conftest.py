@@ -57,6 +57,21 @@ def make_dump(tmp_path):
     return _build
 
 
+def trig(ttype, target_wf, name="T", conditions=None, active=True, deleted=False, tid="tr1"):
+    """Trigger com o shape real do dump (actions = add_to_workflow)."""
+    return {
+        "id": tid, "type": ttype, "name": name, "active": active, "deleted": deleted,
+        "workflow_id": target_wf,
+        "actions": [{"workflow_id": target_wf, "type": "add_to_workflow"}],
+        "conditions": conditions or [],
+    }
+
+
+def tag_cond(value):
+    return {"operator": "index-of-true", "id": "tag-added", "value": value,
+            "title": "Tag Added", "type": "select", "field": "tagsAdded"}
+
+
 def wf(id="wf1", name="[Solar] Compra → Boas-vindas", status="published", steps=None, triggers=None, updated_at=None):
     """Monta o envelope de um workflow."""
     detail = {}
