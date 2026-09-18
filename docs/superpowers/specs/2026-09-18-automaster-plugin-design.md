@@ -161,8 +161,9 @@ O que a skill ensina, com os números da Instaltech como referência:
 Marketplace público e empacotamento portável de Python e Node: o custo não se paga num
 plugin de uso interno.
 
-Escrita no GHL pelo plugin. O automaster lê; mudar produção é outro problema, com outro
-risco.
+~~Escrita no GHL pelo plugin. O automaster lê; mudar produção é outro problema, com outro
+risco.~~ Revogado no mesmo dia por
+[contato-editar](2026-09-18-contato-editar-design.md): escrita de contato com snapshot prévio.
 
 `verify-contracts` e a pasta `contracts/` como tool.
 
