@@ -1,0 +1,7 @@
+{
+  "name": "automaster",
+  "description": "Backup e auditoria de automações GoHighLevel: sete tools MCP sobre dumps offline, /automaster-extract e /automaster-audit",
+  "version": "0.1.0",
+  "author": { "name": "ZOI" },
+  "keywords": ["gohighlevel", "ghl", "workflows", "auditoria"]
+}

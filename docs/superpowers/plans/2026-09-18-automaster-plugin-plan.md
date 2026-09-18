@@ -122,25 +122,25 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 ## Fase 4 — A casa dos dumps
 
 - [x] **Step 1:** raiz de dumps por env no extractor, substituindo o `path.resolve(process.cwd(), "..", "dumps")` de `extractor/src/cli.ts:27`. `dump/writer.ts` já recebe `baseDir` por parâmetro e não muda.
-- [ ] **Step 2:** mover `dumps/` para `~/.automaster/dumps/`. **Atenção ao symlink**
+- [x] **Step 2:** mover `dumps/` para `~/.automaster/dumps/`. **Atenção ao symlink**
   `dumps/6ICT3KsGLmamzMUI7VQS` → `dumps/clientec Odontologia/`, que existe porque o comando
   `timeline` procura por locationId: ele precisa sobreviver.
-- [ ] **Step 3:** conferir que `timeline` e `automaster-audit` acham os dumps no lugar novo.
+- [x] **Step 3:** conferir que `timeline` e `automaster-audit` acham os dumps no lugar novo.
 
 ---
 
 ## Fase 5 — O plugin
 
-- [ ] **Step 1:** `bin/automaster-python.sh` — testa `python3.14`, `python3.13`,
+- [x] **Step 1:** `bin/automaster-python.sh` — testa `python3.14`, `python3.13`,
   `python3.12`, `python3`; confere `sys.version_info >= (3,12)`; `exec`. Falhando todos,
   escreve em stderr a linha que ensina. O piso importa: `/usr/bin/python3` do macOS é 3.9.6
   e quebra no `str | None` de `finding.py`.
-- [ ] **Step 2:** `.claude-plugin/plugin.json` e `.mcp.json` com
+- [x] **Step 2:** `.claude-plugin/plugin.json` e `.mcp.json` com
   `command: ${CLAUDE_PLUGIN_ROOT}/bin/automaster-python.sh` e `env.AUTOMASTER_DUMPS`.
   **Não usar caminho relativo puro** e **não usar `cwd`** — nenhum dos dois é suportado.
-- [ ] **Step 3:** `hooks/hooks.json` com `SessionStart` barato (`timeout: 5`) que só confere
+- [x] **Step 3:** `hooks/hooks.json` com `SessionStart` barato (`timeout: 5`) que só confere
   o Python e aponta para o setup quando falta.
-- [ ] **Step 4:** comandos `/automaster-extract` e `/automaster-audit`. O extract provisiona
+- [x] **Step 4:** comandos `/automaster-extract` e `/automaster-audit`. O extract provisiona
   `npm ci` e `npx playwright install chromium` (~410 MB) na primeira chamada, avisando antes.
 - [ ] **Step 5: instalar numa máquina limpa** e confirmar que as sete tools sobem. É o único
   teste que pega o modo de falha mudo.
@@ -149,11 +149,11 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ## Fase 6 — A skill de leitura
 
-- [ ] **Step 1:** `skills/automaster-leitura/SKILL.md` com o que a spec lista: draft é o
+- [x] **Step 1:** `skills/automaster-leitura/SKILL.md` com o que a spec lista: draft é o
   estado normal (66 de 94), `naming_convention` é ruído (94 de 152), tag órfã quase nunca
   importa (53 de 95 após a Fase 1), ciclo de `add_to_workflow` pode ser desenho, referência
   quebrada é sempre erro, jornada de criação vazia é informação.
-- [ ] **Step 2:** descrições das tools ficam **secas** — o que devolve e quanto custa. A
+- [x] **Step 2:** descrições das tools ficam **secas** — o que devolve e quanto custa. A
   interpretação é da skill, porque descrição de tool é lida sempre, mesmo sem a tool ser
   chamada.
 

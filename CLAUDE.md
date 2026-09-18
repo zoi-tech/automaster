@@ -13,7 +13,7 @@ Docs-chave (leia antes de mudança estrutural):
 
 ## Arquitetura (big picture)
 
-Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `dumps/`:
+Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `~/.automaster/dumps/` (raiz configurável por `AUTOMASTER_DUMPS`; o extractor cai em `../dumps` sem a env):
 
 - **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar (página fica aberta durante a extração). Tokens nunca vão para disco. Extrai workflows + 6 entidades: pipelines, tags, custom_fields, **users, calendars, custom_values**.
 - **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 6 saídas na pasta do dump:
@@ -26,11 +26,15 @@ Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** 
 
   As 4 saídas HTML compartilham o design system **"Sala de Controle"** (IBM Carbon): tema claro `#f4f4f4`/painéis brancos, IBM Plex Sans/Mono embutidas como data-URI, radius zero, shell unificado (topbar escura 48px + sidebar 256px com links relativos entre `dashboard.html`/`graph.html`/`validation.html`/`journey.html`). Acento azul `#0f62fe` só em link/ativo; severidade só em status (`#da1e28`/`#f1c21b`/`#24a148`); vermelho reservado a referência quebrada.
 
+Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`. O servidor `mcp_server.py` expõe sete tools (`dumps`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`.
+
 Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`).
+
+**Índice reverso com papel:** `dashboard._wf_refs` varre steps **e** triggers; cada tag tem `papeis` (`dispara`/`adiciona`/`remove`/`condicao`). Tag só citada em trigger ou condição não é órfã.
 
 **Regras de auditoria (13):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value}_ref` (ERROR); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `naming_convention`/`dead_end_draft` (INFO).
 
-O contrato entre as partes é o formato do dump (`dumps/<locationId>/<YYYY-MM-DD_HHmm>/`): `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
+O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-DD_HHmm>/`): `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
 
 ## Comandos
 
@@ -38,6 +42,7 @@ O contrato entre as partes é o formato do dump (`dumps/<locationId>/<YYYY-MM-DD
 # Extractor (em extractor/)
 npm install && npx playwright install chromium
 npm run extract -- --location <locationId>    # extração completa (abre Chrome p/ login 1x)
+npm run timeline -- -l <loc> -i <contactId> --json  # eventos do contato em JSON (stdout)
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
@@ -50,11 +55,16 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
-.venv/bin/python -m pytest -q                             # suíte (100 testes)
+.venv/bin/python -m pytest -q                             # suíte (129 testes)
+AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
+
+# Plugin (raiz do repo)
+claude plugin marketplace add .   # registra o marketplace local 'zoi'
+claude plugin install automaster@zoi
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
-Subconta de validação: `WPIUKW3L4lDyMhLhKYKG` (Instaltech). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
+Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 94 workflows). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
 
 ## Pontos críticos
 
