@@ -2,6 +2,7 @@ import { Command } from "commander";
 import path from "node:path";
 import { openSession } from "./auth/session.js";
 import { captureTokens, decodeCompanyId, type Tokens } from "./auth/token.js";
+import type { Page } from "playwright";
 import { GhlClient } from "./api/client.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
 import {
@@ -26,22 +27,55 @@ import { execFile } from "node:child_process";
 
 const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
 
-async function runExtract(opts: { location: string }): Promise<void> {
-  const locationId = opts.location;
+/** Snapshot mais recente da subconta: só pastas com manifest.json contam. */
+function latestDumpDir(locationId: string): string | undefined {
+  try {
+    const base = path.join(DUMPS_DIR, locationId);
+    const snaps = fs.readdirSync(base).filter((d) => fs.existsSync(path.join(base, d, "manifest.json"))).sort();
+    const latest = snaps.at(-1);
+    return latest ? path.join(base, latest) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** `raw` de uma entidade do dump mais recente; undefined sem dump ou sem o arquivo. */
+function latestDumpEntity(locationId: string, name: string): unknown {
+  const dir = latestDumpDir(locationId);
+  if (!dir) return undefined;
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), "utf-8"))?.raw;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. */
+async function withClient(
+  locationId: string,
+  log: (msg: string) => void,
+  fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
+): Promise<void> {
   const { context, page } = await openSession();
   try {
-    console.log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
+    log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
     let tokens = await captureTokens(page, locationId);
-    console.log(`tokens ok (bearer ${tokens.bearer.slice(0, 12)}…, token-id ${tokens.tokenId.slice(0, 12)}…)`);
-
     const refresh = async (): Promise<Tokens> => {
-      console.log("401 — recapturando tokens...");
+      log("401 — recapturando tokens...");
       await page.reload({ waitUntil: "domcontentloaded" });
       tokens = await captureTokens(page, locationId);
       return tokens;
     };
+    await fn(new GhlClient(context, tokens, refresh), page, tokens);
+  } finally {
+    await context.close();
+  }
+}
 
-    const client = new GhlClient(context, tokens, refresh);
+async function runExtract(opts: { location: string }): Promise<void> {
+  const locationId = opts.location;
+  await withClient(locationId, console.log, async (client, page, tokens) => {
+    console.log(`tokens ok (bearer ${tokens.bearer.slice(0, 12)}…, token-id ${tokens.tokenId.slice(0, 12)}…)`);
     const writer = new DumpWriter(DUMPS_DIR, locationId, stampNow());
 
     const entries = await listWorkflows(client, locationId);
@@ -71,9 +105,7 @@ async function runExtract(opts: { location: string }): Promise<void> {
 
     await writer.writeManifest({ workflows: ok });
     console.log(`\nDump salvo em: ${writer.dir}`);
-  } finally {
-    await context.close();
-  }
+  });
 }
 
 async function runDiscover(opts: { location: string; area: string }): Promise<void> {
@@ -107,39 +139,26 @@ async function runDiscover(opts: { location: string; area: string }): Promise<vo
 /** id → nome dos workflows do dump mais recente da subconta (melhor esforço). */
 function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
   const names = new Map<string, string>();
+  const dir = latestDumpDir(locationId);
+  if (!dir) return names;
   try {
-    const base = path.join(DUMPS_DIR, locationId);
-    const latest = fs.readdirSync(base).sort().at(-1);
-    if (!latest) return names;
-    const wfDir = path.join(base, latest, "workflows");
+    const wfDir = path.join(dir, "workflows");
     for (const f of fs.readdirSync(wfDir)) {
       const wf = JSON.parse(fs.readFileSync(path.join(wfDir, f), "utf-8"));
       if (wf.id && wf.name) names.set(wf.id, wf.name);
     }
-  } catch {
-    /* sem dump local — timeline mostra o id cru */
-  }
+  } catch { /* sem dump local — timeline mostra o id cru */ }
   return names;
 }
 
 /** id → nome de pipelines e stages do dump mais recente (melhor esforço). */
-function stageNamesFromLatestDump(locationId: string): {
-  pipelines: Map<string, string>;
-  stages: Map<string, string>;
-} {
+function stageNamesFromLatestDump(locationId: string): { pipelines: Map<string, string>; stages: Map<string, string> } {
   const pipelines = new Map<string, string>();
   const stages = new Map<string, string>();
-  try {
-    const base = path.join(DUMPS_DIR, locationId);
-    const latest = fs.readdirSync(base).sort().at(-1);
-    if (!latest) return { pipelines, stages };
-    const obj = JSON.parse(fs.readFileSync(path.join(base, latest, "pipelines.json"), "utf-8"));
-    for (const p of obj?.raw?.pipelines ?? []) {
-      if (p.id && p.name) pipelines.set(p.id, p.name);
-      for (const s of p.stages ?? []) if (s.id && s.name) stages.set(s.id, s.name);
-    }
-  } catch {
-    /* sem pipelines no dump — mostra id cru */
+  const raw = latestDumpEntity(locationId, "pipelines") as { pipelines?: any[] } | undefined;
+  for (const p of raw?.pipelines ?? []) {
+    if (p.id && p.name) pipelines.set(p.id, p.name);
+    for (const s of p.stages ?? []) if (s.id && s.name) stages.set(s.id, s.name);
   }
   return { pipelines, stages };
 }
@@ -147,17 +166,10 @@ function stageNamesFromLatestDump(locationId: string): {
 /** id → nome dos usuários do dump mais recente da subconta (melhor esforço). */
 function userNamesFromLatestDump(locationId: string): Map<string, string> {
   const names = new Map<string, string>();
-  try {
-    const base = path.join(DUMPS_DIR, locationId);
-    const latest = fs.readdirSync(base).sort().at(-1);
-    if (!latest) return names;
-    const obj = JSON.parse(fs.readFileSync(path.join(base, latest, "users.json"), "utf-8"));
-    for (const u of obj?.raw?.users ?? []) {
-      const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(" ");
-      if (u.id && name) names.set(u.id, name);
-    }
-  } catch {
-    /* sem users no dump — mostra id cru */
+  const raw = latestDumpEntity(locationId, "users") as { users?: any[] } | undefined;
+  for (const u of raw?.users ?? []) {
+    const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(" ");
+    if (u.id && name) names.set(u.id, name);
   }
   return names;
 }
@@ -167,17 +179,7 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
   const days = Number(opts.days) || 60;
   // em --json o stdout é só o payload; progresso vai para stderr
   const log = opts.json ? console.error : console.log;
-  const { context, page } = await openSession();
-  try {
-    log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
-    let tokens = await captureTokens(page, locationId);
-    const refresh = async (): Promise<Tokens> => {
-      await page.reload({ waitUntil: "domcontentloaded" });
-      tokens = await captureTokens(page, locationId);
-      return tokens;
-    };
-    const client = new GhlClient(context, tokens, refresh);
-
+  await withClient(locationId, log, async (client, page) => {
     log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
     const logs = await fetchAuditLogs(client, locationId, opts.id, days);
     log(`${logs.length} eventos do contato.`);
@@ -238,9 +240,7 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
     fs.writeFileSync(out, html, "utf-8");
     log(`timeline (efêmera): ${out}`);
     if (process.platform === "darwin") execFile("open", [out]);
-  } finally {
-    await context.close();
-  }
+  });
 }
 
 const program = new Command();
