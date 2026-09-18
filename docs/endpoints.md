@@ -111,3 +111,56 @@ GET services.leadconnectorhq.com/associations/relations/record/<contactId>
 - Agendamentos: `services.../calendars/events?locationId&contactId&startTime&endTime`
   testado e RECUSADO com tokens internos — endpoint correto pendente de discover
   (aba Appointments do contato).
+
+## Escrita — rotas do bundle, GET validado 2026-09-18
+
+Rotas obtidas lendo os chunks JS do app (`contacts-highrise`, `appcdn.leadconnectorhq.com`),
+sem escrita nenhuma em produção. Só o GET abaixo foi confirmado ao vivo; PUT/POST/DELETE
+vêm do código do app e ainda não foram executados (confirmação prevista para depois, ao
+vivo). Headers comuns de escrita, provados pelos scripts soltos do extractor
+(`extractor/restore.ts`, `extractor/patch.ts`, `extractor/cv.ts`, não versionados) em
+`PUT /workflow/...` e `POST /locations/<loc>/customValues`, ambos no host `backend`: os
+mesmos de leitura (`authorization: Bearer`, `token-id`, `channel: APP`,
+`source: WEB_USER`, `version: 2021-07-28`, UA de browser) mais `content-type: application/json`.
+O PUT de workflow exige também `version` e `dataVersion` vindos do GET anterior
+(concorrência otimista) — ainda não se sabe se o PUT de contato tem exigência equivalente.
+
+### Contato inteiro (snapshot) — GET validado ao vivo
+```
+GET services.leadconnectorhq.com/contacts/<contactId>
+```
+- Headers: os de leitura padrão do `GhlClient` (Bearer + `token-id`, sem `content-type`).
+- Resposta **200**, confirmada com um contato real da Instaltech: `{ contact: {...} }`.
+- Chaves de topo: `id`, `dateAdded`, `tags`, `type`, `locationId`, `firstName`,
+  `firstNameLowerCase`, `fullNameLowerCase`, `lastName`, `lastNameLowerCase`, `phone`,
+  `country`, `assignedTo`, `createdBy`, `profilePhoto`, `dateUpdated`, `followers`,
+  `customFields`, `additionalEmails`, `additionalPhones`.
+- `customFields` é **array de `{ id, value }`** — confirmado no mesmo contato real:
+  `customFields: [{"id":"3eqIvbxYmKdonxhAcyGv","value":"Falso"}, ...]`. ⚠️ Armadilha: a
+  API pública v2 usa `field_value` para o mesmo conceito; a interna usa `value`. Quem for
+  montar o corpo do PUT (Task 6, `buildFieldsBody`) tem que usar `value`, não `field_value`.
+
+### Campos do contato — do bundle, não executado
+```
+PUT backend.leadconnectorhq.com/contacts/<contactId>?version=14-05-22
+```
+- O `?version=14-05-22` é parte da rota (query string fixa do app), não um header.
+- Corpo, pelo código do app: campo padrão (`phone`, `companyName`, `email`, ...) vai cru
+  no topo do corpo, como no GET; custom field vai em `customFields: [{ id, value }]`.
+- Resposta: não observada ainda.
+- ⚠️ **Perigo não confirmado nem negado na interna:** na API pública v2 do GHL, mandar
+  `tags` dentro do PUT de campos do contato **sobrescreve a lista inteira de tags**. Por
+  isso, aqui, tag nunca vai por esse PUT — sempre pelos endpoints granulares abaixo.
+
+### Tags — do bundle, não executado
+```
+POST   backend.leadconnectorhq.com/contacts/<contactId>/tags     corpo: { tags: [...] }
+DELETE backend.leadconnectorhq.com/contacts/<contactId>/tags     corpo: { tags: [...] }
+```
+- Adicionar e remover, respectivamente. Resposta: não observada ainda.
+
+### Bônus (do bundle, não usado no projeto ainda)
+```
+POST backend.leadconnectorhq.com/contacts/<contactId>/customFields/refresh
+```
+- Recalcula campo computado. Sem corpo observado, sem uso previsto por ora.
