@@ -60,9 +60,10 @@ npm run contato-editar -- -l <loc> -i <contactId> [--set campo=valor]... [--tag 
   montagem do payload, não na resolução.
 - `--tag` aceita nome; a lista de tags também vem do dump. Tag inexistente é erro (não cria).
 - Ordem: validar entrada → GET contato → gravar snapshot → PUT/POST → GET contato de novo →
-  imprimir `{antes, depois, mudancas, snapshot, dispara}` em JSON no stdout. `dispara` lista
-  os workflows publicados do dump cujo trigger (`Contact Changed`, `Contact Tag`) reage ao
-  campo ou tag pedido; informa, não bloqueia.
+  imprimir `{antes, depois, mudancas, snapshot}` em JSON no stdout. O campo `dispara`
+  (workflows publicados cujo trigger `contact_changed`/`contact_tag` reage ao pedido) é
+  calculado pela tool no auditor, que já tem o `TriggerIndex` de `journey.py`; informa, não
+  bloqueia.
 - Falha no snapshot aborta sem escrever.
 
 ## Snapshot
