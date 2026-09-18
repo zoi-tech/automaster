@@ -1,11 +1,35 @@
 """Contrato e teto das seis tools offline do servidor MCP."""
 import json
 import shutil
+import subprocess
 
 import pytest
 
 from automaster_audit import mcp_server as srv
 from conftest import wf
+
+
+def test_run_extractor_builds_cmd_and_parses_last_line(monkeypatch, tmp_path):
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True); tsx.write_text("")
+    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    seen = {}
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd; seen["env"] = kw["env"]
+        return subprocess.CompletedProcess(cmd, 0, stdout='ruído\n{"ok": 1}\n', stderr="")
+    monkeypatch.setattr(srv.subprocess, "run", fake_run)
+    assert srv._run_extractor("contato-editar", "-l", "L", "--json") == {"ok": 1}
+    assert seen["cmd"][1:] == ["src/cli.ts", "contato-editar", "-l", "L", "--json"]
+    assert seen["env"]["AUTOMASTER_DUMPS"]
+
+
+def test_run_extractor_failure_carries_stderr(monkeypatch, tmp_path):
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True); tsx.write_text("")
+    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(srv.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="snapshot: /x/y.json\nHTTP 403"))
+    with pytest.raises(srv.ToolError, match="snapshot: /x/y.json"):
+        srv._run_extractor("contato-editar")
 
 LOC = "TESTLOC"
 

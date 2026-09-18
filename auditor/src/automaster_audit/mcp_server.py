@@ -214,8 +214,8 @@ def jornada(loc: str, caminho: list[int] | None = None, profundidade: int = 1,
             "filhos": [_slim(c, profundidade) for c in node.get("children") or []], "_snapshot": meta}
 
 
-def _run_timeline(loc: str, id: str, days: int) -> dict:
-    """Chama o extractor ao vivo (abre Chrome; espera segundos). Só o stdout é JSON."""
+def _run_extractor(*args: str) -> dict:
+    """Roda `tsx src/cli.ts <args>` no extractor (abre Chrome; espera segundos). Só a última linha do stdout é JSON."""
     tsx = EXTRACTOR_DIR / "node_modules" / ".bin" / "tsx"
     if not tsx.is_file():
         raise ToolError("extractor não provisionado: rode /automaster-extract uma vez "
@@ -224,11 +224,15 @@ def _run_timeline(loc: str, id: str, days: int) -> dict:
     extra = [str(p) for p in ("/opt/homebrew/bin", "/usr/local/bin", *Path.home().glob(".nvm/versions/node/*/bin"))]
     env = {**os.environ, "AUTOMASTER_DUMPS": str(_root()),
            "PATH": os.pathsep.join([os.environ.get("PATH", ""), *extra])}
-    cmd = [str(tsx), "src/cli.ts", "timeline", "-l", loc, "-i", id, "-d", str(days), "--json"]
+    cmd = [str(tsx), "src/cli.ts", *args]
     r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env)
     if r.returncode != 0 or not r.stdout.strip():
-        raise ToolError(f"timeline falhou (código {r.returncode}): {r.stderr.strip()[-600:]}")
+        raise ToolError(f"{args[0]} falhou (código {r.returncode}): {r.stderr.strip()[-600:]}")
     return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def _run_timeline(loc: str, id: str, days: int) -> dict:
+    return _run_extractor("timeline", "-l", loc, "-i", id, "-d", str(days), "--json")
 
 
 def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot: str | None = None) -> dict:
