@@ -76,22 +76,30 @@ async function runExtract(opts: { location: string }): Promise<void> {
   }
 }
 
-async function runDiscover(opts: { location: string }): Promise<void> {
+async function runDiscover(opts: { location: string; area: string }): Promise<void> {
   const { context, page } = await openSession();
+  const rota = opts.area === "contatos" ? "contacts/smart_list/All" : "automation/workflows";
   console.log(
-    `Modo discover: navegue manualmente pela aba Automations da subconta ${opts.location}.\n` +
-      "Os requests ao backend serão observados. (Mapeamento de endpoints — ver docs/endpoints.md.)\n" +
+    `Modo discover: navegue manualmente pela aba ${opts.area} da subconta ${opts.location}.\n` +
+      "Os requests ao backend serão observados; escritas (não-GET) mostram o corpo. (Ver docs/endpoints.md.)\n" +
       "Feche a janela do Chrome para encerrar.",
   );
-  page.on("request", async (req) => {
+  page.on("request", (req) => {
     const url = req.url();
-    if (url.includes("leadconnectorhq.com") && !url.includes("google-analytics")) {
-      console.log(`${req.method()} ${url}`);
+    if (!url.includes("leadconnectorhq.com") || url.includes("google-analytics")) return;
+    console.log(`${req.method()} ${url}`);
+    if (req.method() !== "GET") {
+      const h = req.headers();
+      console.log(`  headers: token-id=${h["token-id"] ? "sim" : "não"} authorization=${h["authorization"] ? "sim" : "não"} version=${h["version"] ?? "-"} channel=${h["channel"] ?? "-"} source=${h["source"] ?? "-"}`);
+      console.log(`  body: ${(req.postData() ?? "").slice(0, 2000)}`);
     }
   });
-  await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/automation/workflows`, {
-    waitUntil: "domcontentloaded",
+  page.on("response", async (res) => {
+    const req = res.request();
+    if (req.method() === "GET" || !res.url().includes("leadconnectorhq.com")) return;
+    console.log(`  ← ${res.status()} ${(await res.text().catch(() => "")).slice(0, 500)}`);
   });
+  await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/${rota}`, { waitUntil: "domcontentloaded" });
   await page.waitForEvent("close", { timeout: 0 }).catch(() => {});
   await context.close();
 }
@@ -257,6 +265,7 @@ program
   .command("discover")
   .description("Observa os requests ao backend enquanto você navega (mapeia endpoints)")
   .requiredOption("-l, --location <id>", "locationId da subconta")
+  .option("--area <area>", "workflows | contatos", "workflows")
   .action(runDiscover);
 
 program.parseAsync(process.argv);
