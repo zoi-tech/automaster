@@ -34,13 +34,14 @@ export class GhlClient {
     };
   }
 
-  /** GET autenticado com JSON de resposta. Trata 401 (refresh 1x) e 429 (backoff). */
-  async getJson<T = unknown>(url: string): Promise<T> {
+  /** Chamada autenticada com JSON. Trata 401 (refresh 1x) e 429 (backoff). */
+  private async request<T>(method: "get" | "put" | "post" | "delete", url: string, body?: unknown): Promise<T> {
     await sleep(this.throttleMs);
     let refreshed = false;
     for (let attempt = 0; ; attempt++) {
-      const res = await this.context.request.get(url, { headers: this.authHeaders() });
-      if (res.ok()) return (await res.json()) as T;
+      const headers = body === undefined ? this.authHeaders() : { ...this.authHeaders(), "content-type": "application/json" };
+      const res = await this.context.request[method](url, { headers, data: body });
+      if (res.ok()) return (await res.json().catch(() => ({}))) as T;
 
       const status = res.status();
       if (status === 401 && !refreshed) {
@@ -52,9 +53,14 @@ export class GhlClient {
         await sleep(1000 * (attempt + 1));
         continue;
       }
-      throw new Error(`GET ${url} → HTTP ${status} ${await safeBody(res)}`);
+      throw new Error(`${method.toUpperCase()} ${url} → HTTP ${status} ${await safeBody(res)}`);
     }
   }
+
+  getJson<T = unknown>(url: string): Promise<T> { return this.request<T>("get", url); }
+  putJson<T = unknown>(url: string, body: unknown): Promise<T> { return this.request<T>("put", url, body); }
+  postJson<T = unknown>(url: string, body: unknown): Promise<T> { return this.request<T>("post", url, body); }
+  deleteJson<T = unknown>(url: string, body?: unknown): Promise<T> { return this.request<T>("delete", url, body); }
 
   /** GET sem auth (para URLs pré-assinadas do Firebase). */
   async getJsonNoAuth<T = unknown>(url: string): Promise<T> {
