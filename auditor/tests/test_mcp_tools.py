@@ -159,6 +159,15 @@ def test_contato_returns_events_and_snapshot(root, monkeypatch):
     assert out["truncado"] is False and "_snapshot" in out
 
 
+def test_contato_drops_noise_keys(root, monkeypatch):
+    root(workflows=[wf()])
+    ev = {**_ev(0), "traceId": "t", "commonPrimaryId": "c", "_id": "c", "shardId": "s", "secondaryId": "x",
+          "apiVersion": "v", "chPublished": True, "externalChange": True}
+    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [ev]})
+    got = srv.contato(LOC, "c1")["eventos"][0]
+    assert set(got) == set(_ev(0))
+
+
 def test_contato_ceiling_pages_by_time(root, monkeypatch):
     root(workflows=[wf()])
     monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [_ev(i) for i in range(9)]})

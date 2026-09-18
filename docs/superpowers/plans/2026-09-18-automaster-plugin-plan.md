@@ -109,9 +109,15 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ### Task 3.2: `contato`
 
-- [ ] **Step 1: medir primeiro.** Rodar `timeline --json` num contato real e anotar tokens
+- [x] **Step 1: medir primeiro.** Rodar `timeline --json` num contato real e anotar tokens
   e segundos. **É a lacuna que o mapa fechou sem preencher**; sem esse número o teto da tool
   é chute. Anotar no plano antes de seguir.
+  **Medido em 2026-09-18** (contato `O1WodoGFgT3Ncfw750eH`, subconta `wbSVxrr4mvYNRaIw1eJ7`, 60 dias):
+  **9 s** com sessão já logada; 31 eventos, 9.059 tokens brutos (292/evento). Oito chaves de
+  ruído (`traceId`, `commonPrimaryId`, `_id`, `shardId`, `secondaryId`, `apiVersion`,
+  `chPublished`, `externalChange`) são 40% do payload; `contato` as remove → **4.824 tokens
+  (155/evento)**. Teto de 40k chars ≈ 55 eventos por página. Agendamentos falharam nesse
+  contato (`calendars/events` 4xx), aviso preexistente do `timeline`, fora deste plano.
 - [x] **Step 2:** `contato(loc, id, days?)` chama o extractor como subprocesso e devolve o
   JSON, com teto e paginação por janela de tempo.
 - [x] **Step 3:** quando o setup do extractor falta, a tool devolve erro que **ensina** o
@@ -166,8 +172,8 @@ no `dashboard.html`, e as tools `buscar` e `workflow` dependem dele.
 
 ## Verificação final
 
-- [ ] 114 testes do auditor verdes, mais os novos das fases 1 e 2.
-- [ ] `npx tsc --noEmit` limpo no extractor.
+- [x] 114 testes do auditor verdes, mais os novos das fases 1 e 2.
+- [x] `npx tsc --noEmit` limpo no extractor.
 - [ ] As quatro perguntas do mapa respondidas numa sessão real, comparadas com os
   transcripts de `docs/wayfinder/prototipo-007-a-sessao-ideal.md`.
-- [ ] `dashboard.html` regenerado sem as seis tags-gatilho na lista de órfãs.
+- [x] `dashboard.html` regenerado sem as seis tags-gatilho na lista de órfãs.

@@ -23,7 +23,9 @@ from .path_report import workflow_paths_lines
 
 PROTOCOL = "2025-06-18"
 PATHS_MAX_CHARS = 6000  # ~1.500 tokens; a mediana do paths.md é 173 tok, o maior 18.665
-CONTATO_MAX_CHARS = 40000  # ~10k tokens; ponytail: chute até medir num contato real (Fase 3.2)
+CONTATO_MAX_CHARS = 40000  # ~10k tokens; medido: ~180 tok/evento depois de tirar o ruído → ~55 eventos
+CONTATO_NOISE = ("traceId", "commonPrimaryId", "_id", "shardId", "secondaryId", "apiVersion",
+                 "chPublished", "externalChange")  # 40% do payload bruto, nada que o agente use
 EXTRACTOR_DIR = Path(os.environ.get("CLAUDE_PLUGIN_ROOT") or Path(__file__).resolve().parents[3]) / "extractor"
 FATIAS = ("workflows", "tags", "fields", "pipelines", "users", "calendars", "custom_values")
 
@@ -227,7 +229,8 @@ def _run_timeline(loc: str, id: str, days: int) -> dict:
 
 def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot: str | None = None) -> dict:
     _, meta = _load(loc, snapshot)
-    events = _run_timeline(loc, id, int(days))["events"]
+    events = [{k: v for k, v in e.items() if k not in CONTATO_NOISE}
+              for e in _run_timeline(loc, id, int(days))["events"]]
     events.sort(key=lambda e: str(e.get("createdAt", "")), reverse=True)
     if ate:
         events = [e for e in events if str(e.get("createdAt", "")) < ate]
@@ -262,8 +265,8 @@ TOOLS = {
                 "ex. [0,3,1], sobre criacao+anytime; profundidade expande filhos.",
                 {"loc": _LOC, "caminho": {"type": "array", "items": {"type": "integer"}},
                  "profundidade": {"type": "integer", "default": 1}, "snapshot": _SNAP}, ["loc"]),
-    "contato": (contato, "AO VIVO: abre Chrome e pagina o audit log do contato (segundos, exige setup do "
-                "extractor). Eventos mais recentes primeiro, sourceWorkflowName resolvido; teto ~10k tokens, "
+    "contato": (contato, "AO VIVO: abre Chrome e pagina o audit log do contato (~10 s logado, exige setup do "
+                "extractor). Eventos mais recentes primeiro (~155 tokens cada), sourceWorkflowName resolvido; teto ~10k tokens, "
                 "pagine com ate=proximo_ate.",
                 {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
                  "days": {"type": "integer", "default": 60},
