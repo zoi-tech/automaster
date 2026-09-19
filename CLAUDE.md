@@ -56,7 +56,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
-.venv/bin/python -m pytest -q                             # suíte (129 testes)
+.venv/bin/python -m pytest -q                             # suíte (138 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -80,4 +80,6 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 94 workflows). A se
 
 ## Fora de escopo (por enquanto)
 
-Teste ao vivo no GHL (escreve em produção), clonagem/migração entre subcontas, multi-subconta em lote, diff entre snapshots, `broken_template_ref` (templates internos existem — `internal_notification.template_id` — falta puxar a lista).
+Desfazer uma edição de contato, clonagem/migração entre subcontas, multi-subconta em lote, diff entre snapshots, `broken_template_ref` (templates internos existem — `internal_notification.template_id` — falta puxar a lista).
+
+Escrita de contato **saiu** desta lista: está implementada e validada ao vivo (`docs/endpoints.md` seção `## Escrita`). O que ainda não foi confirmado está em `docs/pendencias-escrita-contato.md`.
