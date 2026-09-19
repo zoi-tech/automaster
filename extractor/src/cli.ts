@@ -110,9 +110,9 @@ async function runExtract(opts: { location: string }): Promise<void> {
   });
 }
 
-async function runDiscover(opts: { location: string; area: string }): Promise<void> {
+async function runDiscover(opts: { location: string; area: string; rota?: string; filtro?: string }): Promise<void> {
   const { context, page } = await openSession();
-  const rota = opts.area === "contatos" ? "contacts/smart_list/All" : "automation/workflows";
+  const rota = opts.rota ?? (opts.area === "contatos" ? "contacts/smart_list/All" : "automation/workflows");
   console.log(
     `Modo discover: navegue manualmente pela aba ${opts.area} da subconta ${opts.location}.\n` +
       "Os requests ao backend serão observados; escritas (não-GET) mostram o corpo. (Ver docs/endpoints.md.)\n" +
@@ -131,8 +131,11 @@ async function runDiscover(opts: { location: string; area: string }): Promise<vo
   });
   page.on("response", async (res) => {
     const req = res.request();
-    if (req.method() === "GET" || !res.url().includes("leadconnectorhq.com")) return;
-    console.log(`  ← ${res.status()} ${(await res.text().catch(() => "")).slice(0, 500)}`);
+    if (!res.url().includes("leadconnectorhq.com")) return;
+    // GET só com --filtro: sem ele a aba inteira vira ruído
+    if (req.method() === "GET" && !(opts.filtro && res.url().includes(opts.filtro))) return;
+    const limite = req.method() === "GET" ? 4000 : 500;
+    console.log(`  \u2190 ${res.status()} ${res.url()}\n  ${(await res.text().catch(() => "")).slice(0, limite)}`);
   });
   await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/${rota}`, { waitUntil: "domcontentloaded" });
   await page.waitForEvent("close", { timeout: 0 }).catch(() => {});
@@ -419,6 +422,8 @@ program
   .description("Observa os requests ao backend enquanto você navega (mapeia endpoints)")
   .requiredOption("-l, --location <id>", "locationId da subconta")
   .option("--area <area>", "workflows | contatos", "workflows")
+  .option("--rota <path>", "rota livre depois de /v2/location/<id>/ (ignora --area)")
+  .option("--filtro <substr>", "também mostra a resposta dos GET cuja URL contenha esta substring")
   .action(runDiscover);
 
 program
