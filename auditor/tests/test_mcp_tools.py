@@ -579,3 +579,61 @@ def test_oportunidade_acao_serializa_campos_e_previsao(root, monkeypatch):
                           campos=[{"id": "f1", "fieldValue": "x"}], confirmo=True)
     assert "2026-12-01" in visto["args"]
     assert '[{"id": "f1", "fieldValue": "x"}]' in visto["args"]
+
+
+def test_agenda_recusa_operacao_invalida(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inválido"):
+        srv.agenda(LOC, o="inventar")
+
+
+def test_agenda_eventos_exige_periodo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inicio"):
+        srv.agenda(LOC, o="eventos", calendario="c1")
+
+
+def test_agenda_eventos_passa_periodo_ao_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"events": []})
+    r = srv.agenda(LOC, o="eventos", calendario="c1",
+                   inicio="2026-10-01T00:00:00-03:00", fim="2026-10-08T00:00:00-03:00")
+    assert r["resultado"] == {"events": []}
+    assert "--inicio" in visto["args"] and "2026-10-01T00:00:00-03:00" in visto["args"]
+    assert "--calendario" in visto["args"] and "c1" in visto["args"]
+
+
+def test_agenda_acao_recusa_sem_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="confirmo=true"):
+        srv.agenda_acao(LOC, acao="cancelar", id="e1")
+
+
+def test_agenda_acao_marcar_exige_situacao(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="situacao"):
+        srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
+                        inicio="2026-10-02T14:00:00-03:00", confirmo=True)
+
+
+def test_agenda_acao_recusa_situacao_fora_do_enum(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="remarcado"):
+        srv.agenda_acao(LOC, acao="situacao", id="e1", situacao="remarcado", confirmo=True)
+
+
+def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    r = srv.agenda_acao(LOC, acao="remarcar", id="e1", alvo="instancia",
+                        inicio="2026-10-03T15:00:00-03:00", confirmo=True)
+    assert r["aplicado"] is True
+    assert "--alvo" in visto["args"] and "instancia" in visto["args"]
+    assert "--confirmo" in visto["args"]
