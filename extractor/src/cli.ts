@@ -518,12 +518,15 @@ const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
 const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "ver", "notas"];
 
-/** `--limite abc` vira NaN; `--limite 500` passa do teto documentado. Clampa 1..20,
- * caindo para 20 em valor não numérico. */
-function clampLimite(v?: string): number {
+/** Fora da faixa 1..20 (incluindo não numérico) cai para 20, com aviso via `log`. */
+function clampLimite(v: string | undefined, log: (msg: string) => void): number {
   const n = Number(v);
-  if (!Number.isFinite(n)) return 20;
-  return Math.min(20, Math.max(1, Math.trunc(n)));
+  const valido = Number.isFinite(n) && n >= 1 && n <= 20;
+  if (!valido) {
+    log(`aviso: --limite ${v ?? ""} inválido ou fora de 1..20, ajustado para 20.`);
+    return 20;
+  }
+  return Math.trunc(n);
 }
 
 async function runAgenda(opts: {
@@ -574,7 +577,7 @@ async function runAgenda(opts: {
         out = await getAppointment(client, opts.id!);
         break;
       case "notas": {
-        const limite = clampLimite(opts.limite);
+        const limite = clampLimite(opts.limite, log);
         out = await listNotes(
           client, opts.id!,
           limite,
@@ -652,6 +655,14 @@ async function runAgendaAcao(opts: {
         // execução seguir para o PUT sem saber se é série. Só aceitamos seguir cego quando
         // o usuário já declarou --alvo explicitamente.
         if (!opts.alvo) throw e;
+        if (opts.alvo === "serie") {
+          // --alvo serie precisa do masterEventId, que só vem dessa leitura. Sem ele o PUT
+          // iria na ocorrência (opts.id) em vez da série — o oposto do pedido, sem desfazer.
+          throw new Error(
+            `--alvo serie foi pedido mas não deu para checar ${opts.id} (${String(e)}); ` +
+            "sem essa leitura não há como achar o id-mestre da série. Tente de novo.",
+          );
+        }
         log(`aviso: não deu para checar se ${opts.id} é série (${String(e)}); seguindo com --alvo ${opts.alvo}, como pedido.`);
         return null;
       }) as Record<string, unknown> | null;
@@ -840,13 +851,20 @@ async function runOportunidadeAcao(opts: {
     });
 
     let r: unknown;
-    switch (opts.acao) {
-      case "criar": r = await createOpportunity(client, opts.location, corpo); break;
-      case "editar":
-      case "mover":
-      case "status": r = await updateOpportunity(client, opts.id!, corpo); break;
-      case "apagar": r = await deleteOpportunity(client, opts.id!); break;
-      case "restaurar": r = await restoreOpportunity(client, opts.id!); break;
+    try {
+      switch (opts.acao) {
+        case "criar": r = await createOpportunity(client, opts.location, corpo); break;
+        case "editar":
+        case "mover":
+        case "status": r = await updateOpportunity(client, opts.id!, corpo); break;
+        case "apagar": r = await deleteOpportunity(client, opts.id!); break;
+        case "restaurar": r = await restoreOpportunity(client, opts.id!); break;
+      }
+    } catch (e) {
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), acao: opts.acao, corpo, antes, aplicado: false, erro: String(e),
+      }, null, 2));
+      throw e;
     }
     fs.writeFileSync(registro, JSON.stringify({
       em: new Date().toISOString(), acao: opts.acao, corpo, antes, aplicado: true, resposta: r,
