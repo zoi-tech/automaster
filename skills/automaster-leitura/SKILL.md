@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -82,3 +82,26 @@ com `apagar_com_cards=true`. Ao montar a lista, sempre parta da leitura atual do
 **Apagar pipeline não tem restore.** Apagar card tem (`acao="restaurar"`), e o card
 apagado devolve 404 na leitura até ser restaurado. Pipeline apagado leva os cards junto e
 só volta reconstruído à mão, a partir do estado gravado em `<dumps>/_oportunidades/`.
+
+**As tools de agenda não leem o dump — elas abrem o Chrome.** O dump só guarda nome e id de
+calendário, para resolver referência de workflow. Compromisso não está lá.
+
+**Marcar ou cancelar fala com o cliente.** A escrita dispara o e-mail ou SMS que o
+calendário tem configurado e acorda as automações ligadas ao compromisso. `silenciar`
+desliga as automações junto. Provado ao vivo num calendário com notificação ao contato
+ligada: com `silenciar` nenhuma mensagem saiu. O caso **sem** `silenciar` nunca foi testado
+(mandaria mensagem de verdade), então trate a escrita não silenciada como quem fala com o
+cliente.
+
+**Compromisso que se repete exige dizer o alvo.** Sem `alvo`, a tool recusa em vez de
+escolher: a mesma chamada remarca uma terça ou o ano inteiro, conforme o id enviado.
+
+**Bloqueio de horário não aparece em `o=eventos`.** Ele só vem em `o=bloqueios`
+(`/calendars/blocked-slots`). O que separa os dois é o `status` — `booked` no compromisso,
+`unavailable` no bloqueio — e é isso que o campo `_tipo` traduz. Bloqueio não tem contato,
+não tem situação e não é reunião com ninguém: é a agenda de um usuário fechada num horário.
+Por isso `bloquear` exige `dono` e recusa `contato`/`situacao`.
+
+**`forcar` marca por cima da disponibilidade.** Sem ele o servidor recusa horário ocupado
+(`400 The slot you have selected is no longer available.`); com ele, passa — e exige `dono`,
+porque sem a checagem de horário o servidor não escolhe responsável sozinho.

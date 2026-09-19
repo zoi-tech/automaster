@@ -108,9 +108,9 @@ GET services.leadconnectorhq.com/associations/relations/record/<contactId>
 - `{ relations: [{ recordId: <opportunityId>, ... }] }`. O audit/search/v2 aceita
   o opportunityId no `id` → histórico da oportunidade (criação, stage, status).
 - Snapshot do registro: `POST services.../objects/opportunity/records/ids` (observado, não usado).
-- Agendamentos: `services.../calendars/events?locationId&contactId&startTime&endTime`
-  testado e RECUSADO com tokens internos — endpoint correto pendente de discover
-  (aba Appointments do contato).
+- Agendamentos: ver `## Agenda`. A nota antiga ("endpoint recusado com tokens internos")
+  estava errada: o 4xx vinha de `contactId` (parâmetro inexistente na rota) e da falta de
+  `calendarId`/`userId`/`groupId`, não da auth.
 
 ## Escrita — PUT de campo padrão e custom (todos os tipos), POST/DELETE de tag validados ao vivo (2026-09-18)
 
@@ -480,3 +480,157 @@ uma vez, acordando toda automação que reage a transição.
 
 Apagar o pipeline leva os cards dentro junto, e **não tem restore** — o estado anterior
 fica em `<dumps>/_oportunidades/`.
+
+## Agenda — sondagem ao vivo 2026-09-19 (Instaltech `Xb9gDxwxYhdqtprGcb5E`)
+
+Sondado com os tokens da sessão Chrome (Bearer + `token-id`, UA de browser), sem clicar na
+interface. As rotas são as mesmas da referência pública; o que faltava era o parâmetro, não
+a autenticação.
+
+### Respostas às quatro perguntas da sondagem
+
+1. **Host:** os dois servem agenda, com resposta idêntica byte a byte.
+   `backend.leadconnectorhq.com` e `services.leadconnectorhq.com` foram exercitados lado a
+   lado em `/calendars/`, `/calendars/events`, `/calendars/<id>/free-slots` e
+   `/calendars/groups` — mesmos status e mesmos corpos. Usar `services` (é o host que a
+   referência pública documenta). ✓
+2. **Compromisso vs. bloqueio — resolvido com um bloqueio de verdade (2026-09-19):** o
+   discriminante é o **`status`**: `"booked"` no compromisso, `"unavailable"` no bloqueio. A
+   inferência antiga (`contactId` presente ou ausente) estava fraca e foi trocada por essa no
+   `_tipo` da CLI. Mais: `/calendars/events` e `/calendars/blocked-slots` **não** são dois
+   filtros da mesma lista — com um bloqueio criado no período, `/calendars/events` devolveu
+   `{"events":[]}` (tanto por `userId` quanto por `calendarId`) e só `blocked-slots` o
+   trouxe. Bloqueio não aparece na listagem de eventos. ✓
+3. **`toNotify`, `ignoreFreeSlotValidation`, `ignoreDateRange`:** `toNotify: false`
+   (`--silenciar`) e `ignoreFreeSlotValidation`/`ignoreDateRange` (`--forcar`) exercitados ao
+   vivo em 2026-09-19 — ver as duas seções abaixo. ✓
+4. **Datas — e esta é a armadilha da agenda:** `startTime`/`endTime` de `/calendars/events`
+   e `startDate`/`endDate` de `free-slots` aceitam **só milissegundos desde 1970**.
+   `free-slots` com texto ISO recusa explicitamente
+   (`422 startDate must be a number conforming to the specified constraints`), mas
+   `/calendars/events` com texto ISO responde **200 com `{"events":[]}`** — o mesmo recorte
+   que em milissegundos devolve o compromisso. Data ISO na listagem some com a agenda sem
+   nenhum erro. Já as datas **na resposta** vêm em texto ISO com fuso
+   (`2026-09-04T15:00:00-03:00`). ✓
+
+### Auth
+
+Uma chamada válida de `/calendars/events` respondeu 200 **só com o Bearer**, sem `token-id`.
+O cliente manda os dois de qualquer forma; nada a mudar. ✓
+
+### Rotas confirmadas (host `services.leadconnectorhq.com`)
+
+| Rota | Parâmetros | Status |
+|---|---|---|
+| `GET /calendars/?locationId=<loc>` | — | ✓ 200, `{calendars:[...]}` (já usado por `fetchCalendars`) |
+| `GET /calendars/groups?locationId=<loc>` | — | ✓ 200, `{groups:[...]}` |
+| `GET /calendars/<calendarId>` | — | ✓ 200, `{calendar:{...}}` (usada por `getCalendar`) |
+| `GET /calendars/events` | `locationId` **e** um de `calendarId`/`userId`/`groupId`; `startTime`,`endTime` em ms | ✓ 200, `{events:[...]}` |
+| `GET /calendars/blocked-slots` | idem | ✓ 200, `{events:[...]}` com os bloqueios (`status:"unavailable"`). É a **única** rota que os devolve — `/calendars/events` os omite. |
+| `GET /calendars/<calendarId>/free-slots` | `startDate`,`endDate` em ms; `timezone` IANA opcional | ✓ 200, `{"<YYYY-MM-DD>":{slots:[ISO com fuso]}}` (teto de 31 dias entre `startDate`/`endDate` é guarda nossa em `freeSlots`, nunca observada como limite do servidor — não documentada na referência) |
+| `GET /calendars/events/appointments/<eventId>` | — | ✓ 200, `{appointment:{...}}` |
+| `GET /calendars/appointments/<appointmentId>/notes?limit&offset` | — | ✓ 200, `{notes:[],hasMore:false}` |
+
+Erros que valem lembrar, todos observados:
+
+- sem `calendarId`/`userId`/`groupId` → `422 Either of userId, calendarId or groupId is required`
+- `location_id`/`start_time` (snake_case) → `400 Location ID is required`. O case é camelCase.
+- `contactId` em `/calendars/events` → `422 property contactId should not exist`. **Não existe
+  filtro por contato nessa rota** — para a agenda de um contato, filtrar no cliente.
+
+### Forma do compromisso (campos observados)
+
+```
+id, title, calendarId, locationId, contactId, groupId, calendarProviderId,
+status ("booked"), appointmentStatus ("showed"|"cancelled"|...), appoinmentStatus (typo do
+servidor, espelha o anterior), assignedUserId, isFree, isRecurring, isFullDay, isCancelled,
+deleted, type, google{...}, startTime/endTime (ISO com fuso), dateAdded, dateUpdated,
+selectedTimezone, source, version, assignedResources, appointmentMeta{slotType,bookedDuration}
+```
+
+### Rotas de escrita — validadas ao vivo 2026-09-19
+
+Exercitadas na Instaltech, num calendário descartável criado e apagado na hora
+(`ZZ TESTE AUTOMASTER`, id `fuqBFE5vmoRDGK6u6Vpj`), com o contato de teste
+`uWqujqll20tRuglV3mLt`. Nenhum calendário de produção foi tocado.
+
+| Rota | Status | O que o servidor ensinou |
+|---|---|---|
+| `POST /calendars/events/appointments` | ✓ 200 | Corpo `{calendarId, locationId, contactId, startTime, endTime, title, appointmentStatus, toNotify}` com datas **ISO com fuso** (aqui, ao contrário da listagem, epoch não é necessário). **Com `rrule` o servidor exige `assignedUserId`**: 422 `A team member needs to be selected. assignedUserId is missing`. Virou guarda na CLI (`--repeticao` exige `--dono`) e na tool. |
+| `PUT /calendars/events/appointments/<eventId>` | ✓ 200 | Serve para remarcar, mudar situação e cancelar (`appointmentStatus: cancelled` — `status` continua `booked` e `isCancelled` continua `false`; quem lê tem que olhar o `appointmentStatus`). Em série, o **id enviado é que decide o alvo** (ver abaixo). |
+| `DELETE /calendars/events/<eventId>` | ✓ 200 `{succeeded:true}` | Usada só na limpeza, por script descartável — a CLI não expõe apagar por decisão de desenho (cancelar deixa rastro). Apagar o id-mestre apaga a série inteira. |
+| `POST /calendars/appointments/<id>/notes` | ✓ 200 | Corpo `{body}`; a resposta é `{note:{...}}` e traz `relations:[{objectKey:"appointment", recordId:<eventId>}]` e `contactId` preenchidos pelo servidor. |
+| `PUT /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 | Corpo `{body}`; devolve a nota inteira já editada. |
+| `DELETE /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 `{success:true}` | Some do `GET .../notes` na hora. |
+| `POST /calendars/events/block-slots` | ✓ 200 | Corpo `{locationId, startTime, endTime, title, assignedUserId}`, datas ISO com fuso. **`assignedUserId` é obrigatório na prática:** com `calendarId` de um calendário comum o servidor responde `400 The calendar is not an event calendar.` — bloqueio é da agenda de um usuário, não de um calendário de captação. Por isso `--acao bloquear` exige `--dono`. A resposta traz `status: "unavailable"`, sem `contactId` e sem `appointmentStatus`. |
+| `PUT /calendars/events/block-slots/<eventId>` | ✓ 200 | Mesmo corpo; devolve o bloqueio já editado. `GET /calendars/events/appointments/<id>` **aceita o id de um bloqueio** e devolve `{appointment:{... status:"unavailable"}}` — é o que o rastro usa como `antes`. |
+| `POST /calendars/` e `DELETE /calendars/<id>` | ✓ 200 | Fora da superfície do projeto, exercitadas para criar e apagar o calendário do teste. POST mínimo: `{locationId, name, calendarType:"personal", slotDuration, slotDurationUnit, teamMembers:[{userId, priority, isPrimary}]}`. DELETE devolve `{message:"calendar deleted"}`. |
+
+### Série recorrente — o id é o alvo (observado ao vivo)
+
+`rrule` vira `RRULE:FREQ=...` na resposta. A série tem um **id-mestre**; cada ocorrência
+aparece no `GET /calendars/events` com id composto `<mestre>_<epochMs>_<duracaoSeg>` e
+`masterEventId` apontando para o mestre. O `GET /calendars/events/appointments/<id>` aceita
+os dois ids e devolve `isRecurring: true` em ambos.
+
+- PUT no **id-mestre** (`--alvo serie`) move as três ocorrências de uma vez.
+- PUT no **id composto** (`--alvo instancia`) **destaca** aquela ocorrência: o servidor
+  responde com um **id novo, avulso** (`isRecurring:false`, sem `masterEventId`) e a série
+  perde aquele dia. Não é edição no lugar — é uma exceção materializada como compromisso
+  independente.
+
+**Bug achado e corrigido pela validação:** a checagem de série na CLI lia o envelope errado
+(`{event:...}`); a rota devolve `{appointment:...}`. Com isso a guarda de `--alvo` nunca
+disparava e um `remarcar` sem alvo destacou uma ocorrência sem avisar. Corrigido em
+`extractor/src/cli.ts`; com a correção, `remarcar` sem `--alvo` recusa, `--alvo instancia`
+mexe em uma só e `--alvo serie` nas três — os três casos exercitados ao vivo.
+
+⚠️ **Essa guarda e esse desembrulho não têm teste que rode em CI.** O extractor não tem
+runner de teste; a única prova dos dois é a validação manual registrada acima e em
+`.superpowers/sdd/2026-09-19-agenda-mcp/task-6-report.md`. Por isso o campo `appointment` do
+envelope merece cuidado em qualquer mudança futura: se a rota trocar de chave, ou se alguém
+mexer no desembrulho, a guarda de `--alvo` volta a nunca disparar e um `remarcar` sem alvo
+destaca uma ocorrência em silêncio — exatamente o bug acima, e nada quebra para avisar.
+
+### `--forcar` (`ignoreFreeSlotValidation` + `ignoreDateRange`) — validado ao vivo 2026-09-19 ✓
+
+Num calendário descartável, com um bloqueio criado às 09:00–10:00 do dia alvo (o bloqueio
+**some os horários da resposta de `free-slots`** — 09:00 e 09:30 deixaram de ser listados):
+
+- marcar às 09:00 **sem** `--forcar` → `400 The slot you have selected is no longer available.`
+- marcar às 09:00 **com** `--forcar` → **422** `A team member needs to be selected.
+  assignedUserId is missing`. Mesmo 422 da série: sem a checagem de horário livre o servidor
+  não escolhe o responsável sozinho. Virou guarda — `--forcar` em `marcar` exige `--dono`.
+- marcar às 09:00 com `--forcar` **e** `--dono` → **200**, compromisso criado em cima do
+  bloqueio (`status: "booked"`).
+
+### `--silenciar` (`toNotify: false`) — lado seguro provado ao vivo 2026-09-19 ✓/✗
+
+Calendário descartável criado **com** notificação ao contato ligada
+(`notifications: [{type:"email", shouldSendToContact:true, templateId:"default"}]`, confirmado
+na resposta do POST). Com esse calendário, um compromisso marcado **com `--silenciar`**
+(`toNotify: false`) para o contato de teste: a conversa do contato continuou com as mesmas 5
+mensagens, a última de 14:14Z, seis horas antes da escrita (20:25Z). A leitura é boa prova
+porque e-mail de confirmação de calendário **aparece** nessa conversa — as duas mensagens
+`EMAIL` "REUNIÃO CONFIRMADA!" de 2026-08-24 do mesmo contato são exatamente isso.
+
+**Provado:** com `--silenciar`, num calendário com notificação ligada, nada saiu para o
+contato. **Continua sem prova ✗:** o caso **não** silenciado. Confirmar exigiria mandar
+e-mail de verdade para uma pessoa real, e essa autorização não foi dada — decisão de
+segurança, não lacuna de mapeamento.
+
+Registro histórico: a rodada anterior (calendário descartável com `notifications: []`) não
+provava nada, porque não havia mensagem a impedir. Foi essa lacuna que a rodada acima fechou.
+
+### Resíduo
+
+Nenhum. O calendário de teste (`sxT3Q04MFNLfdqvFgw6u`, `ZZ TESTE AUTOMASTER lacunas`), o
+bloqueio (`SwNMriJoH6FtUkOEGg1H`) e o compromisso forçado (`I5ON7znc4qgmYlFq3VpX`) foram
+apagados; a releitura do período devolveu `{"events":[]}` em `eventos` e em `bloqueios`, e a
+subconta voltou aos 7 calendários de produção.
+
+### Rastro de escrita
+
+Cada escrita gravou `<dumps>/_agenda/<loc>/<chave>/<ts>.json` com `antes`, `corpo` e
+`aplicado`. O 422 da série foi gravado com `aplicado: false` e o `erro` do servidor, como
+projetado.

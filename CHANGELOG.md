@@ -4,6 +4,78 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.8.0 — 2026-09-19
+
+Bloqueio de horário: capacidade nova na agenda, mais uma mudança de comportamento em
+`forcar` e uma rodada de correções de uma revisão sobre a 0.7.0.
+
+- **`agenda_acao` ganha `bloquear` e `bloqueio-editar`** (`POST`/`PUT
+  /calendars/events/block-slots`), e `agenda` ganha `o=bloqueios`. Bloqueio não tem contato
+  nem situação nem `calendario` — a tool recusa os três — e exige `dono`: com `calendario`
+  de um calendário comum o servidor responde `400 The calendar is not an event calendar.`
+  Sem tool nova: o plugin continua com 23 tools.
+- **Mudança de comportamento: `forcar` agora EXIGE `dono`**, em `marcar` e também em
+  `remarcar` (os dois ligam `ignoreFreeSlotValidation`, e sem `dono` o servidor devolve
+  `422 A team member needs to be selected`). Quem chamava `forcar` em `remarcar` sem `dono`
+  e contava com o servidor resolver sozinho passa a levar o erro da tool em vez do 422 —
+  quebra uma chamada que antes "funcionava" por sorte do compromisso já ter responsável.
+
+### Corrigido
+- `_tipo`: o discriminante é `status` (`booked`/`unavailable`), não a presença de
+  `contactId`.
+- Bloqueio **não aparece** em `o=eventos` — só em `o=bloqueios`. Descrição da tool
+  `agenda` e o comentário de `listBlockedSlots` diziam o contrário; corrigidos, porque um
+  agente lendo a versão errada concluiria "sem bloqueio" e escreveria por cima de um.
+- `bloqueio-editar` ganhou a mesma guarda de campos obrigatórios de `bloquear` (`inicio`,
+  `fim`, `dono`, além de `id`): o PUT substitui o bloqueio inteiro, e campo ausente era
+  perdido em silêncio — `bloqueio-editar -i x --titulo novo --confirmo` sozinho já bastava
+  para o bloqueio perder dono e horário.
+- `o=bloqueios` recusa `contato`: a rota não filtra por contato, e pedir isso devolvia o
+  período inteiro sem avisar que o filtro foi ignorado.
+- `--pagina` sem coerção virava offset `NaN`; agora clampada como `--limite`. Mesma
+  correção nos dois filtros irmãos de oportunidades (`limite`/`pagina`).
+- **`silenciar` provado do lado seguro** (herdado da 0.7.1): em calendário com notificação
+  ao contato ligada, compromisso marcado com `silenciar` não gerou nenhuma mensagem na
+  conversa do contato. O caso não silenciado segue sem prova, por decisão de segurança.
+
+`bloqueio-editar` com corpo parcial (só `--titulo`, por exemplo) não foi exercitado ao vivo:
+a guarda nova recusa esse caso antes de chegar ao servidor, então não há prova de como o
+GHL de fato reagiria a um PUT parcial.
+
+## 0.7.0 — 2026-09-19
+
+Agenda: calendários, compromissos e notas, lidos e escritos ao vivo.
+
+- **`agenda`**: calendários, calendário por id, horários livres, lista de eventos (mistura
+  compromisso e bloqueio — filtre por `_tipo`), um compromisso por id, notas de um
+  compromisso. Só leitura, sempre ao vivo — o dump só guarda nome e id de calendário, para
+  resolver referência de workflow; compromisso não está lá.
+- **`agenda_acao`**: marca, remarca, muda a situação (`new`/`confirmed`/`cancelled`/
+  `showed`/`noshow`/`invalid`/`completed`/`active` — não existe "remarcado"), cancela, e
+  cria/edita/apaga nota. Exige `confirmo=true`; registro em `<dumps>/_agenda/`. Compromisso
+  que se repete exige `alvo` (`instancia` ou `serie`) — sem ele a tool recusa em vez de
+  escolher.
+
+**A escrita fala com o cliente.** Marcar ou remarcar dispara o e-mail ou SMS que o
+calendário tem configurado e acorda as automações do compromisso. `--silenciar`/
+`silenciar=true` desliga as automações junto, mas **não está provado** que também impede a
+mensagem — o calendário de teste não tinha notificação configurada.
+
+Validado ao vivo na Instaltech, num calendário descartável criado e apagado na hora
+(`fuqBFE5vmoRDGK6u6Vpj`), com o contato de teste. Cobriu marcar, remarcar (série completa e
+uma só ocorrência), mudar situação, cancelar e as três operações de nota. **Não** exercitado
+ao vivo: bloqueio de horário (`block-slots`), `--forcar` isolado, e a forma real de um
+bloqueio (a Instaltech não tinha nenhum — o discriminante `_tipo` vem da referência, não de
+um bloqueio observado). Rotas e armadilhas em `docs/endpoints.md` seção `## Agenda`.
+
+Bug achado e corrigido pela própria validação: a checagem de série lia o envelope errado
+(`{event:...}` em vez de `{appointment:...}`), o que fazia a guarda de `--alvo` nunca
+disparar. Corrigido; os três casos (`--alvo instancia`, `--alvo serie`, sem `--alvo`)
+exercitados ao vivo depois da correção. Essa guarda e o desembrulho do envelope não têm
+teste em CI (o extractor não tem runner) — só a prova manual registrada acima.
+
+CLI: agenda, agenda-acao.
+
 ## 0.6.0 — 2026-09-19
 
 Oportunidades: os funis e os cards da subconta, lidos e escritos ao vivo.
