@@ -22,6 +22,10 @@ import {
 import { createGroup, sendGroupMessage, checkInternalChat, updateInternalChatParticipants } from "./api/group.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
 import {
+  listForms, listSurveys, getForm, getSurvey,
+  listFormSubmissions, listSurveySubmissions,
+} from "./api/forms.js";
+import {
   fetchPipelines,
   fetchCustomFields,
   fetchTags,
@@ -856,6 +860,57 @@ async function runAgendaAcao(opts: {
   });
 }
 
+async function runFormularios(opts: {
+  location: string; o: string; tipo: string; id?: string; formulario?: string;
+  termo?: string; inicio?: string; fim?: string; limite?: string; pagina?: string;
+  json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (opts.tipo !== "formulario" && opts.tipo !== "survey") {
+    throw new Error(`--tipo inválido: ${opts.tipo}. Aceitos: formulario, survey`);
+  }
+  const survey = opts.tipo === "survey";
+  await withClient(opts.location, log, async (client) => {
+    const filtro = {
+      [survey ? "surveyId" : "formId"]: opts.formulario,
+      q: opts.termo,
+      startAt: opts.inicio,
+      endAt: opts.fim,
+      limit: numeroOpcional(opts.limite, "limite", log),
+      page: numeroOpcional(opts.pagina, "pagina", log),
+    };
+    let out: unknown;
+    switch (opts.o) {
+      case "lista":
+        out = survey ? await listSurveys(client, opts.location) : await listForms(client, opts.location);
+        break;
+      case "detalhe":
+        if (!opts.id) throw new Error("-o detalhe exige --id");
+        out = survey ? await getSurvey(client, opts.location, opts.id) : await getForm(client, opts.id);
+        break;
+      case "submissoes":
+        out = survey
+          ? await listSurveySubmissions(client, opts.location, filtro)
+          : await listFormSubmissions(client, opts.location, filtro);
+        break;
+      case "buscar": {
+        if (!opts.termo) throw new Error("-o buscar exige --termo");
+        // não existe busca por nome no servidor: a lista inteira é curta e vem numa varredura
+        const alvo = opts.termo.toLowerCase();
+        const todos = survey
+          ? ((await listSurveys(client, opts.location)) as { surveys: { name?: string }[] }).surveys
+          : ((await listForms(client, opts.location)) as { forms: { name?: string }[] }).forms;
+        out = { itens: todos.filter((x) => (x.name ?? "").toLowerCase().includes(alvo)) };
+        break;
+      }
+      default:
+        throw new Error(`-o inválido: ${opts.o}. Aceitos: lista, detalhe, submissoes, buscar`);
+    }
+    if (opts.json) console.log(JSON.stringify(out));
+    else console.log(JSON.stringify(out, null, 2));
+  });
+}
+
 async function runOportunidades(opts: {
   location: string; o: string; id?: string; pipeline?: string; estagio?: string;
   status?: string; contato?: string; termo?: string; limite?: string; pagina?: string;
@@ -1544,6 +1599,22 @@ program
   .option("--pagina <n>", "página da listagem, a partir de 1")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runOportunidades(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("formularios")
+  .description("Leitura ao vivo de formulários, surveys e suas submissões")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .option("-o, --o <op>", "lista | detalhe | submissoes | buscar", "lista")
+  .option("--tipo <t>", "formulario | survey", "formulario")
+  .option("-i, --id <id>", "id do formulário ou survey (com -o detalhe)")
+  .option("--formulario <id>", "filtra as submissões por formulário ou survey")
+  .option("--termo <texto>", "busca por nome (-o buscar) ou por contato/e-mail/telefone (-o submissoes)")
+  .option("--inicio <data>", "primeira data das submissões, YYYY-MM-DD")
+  .option("--fim <data>", "última data das submissões, YYYY-MM-DD")
+  .option("--limite <n>", "quantas submissões trazer, até 100")
+  .option("--pagina <n>", "página das submissões, a partir de 1")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runFormularios(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("agenda")
