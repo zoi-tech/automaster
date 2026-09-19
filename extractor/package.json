@@ -18,7 +18,8 @@
     "conversas-marcar": "tsx src/cli.ts conversas-marcar",
     "conversas-rascunho": "tsx src/cli.ts conversas-rascunho",
     "conversas-mensagem": "tsx src/cli.ts conversas-mensagem",
-    "conversas-buscar": "tsx src/cli.ts conversas-buscar"
+    "conversas-buscar": "tsx src/cli.ts conversas-buscar",
+    "conversas-anexar": "tsx src/cli.ts conversas-anexar"
   },
   "dependencies": {
     "commander": "^12.1.0",

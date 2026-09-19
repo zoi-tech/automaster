@@ -8,6 +8,7 @@ import {
   searchConversations, fetchMessages, sendMessage, typeName, isActivity, SEND_TYPES, type SendType,
   searchInConversation, searchMessages, fetchEmail, fetchTranscription, recordingUrl,
   updateConversation, deleteConversation, saveDraft, fetchDrafts, deleteDraft, cancelScheduled, resend,
+  uploadAttachments,
 } from "./api/conversations.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
 import {
@@ -477,6 +478,60 @@ async function runConversas(opts: {
   });
 }
 
+const MIME: Record<string, string> = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".pdf": "application/pdf", ".mp4": "video/mp4", ".mp3": "audio/mpeg",
+  ".ogg": "audio/ogg", ".txt": "text/plain", ".csv": "text/csv",
+};
+
+async function runConversasAnexar(opts: {
+  location: string; id: string; arquivo: string[]; conversa?: string; grupo?: boolean; v4?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!opts.arquivo.length) throw new Error("--arquivo é obrigatório (repetível)");
+  const files = opts.arquivo.map((p) => {
+    const abs = path.resolve(p);
+    const st = fs.statSync(abs);
+    if (!st.isFile()) throw new Error(`não é arquivo: ${abs}`);
+    return {
+      name: path.basename(abs),
+      mimeType: MIME[path.extname(abs).toLowerCase()] ?? "application/octet-stream",
+      buffer: fs.readFileSync(abs),
+      caminho: abs,
+      bytes: st.size,
+    };
+  });
+
+  await withClient(opts.location, log, async (client) => {
+    let conversationId = opts.conversa;
+    if (!conversationId) {
+      const convs = await searchConversations(client, opts.location, opts.id, 20);
+      if (!convs.length) throw new Error(`contato ${opts.id} não tem conversa; use --conversa`);
+      conversationId = convs[0].id;
+    }
+
+    const dir = path.join(DUMPS_DIR, "_anexos", opts.location, opts.id);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = new Date();
+    const registro = path.join(dir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
+    const arquivos = files.map((f) => ({ caminho: f.caminho, nome: f.name, bytes: f.bytes, mimeType: f.mimeType }));
+    fs.writeFileSync(registro, JSON.stringify({ subidoEm: now.toISOString(), conversationId, arquivos, subido: false }, null, 2));
+
+    log(`Subindo ${files.length} arquivo(s) na conversa ${conversationId}...`);
+    const r = await uploadAttachments(client, {
+      conversationId,
+      files: files.map((f) => ({ name: f.name, mimeType: f.mimeType, buffer: f.buffer })),
+      isGroupSms: opts.grupo,
+      v4: opts.v4,
+    });
+    fs.writeFileSync(registro, JSON.stringify({ subidoEm: now.toISOString(), conversationId, arquivos, subido: true, resposta: r }, null, 2));
+
+    const out = { subido: true, conversationId, contactId: opts.id, urls: r.urls, uploadedFiles: r.uploadedFiles, mediaSids: r.mediaSids, registro };
+    if (opts.json) console.log(JSON.stringify(out));
+    else { log(`ok — ${r.urls.length} URL(s); registro em ${registro}`); r.urls.forEach((u) => log(u)); }
+  });
+}
+
 async function runConversasEnviar(opts: {
   location: string; id: string; tipo: string; texto?: string; assunto?: string;
   de?: string; anexo: string[]; quando?: string; json?: boolean;
@@ -651,6 +706,18 @@ program
   .option("--quando <iso>", "agenda o envio (ISO); InternalComment não aceita")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runConversasEnviar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("conversas-anexar")
+  .description("Sobe arquivos como anexo da conversa e devolve as URLs (não envia nada ao contato)")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("-i, --id <id>", "id do contato")
+  .option("--arquivo <path>", "caminho do arquivo; repetível", (v: string, acc: string[]) => [...acc, v], [])
+  .option("--conversa <id>", "conversationId (default: a primeira do contato)")
+  .option("--grupo", "anexo de group chat (isGroupSms)")
+  .option("--v4", "manda o header version: v4")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runConversasAnexar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("conversas-marcar")

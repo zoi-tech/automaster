@@ -210,3 +210,38 @@ export async function sendMessage(
 ): Promise<{ conversationId?: string; messageId?: string; [k: string]: unknown }> {
   return client.postJson(`${SERVICES}/conversations/messages`, payload);
 }
+
+export interface UploadResult {
+  /** URLs dos arquivos subidos, na ordem em que o servidor devolveu. */
+  urls: string[];
+  /** nome do arquivo → URL. */
+  uploadedFiles: Record<string, string>;
+  /** sids de mídia do Twilio, quando o canal é SMS/MMS. */
+  mediaSids: string[];
+}
+
+/**
+ * Sobe anexos e devolve as URLs para usar no `attachments` do envio. O upload
+ * não fala com o contato — só cria os arquivos no CRM.
+ * Campos do multipart lidos do bundle `conversations-new-ui` (2026-09-19).
+ */
+export async function uploadAttachments(
+  client: GhlClient,
+  opts: { conversationId: string; files: { name: string; mimeType: string; buffer: Buffer }[]; isGroupSms?: boolean; v4?: boolean },
+): Promise<UploadResult> {
+  const form = new FormData();
+  form.append("conversationId", opts.conversationId);
+  form.append("disableMaxFileSize", "true");
+  form.append("disableMaxFiles", "true");
+  if (opts.isGroupSms) form.append("isGroupSms", "true");
+  for (const f of opts.files) {
+    form.append("files", new Blob([new Uint8Array(f.buffer)], { type: f.mimeType }), f.name);
+  }
+  const r = await client.postMultipart<{ uploadedFiles?: Record<string, string>; twilioMediaSids?: string[] }>(
+    `${SERVICES}/conversations/messages/upload`,
+    form,
+    opts.v4 ? { version: "v4" } : {},
+  );
+  const uploadedFiles = r.uploadedFiles ?? {};
+  return { urls: Object.values(uploadedFiles), uploadedFiles, mediaSids: r.twilioMediaSids ?? [] };
+}

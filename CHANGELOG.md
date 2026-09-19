@@ -4,6 +4,17 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.5.0 — 2026-09-19
+
+Anexo de verdade: subir arquivo local e usar a URL no envio.
+
+- **`anexar`**: sobe arquivos do disco como anexo de uma conversa e devolve as URLs para
+  passar ao `enviar(anexos=[...])`. Não fala com o contato — só cria os arquivos no CRM.
+  Teto de 25 MB por arquivo; cada upload deixa registro em `<dumps>/_anexos/`.
+- O cliente HTTP do extractor passou a falar multipart (`postMultipart`), que era o que
+  travava essa parte desde a 0.4.0.
+- CLI: `npm run conversas-anexar`.
+
 ## 0.4.0 — 2026-09-19
 
 Conversas completas: o que faltava da leitura, a gestão da caixa e os rascunhos.

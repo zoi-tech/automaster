@@ -392,6 +392,34 @@ def rascunho(loc: str, id: str, acao: str = "listar", texto: str | None = None,
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
+MAX_ANEXO_BYTES = 25 * 1024 * 1024
+
+
+def anexar(loc: str, id: str, arquivos: list, conversa: str | None = None,
+           grupo: bool = False, snapshot: str | None = None) -> dict:
+    """Sobe arquivos locais como anexo da conversa. Não envia nada ao contato."""
+    if not arquivos:
+        raise ToolError("arquivos é obrigatório")
+    for a in arquivos:
+        f = Path(a).expanduser()
+        if not f.exists():
+            raise ToolError(f"arquivo não existe: {a}")
+        if not f.is_file():
+            raise ToolError(f"não é arquivo comum: {a}")
+        size = f.stat().st_size
+        if size > MAX_ANEXO_BYTES:
+            raise ToolError(f"{a}: {size} bytes passa do teto de {MAX_ANEXO_BYTES}")
+    _, meta = _load(loc, snapshot)
+    args = ["conversas-anexar", "-l", loc, "-i", id]
+    for a in arquivos:
+        args += ["--arquivo", str(Path(a).expanduser())]
+    if conversa:
+        args += ["--conversa", conversa]
+    if grupo:
+        args.append("--grupo")
+    return _run_extractor(*args, "--json") | {"_snapshot": meta}
+
+
 SEND_TYPES = ("SMS", "Email", "WhatsApp", "IG", "FB", "Live_Chat", "Custom", "InternalComment")
 
 
@@ -497,6 +525,16 @@ TOOLS = {
                              "description": "obrigatório em tudo que não seja InternalComment"},
                 "snapshot": _SNAP},
                ["loc", "id", "tipo", "texto"]),
+    "anexar": (anexar, "Sobe arquivos locais como anexo da conversa e devolve as URLs para usar em "
+               "`enviar(anexos=[...])`. NÃO fala com o contato — só cria os arquivos no CRM. Teto de 25 MB por "
+               "arquivo; fica um registro em <dumps>/_anexos/.",
+               {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                "arquivos": {"type": "array", "items": {"type": "string"},
+                             "description": "caminhos locais dos arquivos"},
+                "conversa": {"type": "string", "description": "conversationId (default: a primeira do contato)"},
+                "grupo": {"type": "boolean", "default": False, "description": "anexo de group chat"},
+                "snapshot": _SNAP},
+               ["loc", "id", "arquivos"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",

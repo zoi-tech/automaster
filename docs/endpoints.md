@@ -349,10 +349,38 @@ de envio é aceito, mas com `InternalComment` a mensagem sai na hora: o cancelam
 foi exercitado — testar significa arriscar mandar a mensagem de verdade se o cancelamento
 falhar.
 
+### Upload de anexo — validado ao vivo (2026-09-19)
+
+```
+POST services.leadconnectorhq.com/conversations/messages/upload
+multipart: conversationId, disableMaxFileSize=true, disableMaxFiles=true,
+           files (um campo por arquivo), isGroupSms=true só em group chat
+```
+- Resposta: `{uploadedFiles: {<nome do arquivo>: <url>}, twilioMediaSids: [...]}`. As URLs
+  saem no domínio da subconta (`app.<dominio>/conversations-assets/location/<loc>/conversations/<conv>/<uuid>.<ext>`)
+  e alimentam o `attachments` do POST de envio.
+- **Não mande `content-type` à mão** — o boundary é montado pelo Playwright a partir do
+  `FormData`. É o único caminho não-JSON do `GhlClient` (`postMultipart`).
+- O header `version: v4` que o bundle liga condicionalmente **não foi necessário**: o
+  upload passou sem ele. A CLI expõe `--v4` para o caso de alguma conta exigir.
+- Validado na Instaltech (contato `uWqujqll20tRuglV3mLt`, conversa `HypNQNXNG1ADmmr0uUPr`):
+  PNG de 8×8 subiu e a URL voltou numa nota interna (`messageId NYxwRVHxtUQD6N2DhZJN`).
+- Group chat (`isGroupSms`) e anexo de WhatsApp (base `phone-system`) **não** foram
+  exercitados; o campo existe no código mas segue sem prova ao vivo.
+
+### Mapa das áreas restantes (lido do bundle, sem prova ao vivo)
+
+Bundle `crm/conversations-new-ui/2567`, baixado com `curl -A "<UA de Chrome>"`. Base
+`services.leadconnectorhq.com/conversations` salvo onde indicado.
+
+| área | rotas |
+|---|---|
+| group chat | `POST /group`, `POST /group/messages`, `POST /internal`, `POST /internal/check`, `POST /internal/user` |
+| WhatsApp (base `/phone-system`) | `GET /whatsapp/location/<loc>/template[?templateId=&includeRewriterIds=true]`, `GET /whatsapp/workflow/options/template_id?locationId=`, `GET /whatsapp/flows?locationId=`, `POST /whatsapp/location/<loc>/attachment?conversationId=`, `POST /whatsapp/location/<loc>/voice-note?userId=&contactId=&conversationId=`, `GET /whatsapp/location/<loc>/{is-configured,phone-numbers,media?url=}` |
+| IA | `GET /ai/settings/<loc>`, `POST /ai/settings`, `PUT /ai/settings/<loc>`, `POST /text/<x>/suggestions`, `POST /text/suggestions/<x>/deliver`, `PUT /interactions/suggestions/<responseId>`; knowledge base em `services.../knowledge-base` |
+| SLA | `GET /sla-settings/<loc>`, `POST /sla-settings`, `PUT /sla-settings/<loc>`, `GET /sla-settings/<loc>/inbox-sla-status`, `GET /sla-settings/<loc>/manual-clear-permission`, `POST /sla-settings/clear-sla/<x>` |
+
 ### Fora de escopo, com motivo
 
-Upload de anexo (`POST /conversations/messages/upload`) é multipart e o `GhlClient` só fala
-JSON; o envio já aceita anexo por URL. Group chat, live-chat typing, review reply, spam
-check, views salvas da caixa de entrada, templates e flows de WhatsApp, voice note,
-knowledge base da IA e SLA existem na API interna (mapeados no bundle) e não têm uso no
-diagnóstico de automação.
+Live-chat typing, review reply, spam check e views salvas da caixa de entrada existem na API
+interna (mapeados no bundle) e não têm uso no diagnóstico de automação.

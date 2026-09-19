@@ -374,3 +374,43 @@ def test_conversas_repassa_filtros(root, monkeypatch):
     srv.conversas(LOC, "c1", tipo="TYPE_EMAIL", busca="oi", email="e1")
     for flag, valor in (("--tipo", "TYPE_EMAIL"), ("--busca", "oi"), ("--email", "e1")):
         assert seen["args"][seen["args"].index(flag) + 1] == valor
+
+
+def test_anexar_recusa_caminho_invalido(root, tmp_path, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError):
+        srv.anexar(LOC, "c1", [])
+    with pytest.raises(srv.ToolError) as e:
+        srv.anexar(LOC, "c1", [str(tmp_path / "nao-existe.png")])
+    assert "não existe" in str(e.value)
+    with pytest.raises(srv.ToolError) as e:
+        srv.anexar(LOC, "c1", [str(tmp_path)])
+    assert "não é arquivo" in str(e.value)
+
+
+def test_anexar_recusa_arquivo_grande(root, tmp_path, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(srv, "MAX_ANEXO_BYTES", 10)
+    f = tmp_path / "grande.bin"
+    f.write_bytes(b"x" * 11)
+    with pytest.raises(srv.ToolError) as e:
+        srv.anexar(LOC, "c1", [str(f)])
+    assert "teto" in str(e.value)
+
+
+def test_anexar_passa_argumentos_ao_extractor(root, tmp_path, monkeypatch):
+    root(workflows=[wf()])
+    f = tmp_path / "a.png"
+    f.write_bytes(b"png")
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor",
+                        lambda *a: seen.update(args=a) or {"subido": True, "urls": ["http://x/a.png"]})
+    out = srv.anexar(LOC, "c1", [str(f)], conversa="k1", grupo=True)
+    assert out["urls"] == ["http://x/a.png"]
+    args = seen["args"]
+    assert args[:5] == ("conversas-anexar", "-l", LOC, "-i", "c1")
+    assert args[args.index("--arquivo") + 1] == str(f)
+    assert args[args.index("--conversa") + 1] == "k1"
+    assert "--grupo" in args

@@ -62,6 +62,34 @@ export class GhlClient {
   postJson<T = unknown>(url: string, body: unknown): Promise<T> { return this.request<T>("post", url, body); }
   deleteJson<T = unknown>(url: string, body?: unknown): Promise<T> { return this.request<T>("delete", url, body); }
 
+  /**
+   * POST multipart. Mesmo tratamento de 401/429 do JSON; o `content-type` (com
+   * boundary) é montado pelo Playwright a partir do FormData — nunca defina à mão.
+   */
+  async postMultipart<T = unknown>(
+    url: string, form: FormData, extraHeaders: Record<string, string> = {},
+  ): Promise<T> {
+    await sleep(this.throttleMs);
+    let refreshed = false;
+    for (let attempt = 0; ; attempt++) {
+      const headers = { ...this.authHeaders(), ...extraHeaders };
+      const res = await this.context.request.post(url, { headers, multipart: form });
+      if (res.ok()) return (await res.json().catch(() => ({}))) as T;
+
+      const status = res.status();
+      if (status === 401 && !refreshed) {
+        this.tokens = await this.onRefresh();
+        refreshed = true;
+        continue;
+      }
+      if (status === 429 && attempt < 4) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      throw new Error(`POST ${url} → HTTP ${status} ${await safeBody(res)}`);
+    }
+  }
+
   /** GET sem auth (para URLs pré-assinadas do Firebase). */
   async getJsonNoAuth<T = unknown>(url: string): Promise<T> {
     const res = await this.context.request.get(url, { headers: { "user-agent": UA, accept: "application/json" } });
