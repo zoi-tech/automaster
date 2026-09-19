@@ -45,6 +45,8 @@ import {
 } from "./api/opportunities.js";
 import {
   listCalendars, getCalendar, freeSlots, listEvents, getAppointment, listNotes,
+  AGENDA_SITUACOES, isoComFuso, createAppointment, updateAppointment,
+  createNote, updateNote, deleteNote,
 } from "./api/calendars.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -573,6 +575,125 @@ async function runAgenda(opts: {
     }
     if (opts.json) console.log(JSON.stringify(out));
     else console.log(JSON.stringify(out, null, 2));
+  });
+}
+
+const AGENDA_ACOES = [
+  "marcar", "remarcar", "situacao", "cancelar", "nota-criar", "nota-editar", "nota-apagar",
+];
+
+async function runAgendaAcao(opts: {
+  location: string; acao: string; id?: string; calendario?: string; contato?: string;
+  inicio?: string; fim?: string; titulo?: string; descricao?: string; endereco?: string;
+  situacao?: string; dono?: string; repeticao?: string; alvo?: string; nota?: string;
+  texto?: string; silenciar?: boolean; forcar?: boolean;
+  confirmo?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!AGENDA_ACOES.includes(opts.acao)) {
+    throw new Error(`--acao inválida: ${opts.acao}. Aceitas: ${AGENDA_ACOES.join(", ")}`);
+  }
+  if (!opts.confirmo) {
+    throw new Error(
+      "Isto muda a agenda de verdade: fala com o cliente por e-mail ou SMS, acorda as " +
+      "automações ligadas ao compromisso e não tem desfazer. Repita com --confirmo.",
+    );
+  }
+  if (opts.acao === "marcar") {
+    if (!(opts.calendario && opts.contato && opts.inicio && opts.situacao)) {
+      throw new Error("marcar exige --calendario, --contato, --inicio e --situacao");
+    }
+  } else if (!opts.id) {
+    throw new Error(`${opts.acao} exige --id`);
+  }
+  if (opts.situacao && !AGENDA_SITUACOES.includes(opts.situacao as never)) {
+    throw new Error(
+      `--situacao inválida: ${opts.situacao}. Aceitas: ${AGENDA_SITUACOES.join(", ")}. ` +
+      `"remarcado" não existe: remarcar é mudar o horário com --acao remarcar.`,
+    );
+  }
+  if (opts.acao.startsWith("nota-") && opts.acao !== "nota-apagar" && !opts.texto) {
+    throw new Error(`${opts.acao} exige --texto`);
+  }
+  if ((opts.acao === "nota-editar" || opts.acao === "nota-apagar") && !opts.nota) {
+    throw new Error(`${opts.acao} exige --nota com o id da nota`);
+  }
+  if (opts.alvo && !["instancia", "serie"].includes(opts.alvo)) {
+    throw new Error("--alvo aceita instancia ou serie");
+  }
+
+  await withClient(opts.location, log, async (client) => {
+    // série: a API distingue pelo id enviado. Sem --alvo a tool recusa em vez de adivinhar.
+    let alvoId = opts.id;
+    if (["remarcar", "situacao", "cancelar"].includes(opts.acao)) {
+      const atual = await getAppointment(client, opts.id!).catch(() => null) as
+        { event?: Record<string, unknown> } | Record<string, unknown> | null;
+      const ev = (atual && "event" in (atual as object)
+        ? (atual as { event?: Record<string, unknown> }).event
+        : atual) as Record<string, unknown> | null;
+      const serie = ev?.masterEventId as string | undefined;
+      if (ev?.isRecurring || serie) {
+        if (!opts.alvo) {
+          throw new Error(
+            "este compromisso faz parte de uma série que se repete. Diga o alvo: " +
+            "--alvo instancia (só esta ocorrência) ou --alvo serie (todas). " +
+            "Sem isso a chamada pode remarcar o ano inteiro.",
+          );
+        }
+        if (opts.alvo === "serie" && serie) alvoId = serie;
+      }
+    }
+
+    const corpo: Record<string, unknown> = {
+      ...(opts.calendario ? { calendarId: opts.calendario } : {}),
+      ...(opts.acao === "marcar" ? { locationId: opts.location, contactId: opts.contato } : {}),
+      ...(opts.inicio ? { startTime: isoComFuso(opts.inicio) } : {}),
+      ...(opts.fim ? { endTime: isoComFuso(opts.fim) } : {}),
+      ...(opts.titulo ? { title: opts.titulo } : {}),
+      ...(opts.descricao ? { description: opts.descricao } : {}),
+      ...(opts.endereco ? { address: opts.endereco } : {}),
+      ...(opts.situacao ? { appointmentStatus: opts.situacao } : {}),
+      ...(opts.acao === "cancelar" ? { appointmentStatus: "cancelled" } : {}),
+      ...(opts.dono ? { assignedUserId: opts.dono } : {}),
+      ...(opts.silenciar ? { toNotify: false } : {}),
+      // a regra de repetição só vale com a validação de horário livre desligada
+      ...(opts.repeticao ? { rrule: opts.repeticao, ignoreFreeSlotValidation: true } : {}),
+      ...(opts.forcar ? { ignoreFreeSlotValidation: true, ignoreDateRange: true } : {}),
+    };
+
+    if (opts.silenciar) {
+      log("aviso: --silenciar também desliga os workflows ligados a este compromisso, " +
+          "e pode não impedir o e-mail que a configuração do calendário manda sozinha.");
+    }
+    if (opts.repeticao) {
+      log("aviso: com --repeticao o horário NÃO é conferido — o compromisso pode cair " +
+          "em cima de outro que já existe.");
+    }
+
+    const chave = alvoId ?? "novo";
+    const antes = alvoId ? await getAppointment(client, alvoId).catch(() => null) : null;
+    const registro = registroEscrita(opts.location, "_agenda", chave, {
+      acao: opts.acao, alvo: opts.alvo ?? null, corpo, antes, aplicado: false,
+    });
+    log(`snapshot: ${registro}`);
+
+    let r: unknown;
+    switch (opts.acao) {
+      case "marcar": r = await createAppointment(client, corpo); break;
+      case "remarcar":
+      case "situacao":
+      case "cancelar": r = await updateAppointment(client, alvoId!, corpo); break;
+      case "nota-criar": r = await createNote(client, opts.id!, opts.texto!, opts.dono); break;
+      case "nota-editar": r = await updateNote(client, opts.id!, opts.nota!, opts.texto!); break;
+      case "nota-apagar": r = await deleteNote(client, opts.id!, opts.nota!); break;
+    }
+    fs.writeFileSync(registro, JSON.stringify({
+      em: new Date().toISOString(), acao: opts.acao, alvo: opts.alvo ?? null,
+      corpo, antes, aplicado: true, resposta: r,
+    }, null, 2));
+    const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
+    if (opts.json) console.log(JSON.stringify(out));
+    else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
 
@@ -1275,6 +1396,31 @@ program
   .option("--pagina <n>", "página das notas, a partir de 1")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runAgenda(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("agenda-acao")
+  .description("ESCREVE: marca, remarca, muda a situação ou cancela compromisso; notas")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("--acao <a>", "marcar | remarcar | situacao | cancelar | nota-criar | nota-editar | nota-apagar")
+  .option("-i, --id <id>", "id do compromisso (tudo menos marcar)")
+  .option("--calendario <id>", "calendário do compromisso")
+  .option("--contato <id>", "contato, só em marcar")
+  .option("--inicio <iso>", "início, ISO com fuso: 2026-10-02T14:00:00-03:00")
+  .option("--fim <iso>", "fim, ISO com fuso")
+  .option("--titulo <texto>", "título do compromisso")
+  .option("--descricao <texto>", "descrição")
+  .option("--endereco <texto>", "local")
+  .option("--situacao <s>", "new | confirmed | cancelled | showed | noshow | invalid | completed | active")
+  .option("--dono <id>", "usuário responsável")
+  .option("--repeticao <rrule>", "regra de repetição RFC 5545; desliga a checagem de horário")
+  .option("--alvo <a>", "instancia | serie — obrigatório em compromisso que se repete")
+  .option("--nota <id>", "id da nota (nota-editar, nota-apagar)")
+  .option("--texto <texto>", "corpo da nota")
+  .option("--silenciar", "não notifica — também desliga os workflows do compromisso")
+  .option("--forcar", "marca fora da disponibilidade, sem checar horário livre")
+  .option("--confirmo", "obrigatório: fala com o cliente e não tem desfazer")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runAgendaAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("oportunidade-acao")

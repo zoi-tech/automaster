@@ -118,3 +118,66 @@ export function listNotes(
     `${BASE}/calendars/appointments/${encodeURIComponent(appointmentId)}/notes?${p.toString()}`,
   );
 }
+
+export interface CompromissoCorpo {
+  calendarId?: string;
+  locationId?: string;
+  contactId?: string;
+  startTime?: string;
+  endTime?: string;
+  title?: string;
+  description?: string;
+  address?: string;
+  appointmentStatus?: string;
+  assignedUserId?: string;
+  toNotify?: boolean;
+  ignoreDateRange?: boolean;
+  ignoreFreeSlotValidation?: boolean;
+  rrule?: string;
+}
+
+export function createAppointment(
+  client: GhlClient, corpo: CompromissoCorpo,
+): Promise<unknown> {
+  return client.postJson(`${BASE}/calendars/events/appointments`, corpo);
+}
+
+export function updateAppointment(
+  client: GhlClient, eventId: string, corpo: CompromissoCorpo,
+): Promise<unknown> {
+  return client.putJson(
+    `${BASE}/calendars/events/appointments/${encodeURIComponent(eventId)}`, corpo,
+  );
+}
+
+export function deleteEvent(client: GhlClient, eventId: string): Promise<unknown> {
+  return client.deleteJson(`${BASE}/calendars/events/${encodeURIComponent(eventId)}`);
+}
+
+export function createNote(
+  client: GhlClient, appointmentId: string, body: string, userId?: string,
+): Promise<unknown> {
+  return client.postJson(
+    `${BASE}/calendars/appointments/${encodeURIComponent(appointmentId)}/notes`,
+    { body, ...(userId ? { userId } : {}) },
+  );
+}
+
+export function updateNote(
+  client: GhlClient, appointmentId: string, noteId: string, body: string,
+): Promise<unknown> {
+  return client.putJson(
+    `${BASE}/calendars/appointments/${encodeURIComponent(appointmentId)}` +
+    `/notes/${encodeURIComponent(noteId)}`,
+    { body },
+  );
+}
+
+export function deleteNote(
+  client: GhlClient, appointmentId: string, noteId: string,
+): Promise<unknown> {
+  return client.deleteJson(
+    `${BASE}/calendars/appointments/${encodeURIComponent(appointmentId)}` +
+    `/notes/${encodeURIComponent(noteId)}`,
+  );
+}

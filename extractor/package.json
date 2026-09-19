@@ -27,7 +27,8 @@
     "oportunidades": "tsx src/cli.ts oportunidades",
     "oportunidade-acao": "tsx src/cli.ts oportunidade-acao",
     "pipeline": "tsx src/cli.ts pipeline",
-    "agenda": "tsx src/cli.ts agenda"
+    "agenda": "tsx src/cli.ts agenda",
+    "agenda-acao": "tsx src/cli.ts agenda-acao"
   },
   "dependencies": {
     "commander": "^12.1.0",
