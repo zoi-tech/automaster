@@ -22,6 +22,8 @@ regras de auditoria.
 - **Comando de CLI novo** `npm run formularios`. Rotas em `docs/endpoints.md`, seção
   `## Formulários e surveys`.
 - O id `fb-<locationId>` das submissões é o lead gen do Facebook e nunca vira achado.
+- **Seção "Regras cegas" no `report.md`**: dump anterior a uma lista opcional passa a dizer
+  quais regras não rodaram, para que ausência de achado não se confunda com tudo certo.
 
 ## 0.10.0 — 2026-09-19
 

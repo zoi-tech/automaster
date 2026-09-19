@@ -31,6 +31,15 @@ def _counts(findings: list[Finding]) -> dict[str, int]:
     return c
 
 
+# lista opcional que falta no dump -> (arquivo, regras que ficam no-op)
+_CEGAS = [
+    (lambda ctx: "message" not in ctx.template_ids and "whatsapp" not in ctx.template_ids,
+     "message_templates.json / whatsapp_templates.json", "broken_template_ref"),
+    (lambda ctx: not ctx.form_ids,
+     "forms.json / surveys.json", "broken_form_ref, unused_form"),
+]
+
+
 def _render_md(ctx: DumpContext, findings: list[Finding]) -> str:
     c = _counts(findings)
     loc = ctx.manifest.get("locationId", "?")
@@ -51,6 +60,21 @@ def _render_md(ctx: DumpContext, findings: list[Finding]) -> str:
         f"| INFO | {c[INFO]} |",
         "",
     ]
+
+    cegas = [(arq, regras) for falta, arq, regras in _CEGAS if falta(ctx)]
+    if cegas:
+        lines += [
+            "## Regras cegas",
+            "",
+            "O dump é anterior a estas listas, então as regras abaixo não rodaram. "
+            "Ausência de achado aqui não é prova de que está tudo certo — re-extraia a "
+            "subconta para valer.",
+            "",
+            "| Lista ausente | Regra sem efeito |",
+            "|---|---|",
+        ]
+        lines += [f"| {arq} | {regras} |" for arq, regras in cegas]
+        lines.append("")
 
     if not findings:
         lines += ["## Achados", "", "Nenhum achado. ✅", ""]
