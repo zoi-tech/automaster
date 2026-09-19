@@ -70,7 +70,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
-.venv/bin/python -m pytest -q                             # suíte (167 testes)
+.venv/bin/python -m pytest -q                             # suíte (169 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
