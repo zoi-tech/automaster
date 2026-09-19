@@ -392,6 +392,92 @@ def rascunho(loc: str, id: str, acao: str = "listar", texto: str | None = None,
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
+WA_LEITURA = ("configurado", "numeros", "templates", "aprovados", "flows")
+
+
+def whatsapp(loc: str, o: str = "templates", template: str | None = None,
+             snapshot: str | None = None) -> dict:
+    """Leitura do WhatsApp da subconta: templates, flows, números, estado."""
+    if o not in WA_LEITURA:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(WA_LEITURA)}")
+    _, meta = _load(loc, snapshot)
+    args = ["whatsapp", "-l", loc, "-o", o]
+    if template:
+        args += ["--template", template]
+    return {"resultado": _run_extractor(*args, "--json"), "_snapshot": meta}
+
+
+def whatsapp_enviar(loc: str, id: str, template: str | None = None, flow: str | None = None,
+                    corpo: str | None = None, cta: str | None = None, cabecalho: str | None = None,
+                    rodape: str | None = None, de: str | None = None, para: str | None = None,
+                    conversa: str | None = None, quando: str | None = None,
+                    confirmo: bool = False, snapshot: str | None = None) -> dict:
+    """ESCREVE: manda template aprovado ou flow por WhatsApp. Sai para o contato."""
+    if not confirmo:
+        raise ToolError("WhatsApp sai para uma pessoa de verdade e não tem desfazer. Repita com confirmo=true.")
+    if bool(template) == bool(flow):
+        raise ToolError("informe template OU flow, não os dois")
+    if flow and not (corpo and cta):
+        raise ToolError("flow exige corpo e cta")
+    _, meta = _load(loc, snapshot)
+    args = ["whatsapp-enviar", "-l", loc, "-i", id, "--confirmo"]
+    for flag, val in (("--template", template), ("--flow", flow), ("--corpo", corpo), ("--cta", cta),
+                      ("--cabecalho", cabecalho), ("--rodape", rodape), ("--de", de), ("--para", para),
+                      ("--conversa", conversa), ("--quando", quando)):
+        if val:
+            args += [flag, val]
+    return _run_extractor(*args, "--json") | {"_snapshot": meta}
+
+
+CONFIG_LEITURA = ("ia", "sla", "sla-status", "sla-permissao")
+CONFIG_ESCRITA = ("ia-gravar", "sla-gravar", "sla-zerar")
+
+
+def config(loc: str, o: str = "sla", corpo: dict | None = None, conversa: str | None = None,
+           confirmo: bool = False, snapshot: str | None = None) -> dict:
+    """Configuração de IA e SLA das conversas. As escritas valem para a subconta inteira."""
+    if o not in CONFIG_LEITURA + CONFIG_ESCRITA:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(CONFIG_LEITURA + CONFIG_ESCRITA)}")
+    if o in CONFIG_ESCRITA and not confirmo:
+        raise ToolError(f"{o} muda a configuração da subconta inteira e não tem desfazer. "
+                        "Repita com confirmo=true.")
+    _, meta = _load(loc, snapshot)
+    args = ["config", "-l", loc, "-o", o]
+    if corpo is not None:
+        args += ["--corpo", json.dumps(corpo)]
+    if conversa:
+        args += ["--conversa", conversa]
+    if o in CONFIG_ESCRITA:
+        args.append("--confirmo")
+    return {"resultado": _run_extractor(*args, "--json"), "_snapshot": meta}
+
+
+GRUPO_OPS = ("criar", "mensagem", "interno-checar", "interno-participantes")
+
+
+def grupo(loc: str, o: str, corpo: dict | None = None, conversa: str | None = None,
+          usuarios: list | None = None, desde: str | None = None,
+          confirmo: bool = False, snapshot: str | None = None) -> dict:
+    """Group chat e chat interno. `criar` e `mensagem` falam com pessoas de verdade."""
+    if o not in GRUPO_OPS:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(GRUPO_OPS)}")
+    if o in ("criar", "mensagem") and not confirmo:
+        raise ToolError(f"{o} fala com pessoas de verdade e não tem desfazer. Repita com confirmo=true.")
+    _, meta = _load(loc, snapshot)
+    args = ["grupo", "-l", loc, "-o", o]
+    if corpo is not None:
+        args += ["--corpo", json.dumps(corpo)]
+    if conversa:
+        args += ["--conversa", conversa]
+    for u in usuarios or []:
+        args += ["--usuario", u]
+    if desde:
+        args += ["--desde", desde]
+    if o in ("criar", "mensagem"):
+        args.append("--confirmo")
+    return {"resultado": _run_extractor(*args, "--json"), "_snapshot": meta}
+
+
 MAX_ANEXO_BYTES = 25 * 1024 * 1024
 
 
@@ -535,6 +621,42 @@ TOOLS = {
                 "grupo": {"type": "boolean", "default": False, "description": "anexo de group chat"},
                 "snapshot": _SNAP},
                ["loc", "id", "arquivos"]),
+    "whatsapp": (whatsapp, "Leitura do WhatsApp da subconta (abre Chrome): `templates` (os componentes "
+                 "inteiros), `aprovados` (só os liberados, formato de opção), `flows` (formulários "
+                 "interativos), `numeros` (o id alimenta `de` no envio), `configurado`.",
+                 {"loc": _LOC, "o": {"type": "string", "enum": list(WA_LEITURA), "default": "templates"},
+                  "template": {"type": "string", "description": "um template só (com o=templates)"},
+                  "snapshot": _SNAP}, ["loc"]),
+    "whatsapp_enviar": (whatsapp_enviar, "ESCREVE EM PRODUÇÃO: manda um template aprovado ou um flow "
+                        "interativo por WhatsApp. SAI para o contato, exige confirmo=true e não tem "
+                        "desfazer; registro em <dumps>/_mensagens/. Use `template` OU `flow`; flow exige "
+                        "corpo e cta.",
+                        {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                         "template": {"type": "string"}, "flow": {"type": "string"},
+                         "corpo": {"type": "string"}, "cta": {"type": "string"},
+                         "cabecalho": {"type": "string"}, "rodape": {"type": "string"},
+                         "de": {"type": "string", "description": "fromNumberId"},
+                         "para": {"type": "string"}, "conversa": {"type": "string"},
+                         "quando": {"type": "string", "description": "ISO para agendar"},
+                         "confirmo": {"type": "boolean", "default": False}, "snapshot": _SNAP},
+                        ["loc", "id"]),
+    "config": (config, "Configuração de IA e SLA das conversas: `ia`, `sla`, `sla-status` (o que está "
+               "estourando agora), `sla-permissao`. As escritas (`ia-gravar`, `sla-gravar`, `sla-zerar`) "
+               "valem para a subconta inteira, exigem confirmo=true e gravam o estado anterior em "
+               "<dumps>/_config/.",
+               {"loc": _LOC, "o": {"type": "string", "enum": list(CONFIG_LEITURA + CONFIG_ESCRITA), "default": "sla"},
+                "corpo": {"type": "object", "description": "corpo da escrita"},
+                "conversa": {"type": "string", "description": "conversationId (sla-zerar)"},
+                "confirmo": {"type": "boolean", "default": False}, "snapshot": _SNAP}, ["loc"]),
+    "grupo": (grupo, "Group chat e chat interno entre usuários. `criar` e `mensagem` falam com pessoas de "
+              "verdade (confirmo=true, sem desfazer); `interno-checar` e `interno-participantes` ficam "
+              "entre usuários. O corpo de `criar` NÃO foi confirmado ao vivo — passe o payload cru.",
+              {"loc": _LOC, "o": {"type": "string", "enum": list(GRUPO_OPS)},
+               "corpo": {"type": "object", "description": "payload cru"},
+               "conversa": {"type": "string"},
+               "usuarios": {"type": "array", "items": {"type": "string"}},
+               "desde": {"type": "string", "description": "-1 tudo, 0 nada, YYYY-MM-DD a partir de"},
+               "confirmo": {"type": "boolean", "default": False}, "snapshot": _SNAP}, ["loc", "o"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",

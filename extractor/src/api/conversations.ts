@@ -198,6 +198,8 @@ export interface SendPayload {
   conversationId?: string;
   /** epoch em SEGUNDOS. Ignorado em InternalComment — a nota sai na hora. */
   scheduledTimestamp?: number;
+  /** bloco extra de WhatsApp (template ou flow interativo). Ver api/whatsapp.ts. */
+  whatsapp?: unknown;
 }
 
 /**

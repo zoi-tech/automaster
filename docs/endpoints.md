@@ -368,19 +368,47 @@ multipart: conversationId, disableMaxFileSize=true, disableMaxFiles=true,
 - Group chat (`isGroupSms`) e anexo de WhatsApp (base `phone-system`) **não** foram
   exercitados; o campo existe no código mas segue sem prova ao vivo.
 
-### Mapa das áreas restantes (lido do bundle, sem prova ao vivo)
+### WhatsApp, IA, SLA e group chat (2026-09-19)
 
-Bundle `crm/conversations-new-ui/2567`, baixado com `curl -A "<UA de Chrome>"`. Base
-`services.leadconnectorhq.com/conversations` salvo onde indicado.
+Base `services.leadconnectorhq.com/phone-system` no WhatsApp; `.../conversations` no resto.
+Rotas lidas do bundle `crm/conversations-new-ui/2567`; as leituras foram exercitadas na
+Instaltech, as escritas não.
 
-| área | rotas |
-|---|---|
-| group chat | `POST /group`, `POST /group/messages`, `POST /internal`, `POST /internal/check`, `POST /internal/user` |
-| WhatsApp (base `/phone-system`) | `GET /whatsapp/location/<loc>/template[?templateId=&includeRewriterIds=true]`, `GET /whatsapp/workflow/options/template_id?locationId=`, `GET /whatsapp/flows?locationId=`, `POST /whatsapp/location/<loc>/attachment?conversationId=`, `POST /whatsapp/location/<loc>/voice-note?userId=&contactId=&conversationId=`, `GET /whatsapp/location/<loc>/{is-configured,phone-numbers,media?url=}` |
-| IA | `GET /ai/settings/<loc>`, `POST /ai/settings`, `PUT /ai/settings/<loc>`, `POST /text/<x>/suggestions`, `POST /text/suggestions/<x>/deliver`, `PUT /interactions/suggestions/<responseId>`; knowledge base em `services.../knowledge-base` |
-| SLA | `GET /sla-settings/<loc>`, `POST /sla-settings`, `PUT /sla-settings/<loc>`, `GET /sla-settings/<loc>/inbox-sla-status`, `GET /sla-settings/<loc>/manual-clear-permission`, `POST /sla-settings/clear-sla/<x>` |
+| área | chamada | prova ao vivo |
+|---|---|---|
+| WhatsApp ligado? | `GET /whatsapp/location/<loc>/is-configured` | sim — devolve `whatsAppBusinessAccountId`, `isConfigured` |
+| números | `GET /whatsapp/location/<loc>/phone-numbers` | sim — o `id` é o `fromNumberId` do envio; traz `quality`, `messagingLimitTier` |
+| templates | `GET /whatsapp/location/<loc>/template[?templateId=]` | sim — lista com `components` (HEADER/BODY/FOOTER/BUTTONS), `category`, `language` |
+| templates aprovados | `GET /whatsapp/workflow/options/template_id?locationId=` | sim — `{options:[{label,value}]}`, `value` é o templateId |
+| flows | `GET /whatsapp/flows?locationId=` | sim — `[]` na Instaltech (não usa flows) |
+| IA | `GET /ai/settings/<loc>` | sim — `{conversationsAISettings:{mode, channels, autoPilot*, typeSettings...}}` |
+| SLA | `GET /sla-settings/<loc>` | sim — `{enabled, scope:"channel", channels:[{type, rt:{dueAt,overdueAt}}]}` |
+| SLA agora | `GET /sla-settings/<loc>/inbox-sla-status` | sim |
+| quem zera SLA | `GET /sla-settings/<loc>/manual-clear-permission` | sim — `manualClearPermission: "all"` |
+| gravar IA / SLA | `PUT /ai/settings/<loc>`, `PUT /sla-settings/<loc>` | **não** — muda a subconta inteira |
+| zerar SLA | `POST /sla-settings/clear-sla/<conv>` | **não** |
+| group chat | `POST /group`, `POST /group/messages` | **não** — o corpo de `/group` nem aparece no chunk baixado |
+| chat interno | `POST /internal`, `/internal/check`, `/internal/user` | **não** |
+
+**Template e flow não têm rota própria de envio.** Ambos vão pelo `POST /conversations/messages`
+de sempre, com `type: "WhatsApp"` e um bloco `whatsapp` extra:
+
+```
+template: whatsapp: {type:"template", template:{name, lang, category},
+                     placeholders:{header:[], body:[], buttons:[]}, fromNumberId?, toNumber?}
+flow:     whatsapp: {type:"interactive",
+                     interactive:{type:"flow", flow:{id, header, body, footer, cta}}}
+```
+O `message` é o texto dos componentes concatenado, com `{{n}}` já trocado pelas
+`customVariables` — o servidor não monta isso sozinho.
+
+**Mensagem de group chat leva `subType: 3`**, acrescentado ao mesmo payload de envio.
+
+**`startAfter` do chat interno** decide o histórico que o novo participante enxerga:
+`"-1"` tudo, `"0"` nada, `YYYY-MM-DD` a partir da data.
 
 ### Fora de escopo, com motivo
 
-Live-chat typing, review reply, spam check e views salvas da caixa de entrada existem na API
-interna (mapeados no bundle) e não têm uso no diagnóstico de automação.
+Live-chat typing, review reply, spam check, views salvas da caixa de entrada, voice note e a
+knowledge base da IA existem na API interna (mapeados no bundle) e não têm uso no
+diagnóstico de automação.

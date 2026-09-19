@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, editar) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -50,3 +50,16 @@ a granularidade mínima é a conversa. Nunca ofereça isso como forma de "desfaz
 **`anexar` não fala com o contato, mas deixa arquivo no CRM.** O upload só cria o arquivo e
 devolve a URL; nada sai até você chamar `enviar(anexos=[...])`. Não há desfazer do upload —
 o arquivo fica na pasta da conversa mesmo que o envio nunca aconteça.
+
+**Template de WhatsApp só sai aprovado, e o texto é montado aqui.** O `whatsapp_enviar`
+concatena HEADER, BODY e FOOTER e troca `{{1}}`, `{{2}}` pelas `customVariables` antes de
+mandar — o servidor não faz isso. Template com variável não preenchida sai com o
+`{{n}}` cru na mensagem.
+
+**`config` escreve na subconta inteira, não numa conversa.** `ia-gravar` e `sla-gravar`
+trocam a configuração de todo mundo; o estado anterior fica em `<dumps>/_config/`, mas
+restaurar é você regravando à mão.
+
+**O corpo de `grupo` com `o="criar"` não foi confirmado ao vivo.** A rota existe e responde,
+o formato do payload veio de leitura parcial do app. Trate um erro ali como contrato
+errado, não como bug do CRM.

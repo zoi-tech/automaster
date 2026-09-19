@@ -414,3 +414,59 @@ def test_anexar_passa_argumentos_ao_extractor(root, tmp_path, monkeypatch):
     assert args[args.index("--arquivo") + 1] == str(f)
     assert args[args.index("--conversa") + 1] == "k1"
     assert "--grupo" in args
+
+
+def test_whatsapp_enviar_exige_confirmo_e_um_modo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.whatsapp_enviar(LOC, "c1", template="t1")
+    assert "confirmo=true" in str(e.value)
+    with pytest.raises(srv.ToolError):  # nem template nem flow
+        srv.whatsapp_enviar(LOC, "c1", confirmo=True)
+    with pytest.raises(srv.ToolError):  # os dois
+        srv.whatsapp_enviar(LOC, "c1", template="t1", flow="f1", confirmo=True)
+    with pytest.raises(srv.ToolError) as e:
+        srv.whatsapp_enviar(LOC, "c1", flow="f1", confirmo=True)
+    assert "corpo e cta" in str(e.value)
+
+
+def test_whatsapp_leitura_passa_operacao(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or [{"id": "t1"}])
+    out = srv.whatsapp(LOC, "templates", template="t1")
+    assert out["resultado"] == [{"id": "t1"}]
+    assert seen["args"][:5] == ("whatsapp", "-l", LOC, "-o", "templates")
+    assert seen["args"][seen["args"].index("--template") + 1] == "t1"
+    with pytest.raises(srv.ToolError):
+        srv.whatsapp(LOC, "inventado")
+
+
+def test_config_escrita_exige_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {})
+    with pytest.raises(srv.ToolError) as e:
+        srv.config(LOC, "sla-gravar", corpo={"x": 1})
+    assert "confirmo=true" in str(e.value)
+    srv.config(LOC, "sla")  # leitura passa sem confirmo
+    assert "--confirmo" not in seen["args"]
+    srv.config(LOC, "sla-gravar", corpo={"x": 1}, confirmo=True)
+    assert "--confirmo" in seen["args"]
+    assert seen["args"][seen["args"].index("--corpo") + 1] == '{"x": 1}'
+
+
+def test_grupo_escrita_exige_confirmo_leitura_nao(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {})
+    with pytest.raises(srv.ToolError):
+        srv.grupo(LOC, "mensagem", corpo={"a": 1})
+    srv.grupo(LOC, "interno-participantes", conversa="k1", usuarios=["u1", "u2"], desde="-1")
+    args = seen["args"]
+    assert "--confirmo" not in args
+    assert args.count("--usuario") == 2
+    assert args[args.index("--desde") + 1] == "-1"
+    with pytest.raises(srv.ToolError):
+        srv.grupo(LOC, "inventado")

@@ -19,7 +19,11 @@
     "conversas-rascunho": "tsx src/cli.ts conversas-rascunho",
     "conversas-mensagem": "tsx src/cli.ts conversas-mensagem",
     "conversas-buscar": "tsx src/cli.ts conversas-buscar",
-    "conversas-anexar": "tsx src/cli.ts conversas-anexar"
+    "conversas-anexar": "tsx src/cli.ts conversas-anexar",
+    "whatsapp": "tsx src/cli.ts whatsapp",
+    "whatsapp-enviar": "tsx src/cli.ts whatsapp-enviar",
+    "config": "tsx src/cli.ts config",
+    "grupo": "tsx src/cli.ts grupo"
   },
   "dependencies": {
     "commander": "^12.1.0",

@@ -6,14 +6,23 @@ instalado faz sobe a versão aqui; o time atualiza com
 
 ## 0.5.0 — 2026-09-19
 
-Anexo de verdade: subir arquivo local e usar a URL no envio.
+Fecha as cinco áreas de conversas que a 0.4.0 tinha deixado de fora.
 
 - **`anexar`**: sobe arquivos do disco como anexo de uma conversa e devolve as URLs para
   passar ao `enviar(anexos=[...])`. Não fala com o contato — só cria os arquivos no CRM.
   Teto de 25 MB por arquivo; cada upload deixa registro em `<dumps>/_anexos/`.
+- **`whatsapp`**: templates com os componentes inteiros, templates aprovados, flows,
+  números e estado da conta. Só leitura.
+- **`whatsapp_enviar`**: manda um template aprovado ou um flow interativo. Sai para o
+  contato, exige `confirmo=true`.
+- **`config`**: configuração de IA e de SLA das conversas, incluindo o que está estourando
+  agora na caixa. As escritas valem para a subconta inteira e gravam o estado anterior em
+  `<dumps>/_config/`.
+- **`grupo`**: group chat e chat interno entre usuários. O corpo de criar grupo não foi
+  confirmado ao vivo — a tool aceita o payload cru.
 - O cliente HTTP do extractor passou a falar multipart (`postMultipart`), que era o que
-  travava essa parte desde a 0.4.0.
-- CLI: `npm run conversas-anexar`.
+  travava o anexo desde a 0.4.0.
+- CLI: `conversas-anexar`, `whatsapp`, `whatsapp-enviar`, `config`, `grupo`.
 
 ## 0.4.0 — 2026-09-19
 
