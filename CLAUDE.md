@@ -23,10 +23,11 @@ Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** 
   - `paths.md` — árvore de caminhos de execução por workflow, camada 2 (`automaster-audit paths`)
   - `validation.html` — painel visual das 3 camadas de validação (`automaster-audit validation`)
   - `journey.html` — árvore de jornada do contato: tudo que pode acontecer desde a criação (`automaster-audit journey`)
+  - `diff.md` — o que mudou entre dois snapshots da mesma subconta (`automaster-audit diff <antigo> <novo>`)
 
   As 4 saídas HTML compartilham o design system **"Sala de Controle"** (IBM Carbon): tema claro `#f4f4f4`/painéis brancos, IBM Plex Sans/Mono embutidas como data-URI, radius zero, shell unificado (topbar escura 48px + sidebar 256px com links relativos entre `dashboard.html`/`graph.html`/`validation.html`/`journey.html`). Acento azul `#0f62fe` só em link/ativo; severidade só em status (`#da1e28`/`#f1c21b`/`#24a148`); vermelho reservado a referência quebrada.
 
-Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plugin/mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`. A config MCP fica **fora da raiz de propósito**, apontada pelo campo `mcpServers` do plugin.json: um `.mcp.json` na raiz o Claude Code também carrega como servidor de projeto, e nesse contexto `${CLAUDE_PLUGIN_ROOT}` não expande — o servidor falha com ENOENT em toda sessão aberta no repo. O servidor `mcp_server.py` expõe vinte e três tools (`dumps`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `conversas`, `conversas_buscar`, `conversa_acao`, `rascunho`, `anexar`, `enviar`, `whatsapp`, `whatsapp_enviar`, `config`, `grupo`, `editar`, `oportunidades`, `oportunidade_acao`, `pipeline`, `agenda`, `agenda_acao`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`. **Versões do plugin em `CHANGELOG.md`** — mudança que altere o comportamento do plugin instalado sobe a versão no plugin.json e entra lá.
+Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plugin/mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`. A config MCP fica **fora da raiz de propósito**, apontada pelo campo `mcpServers` do plugin.json: um `.mcp.json` na raiz o Claude Code também carrega como servidor de projeto, e nesse contexto `${CLAUDE_PLUGIN_ROOT}` não expande — o servidor falha com ENOENT em toda sessão aberta no repo. O servidor `mcp_server.py` expõe vinte e quatro tools (`dumps`, `comparar`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `conversas`, `conversas_buscar`, `conversa_acao`, `rascunho`, `anexar`, `enviar`, `whatsapp`, `whatsapp_enviar`, `config`, `grupo`, `editar`, `oportunidades`, `oportunidade_acao`, `pipeline`, `agenda`, `agenda_acao`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`. **Versões do plugin em `CHANGELOG.md`** — mudança que altere o comportamento do plugin instalado sobe a versão no plugin.json e entra lá.
 
 Módulos do auditor: `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`).
 
@@ -73,7 +74,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
-.venv/bin/python -m pytest -q                             # suíte (177 testes)
+.venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
+.venv/bin/python -m pytest -q                             # suíte (194 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -97,7 +99,7 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 94 workflows). A se
 
 ## Fora de escopo (por enquanto)
 
-Desfazer uma edição de contato, um envio de mensagem ou um upload de anexo, clonagem/migração entre subcontas, multi-subconta em lote, diff entre snapshots, `broken_template_ref` (templates internos existem — `internal_notification.template_id` — falta puxar a lista).
+Desfazer uma edição de contato, um envio de mensagem ou um upload de anexo, clonagem/migração entre subcontas, multi-subconta em lote, `broken_template_ref` (templates internos existem — `internal_notification.template_id` — falta puxar a lista).
 
 Oportunidades **saíram** desta lista na 0.6.0: leitura, CRUD de card e gestão de pipeline estão implementados e validados ao vivo (`docs/endpoints.md` seção `## Oportunidades`). Segue fora: apagar cards em lote (`POST /bulk/delete`, destrutivo em lote sem guarda boa) e qualquer regra de auditoria sobre oportunidade.
 

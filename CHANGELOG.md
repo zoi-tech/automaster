@@ -4,6 +4,23 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.9.0 — 2026-09-19
+
+Diff entre dois snapshots da mesma subconta: "o que mudou desde o dump anterior".
+Trabalho só de disco — nenhuma rota nova, nenhum Chrome.
+
+- **Tool nova `comparar`** (24 no total) e subcomando `automaster-audit diff <antigo> <novo>`,
+  que escreve `diff.md` na pasta do snapshot mais recente. Sem `antes`/`depois`, a tool
+  compara os dois snapshots mais recentes da subconta.
+- Workflow conta como alterado quando muda nome, status ou o conteúdo dos steps ou dos
+  triggers. A comparação de conteúdo é por impressão digital do JSON canônico, e não por
+  `updatedAt`: o `updatedAt` do detail nem sempre acompanha edição de step.
+- Entidades entram no diff pelo que apareceu e pelo que sumiu (pipelines, estágios, tags,
+  custom fields, usuários, calendários, custom values). Entidade ausente nos dois dumps
+  antigos simplesmente não gera linha.
+- Comparar dumps de subcontas diferentes não é erro, mas sai um aviso no relatório e no
+  stderr — o resultado nesse caso é "tudo trocado" e não significa nada.
+
 ## 0.8.0 — 2026-09-19
 
 Bloqueio de horário: capacidade nova na agenda, mais uma mudança de comportamento em

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from itertools import count
 from pathlib import Path
 
 import pytest
@@ -25,10 +26,14 @@ def make_dump(tmp_path):
         )
     """
 
+    contador = count()
+
     def _build(workflows=None, tags=None, pipelines=None, fields=None,
                users=None, custom_values=None, calendars=None,
                extracted_at="2026-06-10T00:00:00+00:00"):
-        root = tmp_path / "dump"
+        # sufixo por chamada: o diff precisa de dois dumps no mesmo tmp_path
+        n = next(contador)
+        root = tmp_path / ("dump" if n == 0 else f"dump{n}")
         (root / "workflows").mkdir(parents=True)
         workflows = workflows or []
         for wf in workflows:
