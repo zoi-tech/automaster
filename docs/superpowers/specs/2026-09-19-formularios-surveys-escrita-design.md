@@ -14,11 +14,13 @@ A leitura está no ar: módulo `extractor/src/api/forms.ts`, comando `npm run fo
 tool MCP `formularios`, `forms.json`/`surveys.json` no dump, regras `broken_form_ref` e
 `unused_form`. Rotas de leitura em `docs/endpoints.md`, seção `## Formulários e surveys`.
 
-Fato descoberto no brainstorming: a lista de formulários **não** traz o `formData`. O
-documento vive num arquivo do Google Cloud Storage apontado por
-`versionHistory[].formDataDownloadUrl`, com `versionId` e `version` incremental — o mesmo
-arranjo dos steps de workflow. Editar um campo é, muito provavelmente, publicar uma
-versão nova do documento inteiro, não um PATCH de campo. A pesquisa confirma.
+A lista de formulários **não** traz o `formData`; o documento de cada versão vive num
+arquivo do Google Cloud Storage apontado por `versionHistory[].formDataDownloadUrl`.
+
+O brainstorming supôs que publicar exigiria subir esse arquivo e referenciar a versão. A
+pesquisa desmentiu: o documento inteiro vai no corpo de um POST, e o servidor grava a
+versão sozinho e devolve o histórico atualizado. Um passo de risco a menos. O que
+continua valendo é que editar um campo é republicar o documento inteiro, não um PATCH.
 
 ## Recorte
 
@@ -103,9 +105,11 @@ A escrita manda só o header `token-id`, sem `authorization: Bearer`, mais os he
 
 - `extractor/src/api/forms-write.ts` — módulo novo ao lado do `forms.ts` de leitura, que
   não muda.
-- CLI: `npm run formulario-acao` (criar, editar estrutura, publicar) e
-  `npm run formulario-estilo` (aplicar tokens visuais).
+- CLI: `npm run formulario-acao` (criar, apagar, duplicar, editar campos e slides,
+  publicar, listar e restaurar versão) e `npm run formulario-estilo` (aplicar tokens ao
+  formulário; gravar a paleta padrão da subconta é uma ação à parte dentro dele).
 - MCP: tools `formulario_acao` e `formulario_estilo`, chegando a 27.
+- Skill nova do plugin: `automaster-formulario-visual`.
 - Versão do plugin: 0.12.0, com entrada no `CHANGELOG.md`.
 
 ### Ciclo de edição
@@ -247,6 +251,8 @@ Segue sem formato conhecido: a lógica condicional entre slides do survey.
 
 Os três últimos não têm fonte pública e só se resolvem no formulário descartável.
 
-Técnica disponível: baixar o bundle público do app
-(`appcdn.leadconnectorhq.com/crm/<app>/<build>/static/js/*.js`) com `curl -A` de browser.
-Foi assim que saíram os mapas de conversas e de oportunidades.
+Caminho para mapear o que falta, descoberto nesta pesquisa e melhor que o chute de build:
+`https://production.app-manifest.leadconnectorhq.com/latest/manifest.json` lista os 125
+micro-frontends com o build exato. O builder de formulário é um app à parte, em
+`https://leadgen-apps-form-survey-builder.leadconnectorhq.com/assets/index.<hash>.js`, e é
+lá que estão as rotas de escrita. Tudo baixa sem autenticação, com `curl -A` de browser.
