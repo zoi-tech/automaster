@@ -637,8 +637,8 @@ async function runAgendaAcao(opts: {
       }) as Record<string, unknown> | null;
       // a rota devolve `{appointment:{...}}` (observado ao vivo); `{event:...}` nunca
       // apareceu, mas custa uma linha aceitar os dois.
-      const ev = ((atual?.appointment ?? atual?.event ?? atual) ??
-        null) as Record<string, unknown> | null;
+      const ev = (atual?.appointment ?? atual?.event ?? atual) as
+        Record<string, unknown> | null;
       const serie = ev?.masterEventId as string | undefined;
       if (ev?.isRecurring || serie) {
         if (!opts.alvo) {

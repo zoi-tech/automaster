@@ -584,6 +584,13 @@ disparava e um `remarcar` sem alvo destacou uma ocorrência sem avisar. Corrigid
 `extractor/src/cli.ts`; com a correção, `remarcar` sem `--alvo` recusa, `--alvo instancia`
 mexe em uma só e `--alvo serie` nas três — os três casos exercitados ao vivo.
 
+⚠️ **Essa guarda e esse desembrulho não têm teste que rode em CI.** O extractor não tem
+runner de teste; a única prova dos dois é a validação manual registrada acima e em
+`.superpowers/sdd/2026-09-19-agenda-mcp/task-6-report.md`. Por isso o campo `appointment` do
+envelope merece cuidado em qualquer mudança futura: se a rota trocar de chave, ou se alguém
+mexer no desembrulho, a guarda de `--alvo` volta a nunca disparar e um `remarcar` sem alvo
+destaca uma ocorrência em silêncio — exatamente o bug acima, e nada quebra para avisar.
+
 ### `--silenciar` (`toNotify: false`) — **não dá para afirmar**
 
 Todas as escritas foram feitas com `--silenciar` e a conversa do contato de teste terminou o
