@@ -8,12 +8,13 @@ import { fetchPipelines } from "./entities.js";
 const OPP = "https://services.leadconnectorhq.com/opportunities";
 const PIPE = `${OPP}/pipelines`;
 
+/** A busca usa snake_case — o 422 do servidor rejeita os nomes camelCase do corpo. */
 export interface OppFiltro {
-  pipelineId?: string;
-  pipelineStageId?: string;
+  pipeline_id?: string;
+  pipeline_stage_id?: string;
   status?: string;       // open | won | lost | abandoned | all
-  contactId?: string;
-  assignedTo?: string;
+  contact_id?: string;
+  assigned_to?: string;
   q?: string;            // termo livre
   limit?: number;
   page?: number;
@@ -99,21 +100,27 @@ export function restoreOpportunity(client: GhlClient, id: string): Promise<unkno
   return client.putJson(`${OPP}/${id}/restore`, {});
 }
 
+/** `position` é obrigatório no servidor: sem ele o POST/PUT devolve 422. */
+function posicionar(stages: PipeEstagio[]): PipeEstagio[] {
+  return stages.map((s, i) => ({ ...s, position: s.position ?? i }));
+}
+
 /** ESCREVE: cria um pipeline com seus estágios. */
 export function createPipeline(
   client: GhlClient, locationId: string, name: string, stages: PipeEstagio[],
 ): Promise<unknown> {
-  return client.postJson(PIPE, { locationId, name, stages });
+  return client.postJson(PIPE, { locationId, name, stages: posicionar(stages) });
 }
 
 /**
  * ESCREVE: renomeia o pipeline e redefine seus estágios.
  * A lista de estágios é substitutiva: estágio ausente dela é removido.
+ * O `locationId` vai na query, não no corpo — o corpo o rejeita com 422.
  */
 export function updatePipeline(
   client: GhlClient, locationId: string, id: string, name: string, stages: PipeEstagio[],
 ): Promise<unknown> {
-  return client.putJson(`${PIPE}/${id}`, { locationId, name, stages });
+  return client.putJson(`${PIPE}/${id}?locationId=${locationId}`, { name, stages: posicionar(stages) });
 }
 
 /** ESCREVE: apaga um pipeline. NÃO tem restore. */

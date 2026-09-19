@@ -18,8 +18,8 @@ Oportunidades: os funis e os cards da subconta, lidos e escritos ao vivo.
   estágio omitido é removido junto com os cards dele — a tool conta os cards antes e
   recusa, a menos que `apagar_com_cards=true`. Apagar pipeline não tem restore.
 
-Nenhuma das três foi exercitada contra a API ao vivo ainda: as rotas seguem o contrato
-público da v3 pela sessão do app. Validação pendente em `docs/endpoints.md`.
+As três foram exercitadas ao vivo na Instaltech, num pipeline descartável criado e apagado
+na hora, sem tocar os 4 pipelines reais. Rotas e armadilhas em `docs/endpoints.md`.
 
 CLI: oportunidades, oportunidade-acao, pipeline.
 

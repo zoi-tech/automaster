@@ -519,10 +519,10 @@ async function runOportunidades(opts: {
   const log = opts.json ? console.error : console.log;
   await withClient(opts.location, log, async (client) => {
     const filtro = {
-      pipelineId: opts.pipeline,
-      pipelineStageId: opts.estagio,
+      pipeline_id: opts.pipeline,
+      pipeline_stage_id: opts.estagio,
       status: opts.status,
-      contactId: opts.contato,
+      contact_id: opts.contato,
       limit: opts.limite ? Number(opts.limite) : undefined,
     };
     let out: unknown;
@@ -574,7 +574,8 @@ async function runOportunidadeAcao(opts: {
   await withClient(opts.location, log, async (client) => {
     const corpo = {
       ...(opts.nome ? { name: opts.nome } : {}),
-      ...(opts.status ? { status: opts.status } : {}),
+      // o servidor exige `status` na criação; `open` é o estado natural de um card novo
+      ...(opts.status ? { status: opts.status } : opts.acao === "criar" ? { status: "open" } : {}),
       ...(opts.pipeline ? { pipelineId: opts.pipeline } : {}),
       ...(opts.estagio ? { pipelineStageId: opts.estagio } : {}),
       ...(opts.contato ? { contactId: opts.contato } : {}),
@@ -616,7 +617,7 @@ async function estagiosQueSomem(
   const out: { id: string; name: string; cards: number }[] = [];
   for (const s of somem) {
     const r = await listOpportunities(client, locationId, {
-      pipelineId, pipelineStageId: s.id, status: "all", limit: 1,
+      pipeline_id: pipelineId, pipeline_stage_id: s.id, status: "all", limit: 1,
     }) as { total?: number; opportunities?: unknown[] };
     out.push({ id: s.id, name: s.name, cards: r.total ?? (r.opportunities?.length ?? 0) });
   }
