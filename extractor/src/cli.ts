@@ -530,6 +530,29 @@ function clampLimite(v: string | undefined, log: (msg: string) => void): number 
   return Math.trunc(n);
 }
 
+/** --pagina não numérico vira offset NaN sem esta coerção; abaixo de 1 cai para 1. */
+function clampPagina(v: string | undefined, log: (msg: string) => void): number {
+  if (v === undefined) return 1;
+  const n = Number(v);
+  const valido = Number.isFinite(n) && n >= 1;
+  if (!valido) {
+    log(`aviso: --pagina ${v} inválido, ajustado para 1.`);
+    return 1;
+  }
+  return Math.trunc(n);
+}
+
+/** Igual ao problema de --pagina: valor não numérico viraria NaN no filtro. Ausente fica undefined. */
+function numeroOpcional(v: string | undefined, campo: string, log: (msg: string) => void): number | undefined {
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) {
+    log(`aviso: --${campo} ${v} inválido, ignorado.`);
+    return undefined;
+  }
+  return n;
+}
+
 /**
  * O que separa compromisso de bloqueio é o `status` (observado ao vivo em 2026-09-19 com um
  * bloqueio de verdade): `unavailable` no bloqueio, `booked` no compromisso. Não é a presença
@@ -592,11 +615,8 @@ async function runAgenda(opts: {
         break;
       case "notas": {
         const limite = clampLimite(opts.limite, log);
-        out = await listNotes(
-          client, opts.id!,
-          limite,
-          opts.pagina ? (Number(opts.pagina) - 1) * limite : 0,
-        );
+        const pagina = clampPagina(opts.pagina, log);
+        out = await listNotes(client, opts.id!, limite, (pagina - 1) * limite);
         break;
       }
     }
@@ -641,11 +661,24 @@ async function runAgendaAcao(opts: {
     // 400 ao vivo com --calendario de calendário comum: "The calendar is not an event
     // calendar." O bloqueio normal é do dono da agenda, não de um calendário de captação.
     if (!opts.dono) throw new Error("bloquear exige --dono: o bloqueio é da agenda de um usuário");
+  } else if (opts.acao === "bloqueio-editar") {
+    if (!opts.id) throw new Error("bloqueio-editar exige --id");
+    // bloqueio-editar monta o mesmo corpo de bloquear, e o PUT do servidor trata campo
+    // ausente como remoção (substituição, não merge): sem --inicio/--fim/--dono o bloqueio
+    // perde horário e dono. Exigir os três aqui evita repetir o 422/perda de dado ao vivo.
+    if (!(opts.inicio && opts.fim && opts.dono)) {
+      throw new Error("bloqueio-editar exige --inicio, --fim e --dono além de --id: o PUT substitui o bloqueio inteiro, campo ausente é perdido");
+    }
   } else if (!opts.id) {
     throw new Error(`${opts.acao} exige --id`);
   }
   if (AGENDA_ACOES_BLOQUEIO.includes(opts.acao) && (opts.contato || opts.situacao)) {
     throw new Error("bloqueio não tem contato nem situação: a rota não aceita esses campos");
+  }
+  if (AGENDA_ACOES_BLOQUEIO.includes(opts.acao) && opts.calendario) {
+    // 400 ao vivo: "The calendar is not an event calendar." Bloqueio é sempre da agenda do
+    // --dono, nunca de um --calendario específico.
+    throw new Error("bloqueio não aceita --calendario: a rota recusa com 400 The calendar is not an event calendar");
   }
   if (opts.acao === "remarcar" && !opts.inicio) {
     throw new Error("remarcar exige --inicio");
@@ -674,9 +707,10 @@ async function runAgendaAcao(opts: {
     throw new Error("--repeticao exige --dono: o servidor recusa série sem responsável");
   }
   // mesmo 422, observado ao vivo também com --forcar: sem checar horário livre o servidor
-  // não escolhe o responsável sozinho.
-  if (opts.forcar && opts.acao === "marcar" && !opts.dono) {
-    throw new Error("--forcar exige --dono: sem a checagem de horário o servidor recusa marcar sem responsável");
+  // não escolhe o responsável sozinho. remarcar liga o mesmo ignoreFreeSlotValidation e
+  // pode dar o mesmo 422; mais barato exigir --dono aqui do que descobrir em produção.
+  if (opts.forcar && (opts.acao === "marcar" || opts.acao === "remarcar") && !opts.dono) {
+    throw new Error(`--forcar exige --dono: sem a checagem de horário o servidor recusa ${opts.acao} sem responsável`);
   }
 
   await withClient(opts.location, log, async (client) => {
@@ -816,8 +850,8 @@ async function runOportunidades(opts: {
       pipeline_stage_id: opts.estagio,
       status: opts.status,
       contact_id: opts.contato,
-      limit: opts.limite ? Number(opts.limite) : undefined,
-      page: opts.pagina ? Number(opts.pagina) : undefined,
+      limit: numeroOpcional(opts.limite, "limite", log),
+      page: numeroOpcional(opts.pagina, "pagina", log),
     };
     let out: unknown;
     switch (opts.o) {

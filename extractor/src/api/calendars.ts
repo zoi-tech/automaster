@@ -202,7 +202,8 @@ export function updateBlockSlot(
   );
 }
 
-/** Bloqueios do período. Mesmo envelope de `listEvents`, filtro da mesma coleção. */
+/** Bloqueios do período. Mesmo envelope de `listEvents`, mas coleção diferente:
+ * `/calendars/events` não traz bloqueio, só compromisso. */
 export function listBlockedSlots(
   client: GhlClient, locationId: string, f: EventoFiltro,
 ): Promise<unknown> {

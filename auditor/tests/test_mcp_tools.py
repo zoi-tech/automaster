@@ -701,6 +701,33 @@ def test_agenda_acao_bloqueio_editar_exige_id(root, monkeypatch):
                         inicio="2026-10-02T14:00:00-03:00", confirmo=True)
 
 
+def test_agenda_acao_bloqueio_editar_exige_campos(root, monkeypatch):
+    """bloqueio-editar monta o mesmo corpo de bloquear: campo ausente vira remoção no PUT."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inicio, fim e dono"):
+        srv.agenda_acao(LOC, acao="bloqueio-editar", id="bs1", titulo="novo", confirmo=True)
+
+
+def test_agenda_acao_bloqueio_recusa_calendario(root, monkeypatch):
+    """400 ao vivo: "The calendar is not an event calendar."."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="calendario"):
+        srv.agenda_acao(LOC, acao="bloquear", dono="u1", calendario="c1",
+                        inicio="2026-10-02T14:00:00-03:00",
+                        fim="2026-10-02T15:00:00-03:00", confirmo=True)
+
+
+def test_agenda_bloqueios_recusa_contato(root, monkeypatch):
+    """listBlockedSlots não filtra por contato: bloqueio não tem contato."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="contato"):
+        srv.agenda(LOC, o="bloqueios", calendario="c1", contato="k1",
+                  inicio="2026-10-02T14:00:00-03:00", fim="2026-10-02T15:00:00-03:00")
+
+
 def test_agenda_bloqueios_exige_periodo(root, monkeypatch):
     root(workflows=[wf()])
     monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
@@ -725,4 +752,14 @@ def test_agenda_acao_forcar_exige_dono(root, monkeypatch):
     with pytest.raises(srv.ToolError, match="dono"):
         srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
                         inicio="2026-10-02T14:00:00-03:00", situacao="confirmed",
+                        forcar=True, confirmo=True)
+
+
+def test_agenda_acao_remarcar_forcar_exige_dono(root, monkeypatch):
+    """remarcar também liga ignoreFreeSlotValidation com --forcar, mesmo 422 em potencial."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="dono"):
+        srv.agenda_acao(LOC, acao="remarcar", id="ap1",
+                        inicio="2026-10-02T14:00:00-03:00",
                         forcar=True, confirmo=True)

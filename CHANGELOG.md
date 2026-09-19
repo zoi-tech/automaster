@@ -4,24 +4,43 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
-## 0.7.1 — 2026-09-19
+## 0.8.0 — 2026-09-19
 
-Fecha as quatro lacunas que a 0.7.0 deixou sem prova ao vivo na agenda.
+Bloqueio de horário: capacidade nova na agenda, mais uma mudança de comportamento em
+`forcar` e uma rodada de correções de uma revisão sobre a 0.7.0.
 
 - **`agenda_acao` ganha `bloquear` e `bloqueio-editar`** (`POST`/`PUT
   /calendars/events/block-slots`), e `agenda` ganha `o=bloqueios`. Bloqueio não tem contato
-  nem situação — a tool recusa os dois — e exige `dono`: com `calendario` de um calendário
-  comum o servidor responde `400 The calendar is not an event calendar.` Sem tool nova: o
-  plugin continua com 23 tools.
-- **`_tipo` corrigido.** O que separa compromisso de bloqueio é o `status` (`booked` vs.
-  `unavailable`), não a presença de `contactId`. E bloqueio **não aparece** em `o=eventos`:
-  só em `o=bloqueios`. Os dois fatos foram observados com um bloqueio de verdade.
-- **`forcar` agora exige `dono`**: com `ignoreFreeSlotValidation` o servidor devolve
-  `422 A team member needs to be selected`. Exercitado ao vivo: sem `forcar` o horário
-  ocupado é recusado (`400`), com `forcar` + `dono` passa.
-- **`silenciar` provado do lado seguro**: em calendário com notificação ao contato ligada,
-  compromisso marcado com `silenciar` não gerou nenhuma mensagem na conversa do contato. O
-  caso não silenciado segue sem prova, por decisão de segurança.
+  nem situação nem `calendario` — a tool recusa os três — e exige `dono`: com `calendario`
+  de um calendário comum o servidor responde `400 The calendar is not an event calendar.`
+  Sem tool nova: o plugin continua com 23 tools.
+- **Mudança de comportamento: `forcar` agora EXIGE `dono`**, em `marcar` e também em
+  `remarcar` (os dois ligam `ignoreFreeSlotValidation`, e sem `dono` o servidor devolve
+  `422 A team member needs to be selected`). Quem chamava `forcar` em `remarcar` sem `dono`
+  e contava com o servidor resolver sozinho passa a levar o erro da tool em vez do 422 —
+  quebra uma chamada que antes "funcionava" por sorte do compromisso já ter responsável.
+
+### Corrigido
+- `_tipo`: o discriminante é `status` (`booked`/`unavailable`), não a presença de
+  `contactId`.
+- Bloqueio **não aparece** em `o=eventos` — só em `o=bloqueios`. Descrição da tool
+  `agenda` e o comentário de `listBlockedSlots` diziam o contrário; corrigidos, porque um
+  agente lendo a versão errada concluiria "sem bloqueio" e escreveria por cima de um.
+- `bloqueio-editar` ganhou a mesma guarda de campos obrigatórios de `bloquear` (`inicio`,
+  `fim`, `dono`, além de `id`): o PUT substitui o bloqueio inteiro, e campo ausente era
+  perdido em silêncio — `bloqueio-editar -i x --titulo novo --confirmo` sozinho já bastava
+  para o bloqueio perder dono e horário.
+- `o=bloqueios` recusa `contato`: a rota não filtra por contato, e pedir isso devolvia o
+  período inteiro sem avisar que o filtro foi ignorado.
+- `--pagina` sem coerção virava offset `NaN`; agora clampada como `--limite`. Mesma
+  correção nos dois filtros irmãos de oportunidades (`limite`/`pagina`).
+- **`silenciar` provado do lado seguro** (herdado da 0.7.1): em calendário com notificação
+  ao contato ligada, compromisso marcado com `silenciar` não gerou nenhuma mensagem na
+  conversa do contato. O caso não silenciado segue sem prova, por decisão de segurança.
+
+`bloqueio-editar` com corpo parcial (só `--titulo`, por exemplo) não foi exercitado ao vivo:
+a guarda nova recusa esse caso antes de chegar ao servidor, então não há prova de como o
+GHL de fato reagiria a um PUT parcial.
 
 ## 0.7.0 — 2026-09-19
 

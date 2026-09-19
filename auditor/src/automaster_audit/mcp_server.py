@@ -652,6 +652,8 @@ def agenda(loc: str, o: str = "calendarios", id: str | None = None,
         raise ToolError("o=livres exige calendario")
     if o in ("calendario", "ver", "notas") and not id:
         raise ToolError(f"o={o} exige id")
+    if o == "bloqueios" and contato:
+        raise ToolError("o=bloqueios não filtra por contato: bloqueio não tem contato")
     _, meta = _load(loc, snapshot)
     args = ["agenda", "-l", loc, "-o", o]
     for flag, val in (("-i", id), ("--calendario", calendario), ("--usuario", usuario),
@@ -687,10 +689,21 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
             raise ToolError("bloquear exige inicio e fim")
         if not dono:
             raise ToolError("bloquear exige dono: o bloqueio é da agenda de um usuário")
+    elif acao == "bloqueio-editar":
+        if not id:
+            raise ToolError("bloqueio-editar exige id")
+        # bloqueio-editar monta o mesmo corpo de bloquear, e o PUT substitui o bloqueio
+        # inteiro: campo ausente é perdido (dono e horário inclusive).
+        if not (inicio and fim and dono):
+            raise ToolError("bloqueio-editar exige inicio, fim e dono além de id: o PUT "
+                            "substitui o bloqueio inteiro, campo ausente é perdido")
     elif not id:
         raise ToolError(f"{acao} exige o id do compromisso")
     if acao in AGENDA_ACOES_BLOQUEIO and (contato or situacao):
         raise ToolError("bloqueio não tem contato nem situação: a rota não aceita esses campos")
+    if acao in AGENDA_ACOES_BLOQUEIO and calendario:
+        raise ToolError("bloqueio não aceita calendario: a rota recusa com 400 The calendar "
+                        "is not an event calendar")
     if acao == "remarcar" and not inicio:
         raise ToolError("remarcar exige inicio")
     if acao == "situacao" and not situacao:
@@ -707,9 +720,9 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
         raise ToolError("alvo aceita instancia ou serie")
     if repeticao and not dono:
         raise ToolError("repeticao exige dono: o servidor recusa série sem responsável")
-    if forcar and acao == "marcar" and not dono:
-        raise ToolError("forcar exige dono: sem a checagem de horário o servidor recusa "
-                        "marcar sem responsável")
+    if forcar and acao in ("marcar", "remarcar") and not dono:
+        raise ToolError(f"forcar exige dono: sem a checagem de horário o servidor recusa "
+                        f"{acao} sem responsável")
     _, meta = _load(loc, snapshot)
     args = ["agenda-acao", "-l", loc, "--acao", acao, "--confirmo"]
     for flag, val in (("-i", id), ("--calendario", calendario), ("--contato", contato),
@@ -893,8 +906,8 @@ TOOLS = {
     "agenda": (agenda, "Leitura ao vivo da agenda (abre Chrome, não usa o dump): "
                "`calendarios` (os calendários da subconta), `calendario` (um pelo id), "
                "`livres` (horários livres de um calendário num período, teto de 31 dias), "
-               "`eventos` (compromissos e bloqueios do período — cada item vem marcado em "
-               "`_tipo`), `bloqueios` (só os bloqueios do período), `ver` (um compromisso pelo id), `notas` (as notas de um "
+               "`eventos` (só compromissos do período — bloqueio NUNCA aparece aqui, use "
+               "`bloqueios` para isso), `bloqueios` (só os bloqueios do período), `ver` (um compromisso pelo id), `notas` (as notas de um "
                "compromisso). Datas em ISO com fuso: 2026-10-02T14:00:00-03:00.",
                {"loc": _LOC, "o": {"type": "string", "enum": list(AGENDA_LEITURA),
                                    "default": "calendarios"},
