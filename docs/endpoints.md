@@ -132,22 +132,30 @@ outros 4 custom fields, as 2 tags e todos os 4 campos padrão do contato de test
 sem nenhum aviso de destruição.
 
 **O que foi exercitado:** PUT de custom field `TEXT`, `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`,
-`CHECKBOX` e `DATE`; PUT de campo padrão (`contact.company_name`, `contact.phone`,
-`contact.source`); POST de tag; DELETE de tag; `set` + `tagsDel` na mesma execução. Tudo 200,
-pela CLI e pela tool MCP `editar`.
+`CHECKBOX`, `DATE`, `MONETORY`, `LARGE_TEXT` e `TEXTBOX_LIST`; PUT dos **15** campos padrão do
+mapa `STANDARD_FIELD_BODY_KEY`; POST de tag; DELETE de tag; `set` + `tagsDel` na mesma execução.
+Tudo 200, pela CLI e pela tool MCP `editar`.
+
+**`TEXTBOX_LIST` é o único tipo que não aceita string.** O valor tem que ser um objeto
+`{ "<picklistOption.id>": "<texto>" }`. String crua responde 200 e grava `{}` — escrita perdida
+em silêncio. Objeto por *label* e array `[{id, value}]` também são descartados sem erro.
+Esse objeto é **merge por chave**: `{}` não limpa nada; para limpar, mande cada id com `""`
+(o campo fica `{}`, não some). Por isso a CLI passa a interpretar valor de `--set` que começa
+com `{` ou `[` como JSON (`parseCustomValue`).
 
 **Normalização do GHL na resposta** (o valor vai como string em todos os casos):
-`NUMERICAL` volta número (`1234.5`), `CHECKBOX` volta array (`["sim"]`), `DATE` volta a string
+`NUMERICAL` e `MONETORY` voltam número (`1234.56`), `CHECKBOX` volta array (`["sim"]`), `DATE` volta a string
 ISO como enviada, `contact.phone` volta em E.164 com o DDI do `country` do contato
 (`11999998888` → `+5511999998888`). O aviso de "escrita possivelmente ignorada" dispara nesse
 último caso e é falso positivo esperado.
 
-**Limpar campo:** custom field limpa com string vazia; campo padrão **não** — a API aceita 200
+**Limpar campo:** custom field limpa com string vazia (inclusive `MONETORY` e `LARGE_TEXT`;
+`TEXTBOX_LIST` é a exceção, ver acima); campo padrão **não** — a API aceita 200
 e ignora. Para campo padrão o corpo tem que levar `null`, e é isso que a CLI manda quando o
 valor de `--set` é vazio.
 
-**O que NÃO foi exercitado:** `MONETORY`, `TEXTBOX_LIST`, `EMAIL` e `PHONE` como custom field;
-os 12 campos padrão restantes do mapa.
+**O que NÃO foi exercitado:** `EMAIL` e `PHONE` como custom field — a Instaltech não tem nenhum
+com `model: contact` (só em `business`), então não há onde exercitar sem criar campo na subconta.
 
 ### Contato inteiro (snapshot) — GET validado ao vivo
 ```

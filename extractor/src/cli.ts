@@ -284,6 +284,15 @@ const STANDARD_FIELD_BODY_KEY: Record<string, string> = {
   "contact.timezone": "timezone",
 };
 
+/**
+ * Valor de custom field: JSON quando o texto começa com `{`/`[`, senão string crua.
+ * TEXTBOX_LIST só aceita objeto `{optionId: texto}` — string vira `{}` em silêncio (HTTP 200).
+ */
+function parseCustomValue(value: string): unknown {
+  if (!/^\s*[{[]/.test(value)) return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
 /** Corpo do PUT de campos: padrão vai cru no topo, custom em `customFields: [{id, value}]` (API interna — não `field_value`). */
 function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<string, string>, fields: any[]): Record<string, unknown> {
   const body: Record<string, unknown> = {};
@@ -295,7 +304,7 @@ function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<
       if (!bodyKey) throw new Error(`campo padrão ${JSON.stringify(f.fieldKey)} sem mapeamento conhecido para o corpo do PUT; adicione em STANDARD_FIELD_BODY_KEY antes de usar`);
       // string vazia no campo padrão é ignorada pela API; `null` é o que a UI manda para limpar
       body[bodyKey] = value === "" ? null : value;
-    } else custom.push({ id: ids.get(name), value });
+    } else custom.push({ id: ids.get(name), value: parseCustomValue(value) });
   }
   if (custom.length) body.customFields = custom;
   return body;
@@ -319,7 +328,7 @@ function diffAvisos(antes: unknown, depois: unknown, esperado: Map<string, strin
     if (!vazio(v) && vazio(d[k]) && !esperado.has(k) && !ignorar.has(k))
       avisos.push(`possível PUT destrutivo: ${k} tinha valor antes e está vazio/ausente depois`);
   for (const [k, v] of esperado)
-    if (String(d[k] ?? "") !== v)
+    if (String(d[k] ?? "") !== v && JSON.stringify(d[k] ?? "") !== v)
       avisos.push(`escrita possivelmente ignorada: ${k} deveria ser ${JSON.stringify(v)}, veio ${JSON.stringify(d[k])} — compare os valores antes de concluir: o GHL normaliza (telefone em E.164, data em ISO), e valor equivalente com outra grafia significa que a escrita passou`);
   return avisos;
 }
@@ -358,7 +367,7 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
     if (sets.length) {
       const body = buildFieldsBody(sets, fieldIds, contactFields);
       for (const [k, v] of Object.entries(body)) if (k !== "customFields") esperado.set(k, v === null ? "" : String(v));
-      for (const f of (body.customFields as any[] ?? [])) esperado.set(`cf:${f.id}`, String(f.value));
+      for (const f of (body.customFields as any[] ?? [])) esperado.set(`cf:${f.id}`, typeof f.value === "object" && f.value !== null ? JSON.stringify(f.value) : String(f.value));
       await updateContactFields(client, loc, id, body); marca("set");
     }
     if (tagsAdd.length) { await addContactTags(client, loc, id, tagsAdd); marca("tagsAdd"); }

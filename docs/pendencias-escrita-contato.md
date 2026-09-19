@@ -6,10 +6,10 @@ Estado em 2026-09-18, depois da validação ao vivo na Instaltech
 
 ## Validado ao vivo
 
-PUT de custom field `TEXT`, `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`, `CHECKBOX` e
-`DATE`; PUT de campo padrão (`contact.company_name`, `contact.phone`,
-`contact.source`); POST de tag; DELETE de tag; `set` + `tagsDel` na mesma
-execução. O PUT é **merge**, não replace. Nenhum header de escopo de subconta foi
+PUT de custom field `TEXT`, `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`, `CHECKBOX`,
+`DATE`, `MONETORY`, `LARGE_TEXT` e `TEXTBOX_LIST`; PUT dos 15 campos padrão do
+mapa `STANDARD_FIELD_BODY_KEY`; POST de tag; DELETE de tag; `set` + `tagsDel` na
+mesma execução. O PUT é **merge**, não replace. Nenhum header de escopo de subconta foi
 necessário.
 
 A tool MCP `editar` foi exercitada de dentro do Claude Code em 2026-09-18: o
@@ -24,10 +24,9 @@ do aviso em telefone.
 
 ## Não validado — cada um é uma escrita que pode falhar em silêncio
 
-- **Custom field `MONETORY`, `TEXTBOX_LIST`, `EMAIL` e `PHONE`.** Todo valor de
-  `--set` vai como string; o GHL pode aceitar, coagir ou gravar lixo.
-- **Os 12 campos padrão restantes do mapa** (`firstName`, `email`, `address1`,
-  …). Três dos 15 foram escritos; o resto vem da mesma leitura do bundle JS.
+- **Custom field `EMAIL` e `PHONE`.** A Instaltech não tem nenhum com
+  `model: contact` (os dois existem só em `business`), então validar exige criar
+  um campo na subconta. Ficam como o único tipo sem prova ao vivo.
 
 ## Limites conhecidos do desenho
 
@@ -50,7 +49,9 @@ do aviso em telefone.
   Instaltech e continua lá. Nenhum workflow a referencia. Apagar tag da subconta
   não é coberto por nenhum comando — a tool só tira a tag do contato. O contato
   dummy usado (`uWqujqll20tRuglV3mLt`) foi restaurado ao estado original depois
-  de cada rodada de validação.
+  de cada rodada de validação. Uma sobra da 3ª rodada: o custom field
+  `Redes sociais da empresa` (`rsCP4WVkGKWB732oAEIg`) do contato dummy ficou em
+  `{}` em vez de ausente — `TEXTBOX_LIST` não tem como voltar a "nunca escrito".
 - **~38 scripts `.ts` soltos e não versionados em `extractor/`** (`restore.ts`,
   `cv.ts`, `patch.ts`, …). Vários escrevem em produção e estão fora de qualquer
   revisão. A spec do plugin prevê apagá-los; os headers de escrita que eles
