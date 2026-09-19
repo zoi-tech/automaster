@@ -626,8 +626,10 @@ async function runAgendaAcao(opts: {
     // série: a API distingue pelo id enviado. Sem --alvo a tool recusa em vez de adivinhar.
     let alvoId = opts.id;
     if (["remarcar", "situacao", "cancelar"].includes(opts.acao)) {
-      const atual = await getAppointment(client, opts.id!).catch(() => null) as
-        { event?: Record<string, unknown> } | Record<string, unknown> | null;
+      const atual = await getAppointment(client, opts.id!).catch((e) => {
+        log(`aviso: não deu para checar se ${opts.id} é série (${String(e)}); seguindo como instância única.`);
+        return null;
+      }) as { event?: Record<string, unknown> } | Record<string, unknown> | null;
       const ev = (atual && "event" in (atual as object)
         ? (atual as { event?: Record<string, unknown> }).event
         : atual) as Record<string, unknown> | null;
@@ -678,14 +680,22 @@ async function runAgendaAcao(opts: {
     log(`snapshot: ${registro}`);
 
     let r: unknown;
-    switch (opts.acao) {
-      case "marcar": r = await createAppointment(client, corpo); break;
-      case "remarcar":
-      case "situacao":
-      case "cancelar": r = await updateAppointment(client, alvoId!, corpo); break;
-      case "nota-criar": r = await createNote(client, opts.id!, opts.texto!, opts.dono); break;
-      case "nota-editar": r = await updateNote(client, opts.id!, opts.nota!, opts.texto!); break;
-      case "nota-apagar": r = await deleteNote(client, opts.id!, opts.nota!); break;
+    try {
+      switch (opts.acao) {
+        case "marcar": r = await createAppointment(client, corpo); break;
+        case "remarcar":
+        case "situacao":
+        case "cancelar": r = await updateAppointment(client, alvoId!, corpo); break;
+        case "nota-criar": r = await createNote(client, opts.id!, opts.texto!, opts.dono); break;
+        case "nota-editar": r = await updateNote(client, opts.id!, opts.nota!, opts.texto!); break;
+        case "nota-apagar": r = await deleteNote(client, opts.id!, opts.nota!); break;
+      }
+    } catch (e) {
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), acao: opts.acao, alvo: opts.alvo ?? null,
+        corpo, antes, aplicado: false, erro: String(e),
+      }, null, 2));
+      throw e;
     }
     fs.writeFileSync(registro, JSON.stringify({
       em: new Date().toISOString(), acao: opts.acao, alvo: opts.alvo ?? null,
