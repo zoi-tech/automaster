@@ -82,3 +82,29 @@ export async function fetchMessages(
   }
   return { mensagens: todas, maisPaginas: nextPage, proximo: nextPage ? lastMessageId : null };
 }
+
+/** Canais aceitos pelo POST de envio (mesmos nomes da API pública). */
+export const SEND_TYPES = ["SMS", "Email", "WhatsApp", "IG", "FB", "Live_Chat", "Custom", "InternalComment"] as const;
+export type SendType = (typeof SEND_TYPES)[number];
+
+export interface SendPayload {
+  type: SendType;
+  contactId: string;
+  message?: string;
+  html?: string;
+  subject?: string;
+  emailFrom?: string;
+  attachments?: string[];
+  conversationId?: string;
+}
+
+/**
+ * ESCREVE: envia mensagem ao contato. `InternalComment` é nota interna — fica
+ * na conversa e **não sai** para o contato; é o tipo seguro para testar o caminho.
+ * Resposta traz `conversationId` e `messageId` (e `msg` quando o canal responde).
+ */
+export async function sendMessage(
+  client: GhlClient, payload: SendPayload,
+): Promise<{ conversationId?: string; messageId?: string; [k: string]: unknown }> {
+  return client.postJson(`${SERVICES}/conversations/messages`, payload);
+}

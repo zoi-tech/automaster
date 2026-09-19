@@ -331,6 +331,32 @@ def editar(loc: str, id: str, set: dict | None = None, tags_adicionar: list | No
     return out | {"_snapshot": meta}
 
 
+SEND_TYPES = ("SMS", "Email", "WhatsApp", "IG", "FB", "Live_Chat", "Custom", "InternalComment")
+
+
+def enviar(loc: str, id: str, tipo: str, texto: str, assunto: str | None = None,
+           de: str | None = None, anexos: list | None = None, confirmo: bool = False,
+           snapshot: str | None = None) -> dict:
+    escolhido = next((t for t in SEND_TYPES if t.lower() == str(tipo).lower()), None)
+    if not escolhido:
+        raise ToolError(f"tipo inválido: {tipo}. Aceitos: {', '.join(SEND_TYPES)}")
+    # InternalComment fica na conversa e não sai; os outros vão para uma pessoa real
+    if escolhido != "InternalComment" and not confirmo:
+        raise ToolError(f"{escolhido} envia mensagem de verdade ao contato e não tem desfazer. "
+                        "Repita com confirmo=true, ou use tipo='InternalComment' para uma nota interna.")
+    if escolhido == "Email" and not assunto:
+        raise ToolError("Email exige assunto")
+    _, meta = _load(loc, snapshot)
+    args = ["conversas-enviar", "-l", loc, "-i", id, "--tipo", escolhido, "--texto", texto]
+    if assunto:
+        args += ["--assunto", assunto]
+    if de:
+        args += ["--de", de]
+    for a in anexos or []:
+        args += ["--anexo", a]
+    return _run_extractor(*args, "--json") | {"_snapshot": meta}
+
+
 # ---------------------------------------------------------------- protocolo
 
 _LOC = {"type": "string", "description": "locationId da subconta"}
@@ -366,6 +392,19 @@ TOOLS = {
                    "max": {"type": "integer", "default": 100},
                    "atividades": {"type": "boolean", "default": False}, "snapshot": _SNAP},
                   ["loc", "id"]),
+    "enviar": (enviar, "ESCREVE EM PRODUÇÃO: envia mensagem ao contato pela conversa (SMS, Email, "
+               "WhatsApp, InternalComment...). `InternalComment` é nota interna e NÃO sai para o contato — "
+               "use para testar. Qualquer outro tipo exige confirmo=true, manda mensagem de verdade e não tem "
+               "desfazer; fica um registro em <dumps>/_mensagens/. Email exige assunto.",
+               {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                "tipo": {"type": "string", "enum": list(SEND_TYPES)},
+                "texto": {"type": "string", "description": "corpo da mensagem"},
+                "assunto": {"type": "string"}, "de": {"type": "string", "description": "remetente (Email)"},
+                "anexos": {"type": "array", "items": {"type": "string"}},
+                "confirmo": {"type": "boolean", "default": False,
+                             "description": "obrigatório em tudo que não seja InternalComment"},
+                "snapshot": _SNAP},
+               ["loc", "id", "tipo", "texto"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",

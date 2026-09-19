@@ -302,3 +302,27 @@ def test_conversas_passa_atividades_ao_extractor(root, monkeypatch):
     srv.conversas(LOC, "c1", max=5, atividades=True)
     assert seen["args"][:6] == ("conversas", "-l", LOC, "-i", "c1", "--max")
     assert "--atividades" in seen["args"]
+
+
+def test_enviar_externo_sem_confirmo_e_recusado(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.enviar(LOC, "c1", "SMS", "oi")
+    assert "confirmo=true" in str(e.value)
+
+
+def test_enviar_interno_dispensa_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor",
+                        lambda *a: seen.update(args=a) or {"enviado": True, "messageId": "m1"})
+    out = srv.enviar(LOC, "c1", "internalcomment", "nota")
+    assert out["enviado"] and "--tipo" in seen["args"]
+    assert seen["args"][seen["args"].index("--tipo") + 1] == "InternalComment"
+
+
+def test_enviar_email_exige_assunto(root):
+    root(workflows=[wf()])
+    with pytest.raises(srv.ToolError):
+        srv.enviar(LOC, "c1", "Email", "corpo", confirmo=True)

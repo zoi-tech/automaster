@@ -4,7 +4,7 @@ import { openSession } from "./auth/session.js";
 import { captureTokens, decodeCompanyId, type Tokens } from "./auth/token.js";
 import type { Page } from "playwright";
 import { GhlClient } from "./api/client.js";
-import { searchConversations, fetchMessages, typeName, isActivity } from "./api/conversations.js";
+import { searchConversations, fetchMessages, sendMessage, typeName, isActivity, SEND_TYPES, type SendType } from "./api/conversations.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
 import {
   fetchPipelines,
@@ -446,6 +446,48 @@ async function runConversas(opts: {
   });
 }
 
+async function runConversasEnviar(opts: {
+  location: string; id: string; tipo: string; texto?: string; assunto?: string;
+  de?: string; anexo: string[]; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  const tipo = SEND_TYPES.find((t) => t.toLowerCase() === opts.tipo.toLowerCase());
+  if (!tipo) throw new Error(`--tipo inválido: ${opts.tipo}. Aceitos: ${SEND_TYPES.join(", ")}`);
+  if (!opts.texto) throw new Error("--texto é obrigatório");
+  if (tipo === "Email" && !opts.assunto) throw new Error("Email exige --assunto");
+
+  const payload = {
+    type: tipo as SendType,
+    contactId: opts.id,
+    message: opts.texto,
+    ...(opts.assunto ? { subject: opts.assunto } : {}),
+    ...(opts.de ? { emailFrom: opts.de } : {}),
+    ...(opts.anexo.length ? { attachments: opts.anexo } : {}),
+  };
+
+  await withClient(opts.location, log, async (client) => {
+    // registro da ação: envio não tem desfazer, mas tem que ficar rastro
+    const dir = path.join(DUMPS_DIR, "_mensagens", opts.location, opts.id);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = new Date();
+    const registro = path.join(dir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
+    fs.writeFileSync(registro, JSON.stringify({ enviadoEm: now.toISOString(), payload, enviado: false }, null, 2));
+
+    log(`Enviando ${tipo} para ${opts.id}...`);
+    const r = await sendMessage(client, payload);
+    fs.writeFileSync(registro, JSON.stringify({ enviadoEm: now.toISOString(), payload, enviado: true, resposta: r }, null, 2));
+
+    const out = {
+      enviado: true, tipo, contactId: opts.id,
+      conversationId: r.conversationId ?? null, messageId: r.messageId ?? null,
+      registro,
+      interno: tipo === "InternalComment",
+    };
+    if (opts.json) console.log(JSON.stringify(out));
+    else log(`ok — messageId ${out.messageId}; registro em ${registro}`);
+  });
+}
+
 program.name("automaster-extract").description("Extrai workflows GHL via API interna");
 
 program
@@ -481,6 +523,19 @@ program
   .option("--atividades", "inclui eventos de timeline (ACTIVITY_*), que não são mensagem")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runConversas(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("conversas-enviar")
+  .description("ESCREVE: envia mensagem ao contato (InternalComment é nota interna, não sai)")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("-i, --id <id>", "id do contato")
+  .requiredOption("--tipo <tipo>", `canal: ${SEND_TYPES.join(" | ")}`)
+  .requiredOption("--texto <txt>", "corpo da mensagem")
+  .option("--assunto <s>", "assunto (obrigatório em Email)")
+  .option("--de <email>", "remetente (Email)")
+  .option("--anexo <url>", "URL de anexo; repetível", (v: string, acc: string[]) => [...acc, v], [])
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runConversasEnviar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("contato-editar")

@@ -16,10 +16,17 @@ instalado faz sobe a versão aqui; o time atualiza com
 - `discover` ganhou `--rota` (abre qualquer tela) e `--filtro` (mostra também a resposta
   dos GET), que era o que faltava para mapear leitura da API interna.
 
+- **Tool `enviar`**: manda mensagem ao contato (SMS, Email, WhatsApp, nota interna). Tipo
+  `InternalComment` fica só na conversa e não sai para o contato; qualquer outro exige
+  `confirmo=true`, porque manda mensagem de verdade e não tem desfazer. Cada envio deixa
+  registro em `<dumps>/_mensagens/`. Na CLI: `npm run conversas-enviar`.
+
 ### Cuidado
 
 Automação não se reconhece pela falta de autor: e-mail disparado por workflow vem com
 `userId` preenchido. Use `origem`.
+
+O `type` da mensagem é número na leitura e string no envio. Não são a mesma lista.
 
 ## 0.2.1 — 2026-09-18 (`289beb9`)
 

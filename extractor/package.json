@@ -13,7 +13,8 @@
     "discover": "tsx src/cli.ts discover",
     "timeline": "tsx src/cli.ts timeline",
     "contato-editar": "tsx src/cli.ts contato-editar",
-    "conversas": "tsx src/cli.ts conversas"
+    "conversas": "tsx src/cli.ts conversas",
+    "conversas-enviar": "tsx src/cli.ts conversas-enviar"
   },
   "dependencies": {
     "commander": "^12.1.0",

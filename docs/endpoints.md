@@ -302,3 +302,19 @@ Os arquivos de `appcdn.leadconnectorhq.com/crm/<app>/<build>/static/js/*.js` sã
 mas respondem **403 sem UA de browser**. Com `curl -A "<UA de Chrome>"` baixam normalmente.
 É o caminho mais rápido para enums e templates de rota (`grep -oh '\`/[^\`]*\`'`), sem
 sessão e sem clicar na interface.
+
+### Enviar mensagem — validado ao vivo (2026-09-19)
+```
+POST services.leadconnectorhq.com/conversations/messages
+corpo: { type, contactId, message, subject?, emailFrom?, attachments?, conversationId? }
+```
+- `type` aqui é **string** (`SMS`, `Email`, `WhatsApp`, `IG`, `FB`, `Live_Chat`, `Custom`,
+  `InternalComment`) — ao contrário do `type` numérico que a leitura devolve.
+- Resposta: `{conversationId, messageId, ...}`. Validado com `InternalComment` na Instaltech
+  (contato `uWqujqll20tRuglV3mLt`, messageId `xOFkJpI1XGV6Ox5e10jb`): a nota apareceu na
+  leitura em seguida como `INTERNAL_COMMENT`, `origem: "app"`.
+- **`InternalComment` não sai para o contato** — fica na conversa como nota interna. É o tipo
+  para exercitar o caminho sem mandar nada para fora. Os demais canais não foram enviados ao
+  vivo: fazê-lo significa mandar mensagem de verdade para uma pessoa.
+- Não existe desfazer, e a granularidade mínima de exclusão é a conversa inteira. Cada envio
+  deixa registro em `<dumps>/_mensagens/<loc>/<contactId>/<ts>.json`.
