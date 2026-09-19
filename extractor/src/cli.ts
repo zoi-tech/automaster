@@ -137,11 +137,14 @@ async function runExtract(opts: { location: string }): Promise<void> {
     await writer.writeEntity("calendars", await fetchCalendars(client, locationId));
     await writer.writeEntity("custom_values", await fetchCustomValues(client, locationId));
 
-    // Templates: cada lista é opcional. Canal desligado na subconta (WhatsApp, p.ex.)
-    // vira warning no manifest, e a regra broken_template_ref fica no-op para ele.
+    // Templates, formulários e surveys: cada lista é opcional. Canal desligado na
+    // subconta (WhatsApp, p.ex.) ou busca que falha vira warning no manifest, e a regra
+    // que depende da lista fica no-op.
     for (const [nome, buscar] of [
       ["message_templates", () => fetchMessageTemplates(client, locationId)],
       ["whatsapp_templates", () => waTemplates(client, locationId)],
+      ["forms", () => listForms(client, locationId)],
+      ["surveys", () => listSurveys(client, locationId)],
     ] as const) {
       try {
         await writer.writeEntity(nome, await buscar());
