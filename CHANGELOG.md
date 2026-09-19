@@ -4,6 +4,28 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.10.0 — 2026-09-19
+
+`broken_template_ref`, a última regra de auditoria que faltava, mais as duas listas de
+template que ela precisava no dump.
+
+- **Regra nova `broken_template_ref` (ERROR, 14 no total)**: step que manda WhatsApp, SMS
+  ou DM citando template que não existe mais. Na Instaltech são 25 achados reais,
+  confirmados ao vivo — o app também não acha esses ids.
+- **O dump ganha `message_templates.json` e `whatsapp_templates.json`**, cada um opcional:
+  canal desligado na subconta vira warning no manifest e a regra fica no-op para ele. Dump
+  antigo continua carregando (schemaVersion segue 1, como quando entraram users e
+  calendars) e não gera achado de template.
+- **`template_id: "0"` não é achado**: é a opção "None - Free form message" do próprio app,
+  e o texto vive em `attributes.message`. Sem essa exceção seriam 90 falsos positivos só
+  na Instaltech.
+- **E-mail ficou fora da regra, de propósito**: nenhum `email.template_id` casa com id do
+  email builder, nem varrendo as pastas. Seriam 13 de 13 falsos positivos. Razão em
+  `docs/endpoints.md`.
+- O `diff` passa a comparar as duas listas de template. Dump sem a lista é tratado como
+  "não sei", não como "lista vazia" — senão o primeiro diff depois do upgrade diria
+  "81 templates novos" sem nada ter mudado.
+
 ## 0.9.0 — 2026-09-19
 
 Diff entre dois snapshots da mesma subconta: "o que mudou desde o dump anterior".

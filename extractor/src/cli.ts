@@ -28,6 +28,7 @@ import {
   fetchUsers,
   fetchCalendars,
   fetchCustomValues,
+  fetchMessageTemplates,
 } from "./api/entities.js";
 import { DumpWriter, stampNow } from "./dump/writer.js";
 import {
@@ -123,7 +124,7 @@ async function runExtract(opts: { location: string }): Promise<void> {
       }
     }
 
-    console.log("Baixando entidades (pipelines, tags, custom fields, users, calendars, custom values)...");
+    console.log("Baixando entidades (pipelines, tags, custom fields, users, calendars, custom values, templates)...");
     await writer.writeEntity("pipelines", await fetchPipelines(client, locationId));
     await writer.writeEntity("tags", await fetchTags(client, locationId));
     await writer.writeEntity("custom_fields", await fetchCustomFields(client, locationId));
@@ -131,6 +132,20 @@ async function runExtract(opts: { location: string }): Promise<void> {
     await writer.writeEntity("users", await fetchUsers(client, locationId, companyId));
     await writer.writeEntity("calendars", await fetchCalendars(client, locationId));
     await writer.writeEntity("custom_values", await fetchCustomValues(client, locationId));
+
+    // Templates: cada lista é opcional. Canal desligado na subconta (WhatsApp, p.ex.)
+    // vira warning no manifest, e a regra broken_template_ref fica no-op para ele.
+    for (const [nome, buscar] of [
+      ["message_templates", () => fetchMessageTemplates(client, locationId)],
+      ["whatsapp_templates", () => waTemplates(client, locationId)],
+    ] as const) {
+      try {
+        await writer.writeEntity(nome, await buscar());
+      } catch (e) {
+        writer.warn(`${nome}: ${e instanceof Error ? e.message : String(e)}`);
+        console.warn(`  aviso: ${nome} não veio (${e instanceof Error ? e.message : e})`);
+      }
+    }
 
     await writer.writeManifest({ workflows: ok });
     console.log(`\nDump salvo em: ${writer.dir}`);

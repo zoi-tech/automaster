@@ -8,6 +8,8 @@ Contrato do dump (gerado pelo extractor):
       pipelines.json                {fetchedAt, raw:<resposta API: {pipelines:[...]}>}
       tags.json                     {fetchedAt, raw:<resposta API: {tags:[...]}>}
       custom_fields.json            {fetchedAt, raw:<resposta API: {customFields:[...]}>}
+      message_templates.json        {fetchedAt, raw:{templates:[...]}}   (opcional)
+      whatsapp_templates.json       {fetchedAt, raw:[...]}               (opcional)
 
 As actions de cada workflow vivem em raw.steps.templates (baixadas do Firebase).
 """
@@ -76,6 +78,9 @@ class DumpContext:
     user_names: dict[str, str] = field(default_factory=dict)
     user_deleted: set[str] = field(default_factory=set)
     cv_keys: set[str] = field(default_factory=set)  # chaves custom_values, lower-case
+    # templates por canal (ausentes em dumps anteriores; lista vazia = regra no-op)
+    template_ids: dict[str, set[str]] = field(default_factory=dict)
+    template_names: dict[str, str] = field(default_factory=dict)
     users: list[dict] = field(default_factory=list)
     calendars: list[dict] = field(default_factory=list)
     custom_values: list[dict] = field(default_factory=list)
@@ -161,9 +166,41 @@ def load_dump(path: Path) -> DumpContext:
         for key in _cv_keys(cv):
             ctx.cv_keys.add(key)
 
+    _load_templates(ctx, path)
+
     ctx.pipeline_ids.discard(None)
     ctx.stage_ids.discard(None)
     return ctx
+
+
+def _load_templates(ctx: DumpContext, path: Path) -> None:
+    """Preenche template_ids por canal a partir das 3 listas (todas opcionais).
+
+    `message` cobre SMS e os canais que dividem a mesma coleção (um template de
+    step `instagram-dm` vem de lá com type `sms`).
+    """
+    arquivos = {
+        "message": path / "message_templates.json",
+        "whatsapp": path / "whatsapp_templates.json",
+    }
+    msgs = _entity_raw_optional(arquivos["message"]).get("templates", []) or []
+    # a resposta de WhatsApp é uma lista, não um objeto — _entity_raw a descartaria
+    wa_file = arquivos["whatsapp"]
+    wa_raw = _read_json(wa_file).get("raw") if wa_file.exists() else None
+    if isinstance(wa_raw, dict):
+        wa_raw = wa_raw.get("templates")
+    was = wa_raw if isinstance(wa_raw, list) else []
+
+    for canal, itens in (("message", msgs), ("whatsapp", was)):
+        if not arquivos[canal].exists():
+            continue  # canal ausente do dump: fica fora do template_ids (≠ lista vazia)
+        ids = set()
+        for t in itens:
+            tid = t.get("id") or t.get("_id")
+            if tid:
+                ids.add(str(tid))
+                ctx.template_names[str(tid)] = t.get("name", str(tid))
+        ctx.template_ids[canal] = ids
 
 
 _CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")

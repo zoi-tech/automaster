@@ -26,7 +26,12 @@ def _esc(text: str) -> str:
     return (text or "").replace("|", "\\|")
 
 
-def _entities(ctx: DumpContext) -> dict[str, dict[str, str]]:
+def _tpl(ctx: DumpContext, canal: str) -> dict[str, str] | None:
+    ids = ctx.template_ids.get(canal)
+    return None if ids is None else {i: ctx.template_names.get(i, i) for i in ids}
+
+
+def _entities(ctx: DumpContext) -> dict[str, dict[str, str] | None]:
     """Entidades de cada dump como {tipo: {chave: rótulo}}."""
     return {
         "pipelines": dict(ctx.pipeline_names),
@@ -38,6 +43,10 @@ def _entities(ctx: DumpContext) -> dict[str, dict[str, str]]:
             c.get("id"): c.get("name", c.get("id", "")) for c in ctx.calendars if c.get("id")
         },
         "custom values": {k: k for k in ctx.cv_keys},
+        # None = canal ausente do dump (extração anterior aos templates); comparar
+        # contra ele diria "81 templates novos" quando nada mudou.
+        "templates de mensagem": _tpl(ctx, "message"),
+        "templates de WhatsApp": _tpl(ctx, "whatsapp"),
     }
 
 
@@ -71,6 +80,8 @@ def build_diff(antes: DumpContext, depois: DumpContext) -> dict:
     ent_a, ent_d = _entities(antes), _entities(depois)
     entidades = {}
     for tipo in ent_a:
+        if ent_a[tipo] is None or ent_d[tipo] is None:
+            continue
         novos = sorted(ent_d[tipo][k] for k in ent_d[tipo].keys() - ent_a[tipo].keys())
         sumidos = sorted(ent_a[tipo][k] for k in ent_a[tipo].keys() - ent_d[tipo].keys())
         if novos or sumidos:

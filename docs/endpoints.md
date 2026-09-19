@@ -634,3 +634,41 @@ subconta voltou aos 7 calendários de produção.
 Cada escrita gravou `<dumps>/_agenda/<loc>/<chave>/<ts>.json` com `antes`, `corpo` e
 `aplicado`. O 422 da série foi gravado com `aplicado: false` e o `erro` do servidor, como
 projetado.
+
+## Templates de mensagem — sondagem ao vivo 2026-09-19 (Instaltech `Xb9gDxwxYhdqtprGcb5E`)
+
+O que destravou a regra `broken_template_ref`. As duas listas abaixo entram no dump
+(`message_templates.json`, `whatsapp_templates.json`); as de e-mail não entram, e a razão
+está no fim desta seção.
+
+| Lista | Rota | Resposta |
+|---|---|---|
+| mensagem (SMS e cia.) | `GET backend/locations/<loc>/templates?limit=10000` | `{templates:[{id,name,template,type,urlAttachments}], totalCount}` |
+| e-mail (builder) | `GET backend/emails/builder?locationId=&limit=&offset=&parentId=` | `{builders:[{id,name,templateType,parentId,...}], total:[{total:N}]}` |
+| WhatsApp | `GET services/phone-system/whatsapp/location/<loc>/template` | lista crua da Meta, com `id`, `name`, `status`, `components` |
+
+- `locations/<loc>/templates` **não tem `offset`** (`422 property offset should not exist`);
+  o `limit` default é 25 e aceita valor bem acima do total. Sem `type` devolve todos os
+  canais numa lista só, e `type` é enum fechado (`instagram` dá `422 type must be a valid
+  enum value`). O template citado por um step `instagram-dm` sai daí com `type: "sms"`.
+- `emails/builder` lista **uma pasta por vez**: item com `templateType: "folder"` esconde os
+  seus, e só aparecem passando `parentId=<id da pasta>`. Na Instaltech a raiz tem 8 itens,
+  6 deles pastas; a varredura completa dá 43.
+- WhatsApp: a lista vem inteira numa chamada (81 na Instaltech; `limit`/`skip` não mudam
+  nada). `?templateId=<id>` devolve `[]` para template que não existe mais.
+- **`template_id: "0"` não é referência quebrada:** é o próprio app dizendo "sem template".
+  `GET services/phone-system/whatsapp/workflow/options/template_id?locationId=` devolve a
+  opção `{label: "None - Free form message", value: "0"}`, e nesses steps o texto vive em
+  `attributes.message`. Sem essa exceção, a regra acusava 90 falsos positivos só na
+  Instaltech.
+- **E-mail ficou de fora da auditoria, de propósito.** Nenhum dos 13 `email.template_id` da
+  Instaltech casa com id do email builder — nem com a varredura de pastas completa, nem com
+  `deleted=true`, e as rotas de item único (`/emails/builder/<id>`, `?templateId=`) não
+  resolvem o id. Os ids citados compartilham prefixo de ObjectId (mesmo segundo de
+  criação), o que aponta para cópia guardada dentro do step. Cruzar as duas coleções daria
+  13 de 13 falsos positivos.
+- `internal_notification.template_id` (citado na doc antiga como o alvo desta regra) **não
+  aparece em nenhum dos 12 dumps**. Os campos de template que existem de verdade são
+  `whatsapp_v2.template_id` (789 usos), `sms.template_id` (131), `email.template_id` (67),
+  `instagram-dm.template_id`, `ig_interactive_messenger.templateId` e
+  `proposals_estimates_send_document.templateId` (esse último sem lista para cruzar).

@@ -30,6 +30,7 @@ def make_dump(tmp_path):
 
     def _build(workflows=None, tags=None, pipelines=None, fields=None,
                users=None, custom_values=None, calendars=None,
+               message_templates=None, whatsapp_templates=None,
                extracted_at="2026-06-10T00:00:00+00:00"):
         # sufixo por chamada: o diff precisa de dois dumps no mesmo tmp_path
         n = next(contador)
@@ -47,6 +48,10 @@ def make_dump(tmp_path):
             _write(root / "custom_values.json", {"raw": {"customValues": custom_values}})
         if calendars is not None:
             _write(root / "calendars.json", {"raw": {"calendars": calendars}})
+        if message_templates is not None:
+            _write(root / "message_templates.json", {"raw": {"templates": message_templates}})
+        if whatsapp_templates is not None:
+            _write(root / "whatsapp_templates.json", {"raw": whatsapp_templates})
         _write(
             root / "manifest.json",
             {
