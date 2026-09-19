@@ -318,3 +318,41 @@ corpo: { type, contactId, message, subject?, emailFrom?, attachments?, conversat
   vivo: fazê-lo significa mandar mensagem de verdade para uma pessoa.
 - Não existe desfazer, e a granularidade mínima de exclusão é a conversa inteira. Cada envio
   deixa registro em `<dumps>/_mensagens/<loc>/<contactId>/<ts>.json`.
+
+### Resto da superfície de conversas — validado ao vivo (2026-09-19)
+
+Tudo abaixo na Instaltech, contato `uWqujqll20tRuglV3mLt`, host `services`.
+
+| o quê | chamada | observação |
+|---|---|---|
+| filtrar por tipo | `GET /conversations/<conv>/messages?type=TYPE_EMAIL` | no filtro o tipo é **string**; na resposta volta número |
+| buscar na conversa | `POST /conversations/message-search/<conv>` `{locationId, query, limit, sortDirection}` | devolve só `matchedMessageIds` (com `emailMessageId`), sem corpo |
+| buscar na subconta | `POST /conversations/message-search` `{locationId, query, limit}` | devolve conversas + a mensagem que casou; **`limit` é ignorado** (pedi 3, vieram 20) |
+| e-mail completo | `GET /conversations/messages/email/<emailMessageId>` | o id **não** é o da mensagem: é o `altId`/`emailMessageId`. Com o id da mensagem responde 400 |
+| vários e-mails | `POST /conversations/messages/email/batch` `{locationId, ids}` | o `search?threadId=` recusou toda combinação de params testada |
+| marcar lida | `PUT /conversations/<conv>` `{locationId, unreadCount: 0}` | mandar junto `firstUnreadInboundMessageId`/`Timestamp`, como a interface faz, dá **422** |
+| marcar não lida | `PUT /conversations/<conv>` `{locationId, unreadCount: 1}` | |
+| estrela | `PUT /conversations/<conv>` `{locationId, starred: bool}` | |
+| apagar conversa | `DELETE /conversations/<conv>` | **não exercitado** — leva o histórico inteiro, e não há delete de mensagem avulsa |
+| rascunho | `POST /conversations/messages/drafts` `{locationId, contactId, body, channel, attachments}` | criar/listar/apagar validados; resposta traz `_id` |
+| listar rascunhos | `GET /conversations/messages/drafts/<loc>/contacts/<contactId>` | |
+| apagar rascunho | `DELETE /conversations/messages/drafts/<draftId>` | |
+| cancelar agendada | `DELETE /conversations/messages/<id>/schedule` (ou `/messages/email/<id>/schedule`) | responde **200 mesmo quando falha**, com `message: "Cannot cancel..."` — leia o texto |
+| reenviar | `POST /conversations/messages/resend/text` `{messageId, locationId}` / `/resend/email` `{emailMessageId, locationId}` | **não exercitado**: exige mensagem que falhou |
+| transcrição | `GET /conversations/locations/<loc>/messages/<msgId>/transcription?index=0` | 400 quando a mensagem não tem; só chamada |
+| gravação | `GET /conversations/messages/<msgId>/locations/<loc>/recording?index=0` | 422 em mensagem sem gravação; devolve binário, não JSON |
+| criar conversa | `POST /conversations` | **404** — não existe; o envio cria a conversa sozinho |
+
+**Agendamento não vale para nota interna.** `scheduledTimestamp` (epoch em segundos) no POST
+de envio é aceito, mas com `InternalComment` a mensagem sai na hora: o cancelamento respondeu
+"Cannot cancel the message as the message was already sent!". Para canal externo o campo não
+foi exercitado — testar significa arriscar mandar a mensagem de verdade se o cancelamento
+falhar.
+
+### Fora de escopo, com motivo
+
+Upload de anexo (`POST /conversations/messages/upload`) é multipart e o `GhlClient` só fala
+JSON; o envio já aceita anexo por URL. Group chat, live-chat typing, review reply, spam
+check, views salvas da caixa de entrada, templates e flows de WhatsApp, voice note,
+knowledge base da IA e SLA existem na API interna (mapeados no bundle) e não têm uso no
+diagnóstico de automação.

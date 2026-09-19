@@ -14,7 +14,11 @@
     "timeline": "tsx src/cli.ts timeline",
     "contato-editar": "tsx src/cli.ts contato-editar",
     "conversas": "tsx src/cli.ts conversas",
-    "conversas-enviar": "tsx src/cli.ts conversas-enviar"
+    "conversas-enviar": "tsx src/cli.ts conversas-enviar",
+    "conversas-marcar": "tsx src/cli.ts conversas-marcar",
+    "conversas-rascunho": "tsx src/cli.ts conversas-rascunho",
+    "conversas-mensagem": "tsx src/cli.ts conversas-mensagem",
+    "conversas-buscar": "tsx src/cli.ts conversas-buscar"
   },
   "dependencies": {
     "commander": "^12.1.0",

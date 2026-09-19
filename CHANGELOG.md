@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.4.0 — 2026-09-19
+
+Conversas completas: o que faltava da leitura, a gestão da caixa e os rascunhos.
+
+- `conversas` ganhou filtro por tipo, busca dentro da conversa e `email=<id>` para o corpo
+  inteiro de um e-mail (cortado em 400 caracteres na listagem).
+- **`conversas_buscar`**: procura um texto nas mensagens de toda a subconta e diz quem
+  recebeu.
+- **`conversa_acao`**: marcar lida/não lida, estrela, cancelar uma mensagem agendada,
+  reenviar uma que falhou — e apagar a conversa, que exige `confirmo=true` porque leva o
+  histórico inteiro junto (o GHL não apaga mensagem avulsa).
+- **`rascunho`**: criar, listar e apagar rascunho do contato. Não sai para ninguém.
+- `enviar` aceita `quando` para agendar.
+
+### Cuidado
+
+O cancelamento de mensagem agendada responde **200 mesmo quando não cancelou** — a razão
+vem no texto da resposta. E agendamento não funciona em nota interna: ela sai na hora.
+
 ## 0.3.0 — 2026-09-19
 
 ### Novidade

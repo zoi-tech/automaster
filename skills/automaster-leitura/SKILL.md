@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (inventario, achados, workflow, buscar, jornada, contato, editar) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, enviar, editar) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -26,3 +26,23 @@ As tools devolvem fatos do dump. Esta skill diz o que cada fato costuma signific
 **`editar` escreve em produção.** Só depois de diagnosticar com `contato` e com o pedido explícito do usuário. Ela grava snapshot antes e devolve `dispara`: cite esses workflows na resposta, porque a mudança pode acendê-los. Não cria tag nem campo; se o nome não existe no dump, extraia de novo ou passe o id.
 
 **Workflow sem entrada (`workflow_unreachable`)** já cruza triggers e `add_to_workflow`; o que sobra pode ser execução manual pelo painel do GHL. Pergunte antes de sugerir apagar.
+
+**`conversas` mostra o que o contato recebeu de fato.** É a outra metade do diagnóstico:
+`contato` diz o que a automação fez, `conversas` diz o que chegou na pessoa. Quem responde
+"isso foi automação ou alguém digitou?" é o campo `origem` (`app`, `workflow`, `campaign`,
+`api`) — **não** a presença de `autor`: mensagem de workflow vem com `userId` preenchido.
+
+**Um terço do que volta não é mensagem.** Os tipos `ACTIVITY_*` são eventos de timeline
+(oportunidade movida, agendamento apagado) no mesmo array; ficam escondidos salvo
+`atividades=true`. Se o usuário perguntou "o que foi enviado", eles são ruído.
+
+**Corpo de e-mail vem cortado em 400 caracteres.** Para o texto inteiro, chame `conversas`
+de novo com `email=<emailMessageId>` — o id do e-mail, que a mensagem traz em
+`emailMessageId`, nunca o `id` da mensagem.
+
+**`enviar` fala com uma pessoa de verdade.** `InternalComment` é nota interna e não sai;
+qualquer outro tipo exige `confirmo=true` e não tem desfazer. Diga ao usuário o que vai
+sair, para quem, antes de mandar.
+
+**`conversa_acao` com `apagar` leva o histórico inteiro.** O GHL não apaga mensagem avulsa:
+a granularidade mínima é a conversa. Nunca ofereça isso como forma de "desfazer" um envio.

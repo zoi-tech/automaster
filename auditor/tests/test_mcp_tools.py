@@ -326,3 +326,51 @@ def test_enviar_email_exige_assunto(root):
     root(workflows=[wf()])
     with pytest.raises(srv.ToolError):
         srv.enviar(LOC, "c1", "Email", "corpo", confirmo=True)
+
+
+def test_conversa_acao_apagar_exige_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.conversa_acao(LOC, "apagar", id="c1")
+    assert "conversa INTEIRA" in str(e.value)
+
+
+def test_conversa_acao_mensagem_exige_messageid(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError):
+        srv.conversa_acao(LOC, "reenviar")
+
+
+def test_conversa_acao_marca_lida(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {"ok": True})
+    srv.conversa_acao(LOC, "lida", id="c1")
+    assert seen["args"][:3] == ("conversas-marcar", "-l", LOC)
+    assert "--confirmo" not in seen["args"]
+
+
+def test_rascunho_apagar_exige_id(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError):
+        srv.rascunho(LOC, "c1", acao="apagar")
+
+
+def test_enviar_agendado_recusa_nota_interna(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.enviar(LOC, "c1", "InternalComment", "nota", quando="2026-12-01T10:00:00Z")
+    assert "sai na hora" in str(e.value)
+
+
+def test_conversas_repassa_filtros(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {"mensagens": []})
+    srv.conversas(LOC, "c1", tipo="TYPE_EMAIL", busca="oi", email="e1")
+    for flag, valor in (("--tipo", "TYPE_EMAIL"), ("--busca", "oi"), ("--email", "e1")):
+        assert seen["args"][seen["args"].index(flag) + 1] == valor
