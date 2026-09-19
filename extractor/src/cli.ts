@@ -43,6 +43,9 @@ import {
   createOpportunity, updateOpportunity, deleteOpportunity, restoreOpportunity,
   createPipeline, updatePipeline, deletePipeline,
 } from "./api/opportunities.js";
+import {
+  listCalendars, getCalendar, freeSlots, listEvents, getAppointment, listNotes,
+} from "./api/calendars.js";
 import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
@@ -511,6 +514,67 @@ function registroEscrita(loc: string, pasta: string, chave: string, dados: unkno
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
+const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "ver", "notas"];
+
+async function runAgenda(opts: {
+  location: string; o: string; id?: string; calendario?: string; usuario?: string;
+  grupo?: string; contato?: string; inicio?: string; fim?: string; timezone?: string;
+  limite?: string; pagina?: string; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!AGENDA_LEITURA.includes(opts.o)) {
+    throw new Error(`-o inválido: ${opts.o}. Aceitos: ${AGENDA_LEITURA.join(", ")}`);
+  }
+  if ((opts.o === "livres" || opts.o === "eventos") && !(opts.inicio && opts.fim)) {
+    throw new Error(`${opts.o} exige --inicio e --fim em ISO com fuso`);
+  }
+  if (opts.o === "livres" && !opts.calendario) throw new Error("livres exige --calendario");
+  if ((opts.o === "calendario" || opts.o === "ver" || opts.o === "notas") && !opts.id) {
+    throw new Error(`${opts.o} exige --id`);
+  }
+  await withClient(opts.location, log, async (client) => {
+    let out: unknown;
+    switch (opts.o) {
+      case "calendarios":
+        out = await listCalendars(client, opts.location);
+        break;
+      case "calendario":
+        out = await getCalendar(client, opts.id!);
+        break;
+      case "livres":
+        out = await freeSlots(client, opts.calendario!, {
+          inicio: opts.inicio!, fim: opts.fim!,
+          timezone: opts.timezone, usuario: opts.usuario,
+        });
+        break;
+      case "eventos": {
+        const r = await listEvents(client, opts.location, {
+          inicio: opts.inicio!, fim: opts.fim!, calendario: opts.calendario,
+          usuario: opts.usuario, grupo: opts.grupo, contato: opts.contato,
+        }) as { events?: Record<string, unknown>[] };
+        // compromisso e bloqueio vivem na mesma lista; marcamos cada um para o leitor
+        out = {
+          events: (r.events ?? []).map((e) => ({
+            ...e, _tipo: e.contactId ? "compromisso" : "bloqueio",
+          })),
+        };
+        break;
+      }
+      case "ver":
+        out = await getAppointment(client, opts.id!);
+        break;
+      case "notas":
+        out = await listNotes(
+          client, opts.id!,
+          opts.limite ? Number(opts.limite) : 20,
+          opts.pagina ? (Number(opts.pagina) - 1) * 20 : 0,
+        );
+        break;
+    }
+    if (opts.json) console.log(JSON.stringify(out));
+    else console.log(JSON.stringify(out, null, 2));
+  });
+}
 
 async function runOportunidades(opts: {
   location: string; o: string; id?: string; pipeline?: string; estagio?: string;
@@ -1193,6 +1257,24 @@ program
   .option("--pagina <n>", "página da listagem, a partir de 1")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runOportunidades(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("agenda")
+  .description("Leitura ao vivo de calendários, horários livres e compromissos")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .option("-o, --o <op>", "calendarios | calendario | livres | eventos | ver | notas", "calendarios")
+  .option("-i, --id <id>", "id do calendário, compromisso ou dono das notas")
+  .option("--calendario <id>", "filtra por calendário")
+  .option("--usuario <id>", "filtra pelo dono")
+  .option("--grupo <id>", "filtra por grupo de calendários")
+  .option("--contato <id>", "filtra pelos compromissos de um contato")
+  .option("--inicio <iso>", "início do período, ISO com fuso: 2026-10-02T00:00:00-03:00")
+  .option("--fim <iso>", "fim do período, ISO com fuso")
+  .option("--timezone <tz>", "fuso IANA para os horários livres, ex.: America/Sao_Paulo")
+  .option("--limite <n>", "quantas notas trazer, até 20")
+  .option("--pagina <n>", "página das notas, a partir de 1")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runAgenda(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("oportunidade-acao")
