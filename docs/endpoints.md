@@ -108,9 +108,9 @@ GET services.leadconnectorhq.com/associations/relations/record/<contactId>
 - `{ relations: [{ recordId: <opportunityId>, ... }] }`. O audit/search/v2 aceita
   o opportunityId no `id` → histórico da oportunidade (criação, stage, status).
 - Snapshot do registro: `POST services.../objects/opportunity/records/ids` (observado, não usado).
-- Agendamentos: `services.../calendars/events?locationId&contactId&startTime&endTime`
-  testado e RECUSADO com tokens internos — endpoint correto pendente de discover
-  (aba Appointments do contato).
+- Agendamentos: ver `## Agenda`. A nota antiga ("endpoint recusado com tokens internos")
+  estava errada: o 4xx vinha de `contactId` (parâmetro inexistente na rota) e da falta de
+  `calendarId`/`userId`/`groupId`, não da auth.
 
 ## Escrita — PUT de campo padrão e custom (todos os tipos), POST/DELETE de tag validados ao vivo (2026-09-18)
 
@@ -480,3 +480,76 @@ uma vez, acordando toda automação que reage a transição.
 
 Apagar o pipeline leva os cards dentro junto, e **não tem restore** — o estado anterior
 fica em `<dumps>/_oportunidades/`.
+
+## Agenda — sondagem ao vivo 2026-09-19 (Instaltech `Xb9gDxwxYhdqtprGcb5E`)
+
+Sondado com os tokens da sessão Chrome (Bearer + `token-id`, UA de browser), sem clicar na
+interface. As rotas são as mesmas da referência pública; o que faltava era o parâmetro, não
+a autenticação.
+
+### Respostas às quatro perguntas da sondagem
+
+1. **Host:** os dois servem agenda, com resposta idêntica byte a byte.
+   `backend.leadconnectorhq.com` e `services.leadconnectorhq.com` foram exercitados lado a
+   lado em `/calendars/`, `/calendars/events`, `/calendars/<id>/free-slots` e
+   `/calendars/groups` — mesmos status e mesmos corpos. Usar `services` (é o host que a
+   referência pública documenta). ✓
+2. **Compromisso vs. bloqueio:** `/calendars/events` e `/calendars/blocked-slots` são
+   filtros da mesma coleção e devolvem o mesmo envelope `{events:[...]}`. O compromisso traz
+   `contactId`, `appointmentStatus` e `appointmentMeta`; o bloqueio não. Na Instaltech não
+   existe bloqueio nenhum — `blocked-slots` devolveu `{"events":[]}` em todos os recortes,
+   então o discriminante está inferido da forma do compromisso e da referência, **não
+   observado num bloqueio real**. ✗
+3. **`toNotify`, `ignoreFreeSlotValidation`, `ignoreDateRange`:** os três nomes aparecem com
+   esse case exato na referência de `create-appointment` e `edit-appointment`, junto de
+   `rrule` e `isRecurring`. Nenhum foi exercitado — são corpo de escrita, fora do escopo da
+   Tarefa 1. ✗
+4. **Datas — e esta é a armadilha da agenda:** `startTime`/`endTime` de `/calendars/events`
+   e `startDate`/`endDate` de `free-slots` aceitam **só milissegundos desde 1970**.
+   `free-slots` com texto ISO recusa explicitamente
+   (`422 startDate must be a number conforming to the specified constraints`), mas
+   `/calendars/events` com texto ISO responde **200 com `{"events":[]}`** — o mesmo recorte
+   que em milissegundos devolve o compromisso. Data ISO na listagem some com a agenda sem
+   nenhum erro. Já as datas **na resposta** vêm em texto ISO com fuso
+   (`2026-09-04T15:00:00-03:00`). ✓
+
+### Auth
+
+Uma chamada válida de `/calendars/events` respondeu 200 **só com o Bearer**, sem `token-id`.
+O cliente manda os dois de qualquer forma; nada a mudar. ✓
+
+### Rotas confirmadas (host `services.leadconnectorhq.com`)
+
+| Rota | Parâmetros | Status |
+|---|---|---|
+| `GET /calendars/?locationId=<loc>` | — | ✓ 200, `{calendars:[...]}` (já usado por `fetchCalendars`) |
+| `GET /calendars/groups?locationId=<loc>` | — | ✓ 200, `{groups:[...]}` |
+| `GET /calendars/events` | `locationId` **e** um de `calendarId`/`userId`/`groupId`; `startTime`,`endTime` em ms | ✓ 200, `{events:[...]}` |
+| `GET /calendars/blocked-slots` | idem | ✓ 200 (só recortes vazios na Instaltech) |
+| `GET /calendars/<calendarId>/free-slots` | `startDate`,`endDate` em ms; `timezone` IANA opcional | ✓ 200, `{"<YYYY-MM-DD>":{slots:[ISO com fuso]}}` |
+| `GET /calendars/events/appointments/<eventId>` | — | ✓ 200, `{appointment:{...}}` |
+| `GET /calendars/appointments/<appointmentId>/notes?limit&offset` | — | ✓ 200, `{notes:[],hasMore:false}` |
+
+Erros que valem lembrar, todos observados:
+
+- sem `calendarId`/`userId`/`groupId` → `422 Either of userId, calendarId or groupId is required`
+- `location_id`/`start_time` (snake_case) → `400 Location ID is required`. O case é camelCase.
+- `contactId` em `/calendars/events` → `422 property contactId should not exist`. **Não existe
+  filtro por contato nessa rota** — para a agenda de um contato, filtrar no cliente.
+
+### Forma do compromisso (campos observados)
+
+```
+id, title, calendarId, locationId, contactId, groupId, calendarProviderId,
+status ("booked"), appointmentStatus ("showed"|"cancelled"|...), appoinmentStatus (typo do
+servidor, espelha o anterior), assignedUserId, isFree, isRecurring, isFullDay, isCancelled,
+deleted, type, google{...}, startTime/endTime (ISO com fuso), dateAdded, dateUpdated,
+selectedTimezone, source, version, assignedResources, appointmentMeta{slotType,bookedDuration}
+```
+
+### Rotas de escrita (da referência, nenhuma exercitada) ✗
+
+`POST /calendars/events/appointments`, `PUT /calendars/events/appointments/<eventId>`,
+`DELETE /calendars/events/<eventId>`, `POST /calendars/events/block-slots`,
+`PUT /calendars/events/block-slots/<eventId>`,
+`POST|PUT|DELETE /calendars/appointments/<appointmentId>/notes[/<noteId>]`.
