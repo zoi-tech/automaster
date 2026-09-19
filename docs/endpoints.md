@@ -672,3 +672,40 @@ está no fim desta seção.
   `whatsapp_v2.template_id` (789 usos), `sms.template_id` (131), `email.template_id` (67),
   `instagram-dm.template_id`, `ig_interactive_messenger.templateId` e
   `proposals_estimates_send_document.templateId` (esse último sem lista para cruzar).
+
+## Formulários e surveys
+
+Host `https://backend.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
+extractor). As mesmas rotas existem na API pública v3, mas devolvendo só id e nome.
+Módulo: `extractor/src/api/forms.ts`; CLI `npm run formularios`; tool MCP `formularios`.
+
+| operação | rota |
+| --- | --- |
+| lista de formulários | `GET /forms/?locationId=<loc>&limit=50&skip=<n>` |
+| lista de surveys | `GET /surveys/?locationId=<loc>&limit=50&skip=<n>` |
+| um formulário | `GET /forms/<id>` (locationId dispensável) |
+| um survey | `GET /surveys/<id>?locationId=<loc>` |
+| submissões de formulário | `GET /forms/submissions?locationId=<loc>&...` |
+| submissões de survey | `GET /surveys/submissions?locationId=<loc>&...` |
+
+Paginação das listas: `limit` no máximo 50 — acima disso o servidor devolve
+`422 limit must not be greater than 50`. A varredura soma `skip` até juntar `total`.
+
+Paginação das submissões: `page` a partir de 1, `limit` até 100, e a resposta traz
+`meta.total`, `meta.currentPage`, `meta.nextPage`, `meta.prevPage`. Filtros aceitos:
+`formId`/`surveyId`, `q` (contactId, nome, e-mail ou telefone), `startAt` e `endAt` em
+`YYYY-MM-DD`. Sem filtro de data, o servidor responde o mês corrente.
+
+`type=folder` devolve as pastas na rota de surveys (a Instaltech tem 6) e é **ignorado**
+na de formulários, que não organiza em pasta. Pasta nunca aparece na lista normal, então
+a extração do dump não a grava.
+
+O detalhe traz os campos em `form.formData`; no survey o CSS fica em
+`formData.fieldCSS`. `deleted` não é parâmetro dessas rotas (422). Id inexistente devolve
+`404 Form not found!` em `/forms/<id>` e `400 Survey does not exist` em `/surveys/<id>`.
+
+O id `fb-<locationId>` que aparece nas submissões é o pseudo-formulário de lead gen do
+Facebook: ele nunca está na lista de formulários e **não** é referência quebrada. As
+regras `broken_form_ref` e `unused_form` o ignoram explicitamente.
+
+Não há busca por nome no servidor: `-o buscar` do CLI varre a lista inteira, que é curta.

@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -105,3 +105,18 @@ Por isso `bloquear` exige `dono` e recusa `contato`/`situacao`.
 **`forcar` marca por cima da disponibilidade.** Sem ele o servidor recusa horário ocupado
 (`400 The slot you have selected is no longer available.`); com ele, passa — e exige `dono`,
 porque sem a checagem de horário o servidor não escolhe responsável sozinho.
+
+## Formulários e surveys (`formularios`, `broken_form_ref`, `unused_form`)
+
+A tool `formularios` lê ao vivo, não do dump: lista, detalhe com os campos, submissões
+com filtro de período e contato, e busca por nome. O `tipo` escolhe entre formulário e
+survey.
+
+Nas submissões, o id `fb-<locationId>` é o formulário de lead gen do Facebook, não um
+formulário da subconta — ele não aparece em lista nenhuma e não é referência quebrada.
+
+`broken_form_ref` é erro de verdade: um trigger "Formulário Enviado" ou o `formId` de um
+calendário apontando para formulário apagado nunca dispara.
+
+`unused_form` é revisão, não conserto. Formulário embutido num site externo, num funil ou
+numa landing page não aparece no dump, então aparecer aí não prova que está morto.

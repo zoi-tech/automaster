@@ -544,6 +544,33 @@ _SNAP = {"type": "string", "description": "snapshot YYYY-MM-DD_HHmm (default: ma
 OPP_LEITURA = ("pipelines", "listar", "buscar", "ver")
 OPP_ACOES = ("criar", "editar", "mover", "status", "apagar", "restaurar")
 PIPE_ACOES = ("criar", "editar", "apagar")
+FORM_LEITURA = ("lista", "detalhe", "submissoes", "buscar")
+FORM_TIPOS = ("formulario", "survey")
+
+
+def formularios(loc: str, o: str = "lista", tipo: str = "formulario", id: str | None = None,
+                formulario: str | None = None, termo: str | None = None,
+                inicio: str | None = None, fim: str | None = None,
+                limite: int | None = None, pagina: int | None = None,
+                snapshot: str | None = None) -> dict:
+    """Leitura ao vivo de formulários, surveys e suas submissões."""
+    if o not in FORM_LEITURA:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(FORM_LEITURA)}")
+    if tipo not in FORM_TIPOS:
+        raise ToolError(f"tipo inválido: {tipo}. Aceitos: {', '.join(FORM_TIPOS)}")
+    if o == "detalhe" and not id:
+        raise ToolError("o=detalhe exige id do formulário ou survey")
+    if o == "buscar" and not termo:
+        raise ToolError("o=buscar exige termo")
+    _, meta = _load(loc, snapshot)
+    args = ["formularios", "-l", loc, "-o", o, "--tipo", tipo]
+    for flag, val in (("-i", id), ("--formulario", formulario), ("--termo", termo),
+                      ("--inicio", inicio), ("--fim", fim),
+                      ("--limite", str(limite) if limite else None),
+                      ("--pagina", str(pagina) if pagina else None)):
+        if val:
+            args += [flag, val]
+    return {"resultado": _run_extractor(*args, "--json"), "_snapshot": meta}
 
 
 def oportunidades(loc: str, o: str = "pipelines", id: str | None = None,
@@ -876,6 +903,22 @@ TOOLS = {
                "usuarios": {"type": "array", "items": {"type": "string"}},
                "desde": {"type": "string", "description": "-1 tudo, 0 nada, YYYY-MM-DD a partir de"},
                "confirmo": {"type": "boolean", "default": False}, "snapshot": _SNAP}, ["loc", "o"]),
+    "formularios": (formularios, "Leitura ao vivo de formulários e surveys (abre Chrome, não usa o dump): "
+                    "`lista` (todos, já paginados), `detalhe` (um, com os campos), `submissoes` (respostas, "
+                    "com filtro de formulário, contato e período), `buscar` (por nome). O parâmetro `tipo` "
+                    "escolhe entre formulário e survey. O id `fb-<locationId>` nas submissões é o formulário "
+                    "de lead do Facebook, não um formulário da subconta.",
+                    {"loc": _LOC, "o": {"type": "string", "enum": list(FORM_LEITURA), "default": "lista"},
+                     "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},
+                     "id": {"type": "string", "description": "id do formulário ou survey (com o=detalhe)"},
+                     "formulario": {"type": "string", "description": "filtra as submissões por formulário ou survey"},
+                     "termo": {"type": "string", "description": "nome (o=buscar) ou contato/e-mail/telefone (o=submissoes)"},
+                     "inicio": {"type": "string", "description": "primeira data das submissões, YYYY-MM-DD"},
+                     "fim": {"type": "string", "description": "última data das submissões, YYYY-MM-DD"},
+                     "limite": {"type": "integer", "description": "quantas submissões, até 100"},
+                     "pagina": {"type": "integer", "description": "página das submissões, a partir de 1"},
+                     "snapshot": _SNAP},
+                    ["loc"]),
     "oportunidades": (oportunidades, "Leitura ao vivo de pipelines e oportunidades (abre Chrome, não usa "
                       "o dump): `pipelines` (funis e seus estágios), `listar` (cards, com filtro de pipeline, "
                       "estágio, status e contato), `buscar` (termo livre), `ver` (um card pelo id).",

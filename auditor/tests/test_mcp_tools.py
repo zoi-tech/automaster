@@ -763,3 +763,37 @@ def test_agenda_acao_remarcar_forcar_exige_dono(root, monkeypatch):
         srv.agenda_acao(LOC, acao="remarcar", id="ap1",
                         inicio="2026-10-02T14:00:00-03:00",
                         forcar=True, confirmo=True)
+
+
+def test_formularios_recusa_operacao_invalida(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inválido"):
+        srv.formularios(LOC, o="inventar")
+
+
+def test_formularios_recusa_tipo_invalido(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="tipo"):
+        srv.formularios(LOC, tipo="planilha")
+
+
+def test_formularios_detalhe_exige_id(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="id"):
+        srv.formularios(LOC, o="detalhe")
+
+
+def test_formularios_passa_filtros_ao_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"submissions": []})
+    r = srv.formularios(LOC, o="submissoes", tipo="survey", formulario="S1",
+                        inicio="2026-09-01", limite=5)
+    assert r["resultado"] == {"submissions": []}
+    assert "--tipo" in visto["args"] and "survey" in visto["args"]
+    assert "--formulario" in visto["args"] and "S1" in visto["args"]
+    assert "--inicio" in visto["args"] and "2026-09-01" in visto["args"]
+    assert "--limite" in visto["args"] and "5" in visto["args"]

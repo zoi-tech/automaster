@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.11.0 — 2026-09-19
+
+Formulários e surveys: leitura ao vivo, submissões, duas listas novas no dump e duas
+regras de auditoria.
+
+- **Tool nova `formularios` (25 no total)**: lista (já paginada), detalhe com os campos,
+  submissões com filtro de formulário, contato e período, e busca por nome. O parâmetro
+  `tipo` escolhe entre formulário e survey. Lê ao vivo, não usa o dump.
+- **Regras novas `broken_form_ref` (ERROR) e `unused_form` (INFO), 16 no total**: a
+  primeira acusa trigger de formulário/survey e `formId` de calendário apontando para
+  algo que não existe mais — na Instaltech é 1 achado real, o trigger "Formulário
+  Enviado" citando `bblZYCoXk6rf3xl7ehyO`. A segunda lista o que ninguém referencia, e é
+  INFO de propósito: formulário embutido em site externo não aparece no dump.
+- **O dump ganha `forms.json` e `surveys.json`**, opcionais como os de template. Dump
+  antigo continua carregando (schemaVersion segue 1) e não gera achado novo.
+- **Comando de CLI novo** `npm run formularios`. Rotas em `docs/endpoints.md`, seção
+  `## Formulários e surveys`.
+- O id `fb-<locationId>` das submissões é o lead gen do Facebook e nunca vira achado.
+
 ## 0.10.0 — 2026-09-19
 
 `broken_template_ref`, a última regra de auditoria que faltava, mais as duas listas de
