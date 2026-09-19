@@ -250,7 +250,9 @@ export function resolveFieldIds(fields: { id: string; name?: string; fieldKey?: 
   for (const w of wanted) {
     const key = w.trim().toLowerCase();
     const hits = fields.filter((f) => f.id === w || f.name?.toLowerCase() === key || f.fieldKey?.toLowerCase() === key
-      || f.fieldKey?.toLowerCase().replace(/^contact\./, "") === key);
+      || f.fieldKey?.toLowerCase().replace(/^contact\./, "") === key
+      // camelCase do corpo do PUT ("companyName") também resolve para o fieldKey snake_case
+      || f.fieldKey?.toLowerCase().replace(/^contact\./, "").replace(/_/g, "") === key.replace(/_/g, ""));
     if (hits.length === 0) throw new Error(`campo ${JSON.stringify(w)} não existe no dump; confira em inventario(fatia=fields) ou passe o id`);
     if (new Set(hits.map((h) => h.id)).size > 1) throw new Error(`campo ${JSON.stringify(w)} é ambíguo: ${hits.map((h) => h.id).join(", ")}; passe o id`);
     out.set(w, hits[0].id);
@@ -271,6 +273,7 @@ const STANDARD_FIELD_BODY_KEY: Record<string, string> = {
   "contact.website": "website",
   "contact.phone": "phone",
   "contact.company_name": "companyName",
+  "contact.source": "source",
   "contact.date_of_birth": "dateOfBirth",
   "contact.type": "type",
   "contact.address1": "address1",
@@ -290,7 +293,8 @@ function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<
     if (f?.dataType === "STANDARD_FIELD") {
       const bodyKey = STANDARD_FIELD_BODY_KEY[String(f.fieldKey)];
       if (!bodyKey) throw new Error(`campo padrão ${JSON.stringify(f.fieldKey)} sem mapeamento conhecido para o corpo do PUT; adicione em STANDARD_FIELD_BODY_KEY antes de usar`);
-      body[bodyKey] = value;
+      // string vazia no campo padrão é ignorada pela API; `null` é o que a UI manda para limpar
+      body[bodyKey] = value === "" ? null : value;
     } else custom.push({ id: ids.get(name), value });
   }
   if (custom.length) body.customFields = custom;
@@ -353,7 +357,7 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
     const esperado = new Map<string, string>();
     if (sets.length) {
       const body = buildFieldsBody(sets, fieldIds, contactFields);
-      for (const [k, v] of Object.entries(body)) if (k !== "customFields") esperado.set(k, String(v));
+      for (const [k, v] of Object.entries(body)) if (k !== "customFields") esperado.set(k, v === null ? "" : String(v));
       for (const f of (body.customFields as any[] ?? [])) esperado.set(`cf:${f.id}`, String(f.value));
       await updateContactFields(client, loc, id, body); marca("set");
     }

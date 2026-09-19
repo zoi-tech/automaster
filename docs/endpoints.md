@@ -112,7 +112,7 @@ GET services.leadconnectorhq.com/associations/relations/record/<contactId>
   testado e RECUSADO com tokens internos — endpoint correto pendente de discover
   (aba Appointments do contato).
 
-## Escrita — PUT de custom field, POST/DELETE de tag validados ao vivo (2026-09-18)
+## Escrita — PUT de campo padrão e custom (todos os tipos), POST/DELETE de tag validados ao vivo (2026-09-18)
 
 Rotas obtidas lendo os chunks JS do app (`contacts-highrise`, `appcdn.leadconnectorhq.com`).
 Exercitadas ao vivo em 2026-09-18 contra a Instaltech (`Xb9gDxwxYhdqtprGcb5E`), contato de
@@ -131,10 +131,23 @@ nas 3 execuções ao vivo).
 outros 4 custom fields, as 2 tags e todos os 4 campos padrão do contato de teste, em 3 execuções
 sem nenhum aviso de destruição.
 
-**O que foi exercitado:** PUT de custom field tipo TEXT, POST de tag, DELETE de tag.
-**O que NÃO foi exercitado:** nenhum campo padrão (`firstName`, `phone` etc.) foi escrito; nenhum
-custom field de tipo diferente de TEXT (SINGLE_OPTIONS, RADIO, NUMERICAL, DATE) foi escrito;
-`contact.source` segue fora do mapa por falta de confirmação ao vivo (ver nota abaixo).
+**O que foi exercitado:** PUT de custom field `TEXT`, `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`,
+`CHECKBOX` e `DATE`; PUT de campo padrão (`contact.company_name`, `contact.phone`,
+`contact.source`); POST de tag; DELETE de tag; `set` + `tagsDel` na mesma execução. Tudo 200,
+pela CLI e pela tool MCP `editar`.
+
+**Normalização do GHL na resposta** (o valor vai como string em todos os casos):
+`NUMERICAL` volta número (`1234.5`), `CHECKBOX` volta array (`["sim"]`), `DATE` volta a string
+ISO como enviada, `contact.phone` volta em E.164 com o DDI do `country` do contato
+(`11999998888` → `+5511999998888`). O aviso de "escrita possivelmente ignorada" dispara nesse
+último caso e é falso positivo esperado.
+
+**Limpar campo:** custom field limpa com string vazia; campo padrão **não** — a API aceita 200
+e ignora. Para campo padrão o corpo tem que levar `null`, e é isso que a CLI manda quando o
+valor de `--set` é vazio.
+
+**O que NÃO foi exercitado:** `MONETORY`, `TEXTBOX_LIST`, `EMAIL` e `PHONE` como custom field;
+os 12 campos padrão restantes do mapa.
 
 ### Contato inteiro (snapshot) — GET validado ao vivo
 ```
@@ -159,15 +172,14 @@ PUT backend.leadconnectorhq.com/contacts/<contactId>?version=14-05-22
 - Corpo, pelo código do app e confirmado ao vivo para custom field TEXT: campo padrão
   (`phone`, `companyName`, `email`, ...) vai cru no topo do corpo, como no GET; custom field
   vai em `customFields: [{ id, value }]`.
-- Resposta: **200**, confirmada ao vivo (PUT de custom field TEXT). Campo padrão e custom
-  field de outro tipo (SINGLE_OPTIONS, RADIO, NUMERICAL, DATE) ainda não foram escritos.
+- Resposta: **200**, confirmada ao vivo para campo padrão e para custom field
+  `TEXT`/`SINGLE_OPTIONS`/`RADIO`/`NUMERICAL`/`CHECKBOX`/`DATE`.
 - **PUT é MERGE, não replace** (achado desta validação): campos não incluídos no corpo
   permanecem intocados.
-- ⚠️ `contact.source` foi removido do `STANDARD_FIELD_BODY_KEY` (`extractor/src/cli.ts`):
-  `source` era a única chave do mapa que não aparece nas chaves de topo do GET acima, então
-  escrever nela seria escrever no vazio. `--set` nesse campo agora falha explícito; reponha
-  a entrada só depois de confirmar `source` ao vivo num contato real — isso ainda não
-  aconteceu.
+- `contact.source` está de volta no `STANDARD_FIELD_BODY_KEY` (`extractor/src/cli.ts`):
+  escrita e releitura confirmadas ao vivo em 2026-09-18 (`Facebook` → `Automaster QA` →
+  `Facebook`). A chave `source` aparece no GET quando o contato tem valor; a lista de chaves
+  de topo acima veio de um contato que não tinha.
 - ⚠️ **Perigo não confirmado nem negado na interna:** na API pública v2 do GHL, mandar
   `tags` dentro do PUT de campos do contato **sobrescreve a lista inteira de tags**. Por
   isso, aqui, tag nunca vai por esse PUT — sempre pelos endpoints granulares abaixo. A

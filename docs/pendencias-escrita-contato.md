@@ -6,26 +6,28 @@ Estado em 2026-09-18, depois da validação ao vivo na Instaltech
 
 ## Validado ao vivo
 
-PUT de custom field `TEXT`, POST de tag, DELETE de tag, e `set` + `tagsDel` na
-mesma execução. O PUT é **merge**, não replace. Nenhum header de escopo de
-subconta foi necessário.
+PUT de custom field `TEXT`, `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`, `CHECKBOX` e
+`DATE`; PUT de campo padrão (`contact.company_name`, `contact.phone`,
+`contact.source`); POST de tag; DELETE de tag; `set` + `tagsDel` na mesma
+execução. O PUT é **merge**, não replace. Nenhum header de escopo de subconta foi
+necessário.
+
+A tool MCP `editar` foi exercitada de dentro do Claude Code em 2026-09-18: o
+caminho tool → subprocess → CLI, o snapshot, os `avisos` e o `dispara` (dois
+workflows, entre eles um com trigger "Contato Alterado") vieram como a spec
+previa. O que não conectou foi o servidor `automaster` declarado no `.mcp.json`
+do repo (ENOENT); as tools vieram pelo plugin instalado.
+
+Detalhes que a validação produziu estão em `docs/endpoints.md` seção
+`## Escrita`: a normalização por tipo, a regra de limpar campo e o falso positivo
+do aviso em telefone.
 
 ## Não validado — cada um é uma escrita que pode falhar em silêncio
 
-- **Campo padrão.** `firstName`, `lastName`, `phone`, `email`, `companyName` e os
-  outros 10 do mapa `STANDARD_FIELD_BODY_KEY` (`extractor/src/cli.ts`) nunca
-  foram escritos de verdade. O mapa vem da leitura do bundle JS do app e das
-  chaves do GET; o diff antes/depois avisa se não pegar, mas ninguém testou.
-- **Custom field que não seja TEXT.** `SINGLE_OPTIONS`, `RADIO`, `NUMERICAL`,
-  `DATE`, `CHECKBOX`. Todo valor de `--set` vai como string; o GHL pode aceitar,
-  coagir ou gravar lixo.
-- **`contact.source`.** Removido do mapa de propósito: `source` é a única chave
-  que não aparece nas chaves de topo do GET. `--set` nesse campo falha explícito
-  hoje. Repor só depois de confirmar ao vivo.
-- **A tool `editar` pelo Claude Code.** Só a CLI foi exercitada. O servidor MCP
-  `automaster` não conectava na sessão da validação (ENOENT em
-  `bin/automaster-python.sh`), então o caminho tool → subprocess → CLI, o gate de
-  permissão e o `dispara` na resposta seguem sem prova de ponta a ponta.
+- **Custom field `MONETORY`, `TEXTBOX_LIST`, `EMAIL` e `PHONE`.** Todo valor de
+  `--set` vai como string; o GHL pode aceitar, coagir ou gravar lixo.
+- **Os 12 campos padrão restantes do mapa** (`firstName`, `email`, `address1`,
+  …). Três dos 15 foram escritos; o resto vem da mesma leitura do bundle JS.
 
 ## Limites conhecidos do desenho
 
@@ -35,15 +37,20 @@ subconta foi necessário.
 - **O mapa de campo padrão é fechado nos 15 `contact.*` da Instaltech.** Outra
   subconta com campo padrão diferente faz `--set` falhar com erro explícito — de
   propósito, escrita perdida em silêncio é pior. Mas exige manutenção do mapa.
-- **`--set` não converte tipo.** Ver acima.
+- **`--set` não converte tipo.** O GHL coage; ver `docs/endpoints.md`.
+- **Campo padrão só limpa com `null`.** String vazia vira 200 sem efeito. A CLI
+  traduz `--set campo=` para `null`, mas isso é uma asimetria da API, não do
+  desenho.
 - **Dump sem o campo `model`** esvazia a lista de resolução e todo `--set` vira
   "campo não existe". Falha barulhenta, mas confusa.
 
 ## Resíduos da validação
 
 - A tag **`teste-automaster`** (id `b6exN50lRXSodrTXKDE0`) foi criada na
-  Instaltech e continua lá. Nenhum workflow a referencia. O contato dummy usado
-  (`uWqujqll20tRuglV3mLt`) foi restaurado ao estado original.
+  Instaltech e continua lá. Nenhum workflow a referencia. Apagar tag da subconta
+  não é coberto por nenhum comando — a tool só tira a tag do contato. O contato
+  dummy usado (`uWqujqll20tRuglV3mLt`) foi restaurado ao estado original depois
+  de cada rodada de validação.
 - **~38 scripts `.ts` soltos e não versionados em `extractor/`** (`restore.ts`,
   `cv.ts`, `patch.ts`, …). Vários escrevem em produção e estão fora de qualquer
   revisão. A spec do plugin prevê apagá-los; os headers de escrita que eles
@@ -66,4 +73,9 @@ subconta foi necessário.
 - `withClient` recebe `tokens` no callback sem um comentário explicando por quê
   (`runExtract` precisa do `tokenId` para o `companyId`).
 - Aviso de "escrita possivelmente ignorada" dispara em valor que o GHL
-  normaliza (telefone em E.164, data em ISO). É falso positivo esperado.
+  normaliza (telefone em E.164, data em ISO). É falso positivo esperado,
+  confirmado ao vivo com `contact.phone`.
+- O resolvedor de nome de campo aceita id, nome, `fieldKey` e agora também a
+  forma camelCase (`companyName`). Nome de campo padrão que não esteja no dump
+  com `model: contact` segue falhando — é o caso dos campos de `opportunity`
+  homônimos.
