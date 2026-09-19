@@ -412,3 +412,48 @@ O `message` é o texto dos componentes concatenado, com `{{n}}` já trocado pela
 Live-chat typing, review reply, spam check, views salvas da caixa de entrada, voice note e a
 knowledge base da IA existem na API interna (mapeados no bundle) e não têm uso no
 diagnóstico de automação.
+
+## Oportunidades
+
+Auth: os dois tokens, como todo `opportunities/*`. As rotas abaixo seguem o contrato
+público da v3 (`services.leadconnectorhq.com/opportunities`), chamado pela sessão do app.
+**Nada aqui foi exercitado ao vivo ainda** — a coluna diz o que falta provar.
+
+### Leitura
+| O que | Rota | Ao vivo |
+|---|---|---|
+| Pipelines e estágios | `GET backend.leadconnectorhq.com/opportunities/pipelines?locationId=<loc>` | ✓ (já usado por `fetchPipelines` na extração) |
+| Cards, com filtro | `GET services.../opportunities/search?location_id=<loc>&pipelineId=&pipelineStageId=&status=&contactId=&limit=` | não |
+| Busca por termo | mesma rota, com `q=<termo>` | não |
+| Um card | `GET services.../opportunities/<id>` | não |
+
+### Escrita de card
+| O que | Rota | Corpo | Ao vivo |
+|---|---|---|---|
+| Criar | `POST services.../opportunities/` | `{locationId, pipelineId, name, status, contactId, pipelineStageId?, monetaryValue?, assignedTo?, forecastExpectedCloseDate?, forecastProbability?, customFields?}` | não |
+| Editar e mover de estágio | `PUT services.../opportunities/<id>` | mesmo corpo, nenhum campo obrigatório, **sem `contactId`** | não |
+| Apagar | `DELETE services.../opportunities/<id>` | — | não |
+| Restaurar | `PUT services.../opportunities/<id>/restore` | `{}` | não |
+
+Mover de estágio não tem rota própria: é o `PUT` da edição com `pipelineStageId` trocado.
+O contato só se vincula na criação — o schema do `PUT` não tem `contactId`.
+
+### Escrita de pipeline
+Sem contrato documentado: a API pública v3 só tem leitura de pipeline. As rotas abaixo
+vieram do bundle do app, e o **corpo é suposição** até a sondagem ao vivo.
+
+| O que | Rota | Corpo suposto | Ao vivo |
+|---|---|---|---|
+| Criar | `POST services.../opportunities/pipelines` | `{locationId, name, stages: [{name, position?}]}` | não |
+| Editar nome e estágios | `PUT services.../opportunities/pipelines/<id>` | `{locationId, name, stages: [{id?, name, position?}]}` | não |
+| Apagar | `DELETE services.../opportunities/pipelines/<id>?locationId=<loc>` | — | não |
+
+**Editar estágios manda a lista inteira?** Suposto que sim, e é por isso que a CLI conta
+os cards de cada estágio que sumiria e recusa sem `--apagar-com-cards`. Falta confirmar.
+
+**Remover estágio com cards dentro:** desconhecido. A guarda da CLI existe justamente
+porque o comportamento do servidor não foi observado.
+
+**O que falta sondar** (`npm run discover -- --location Xb9gDxwxYhdqtprGcb5E`, percorrendo
+a aba Oportunidades): a rota real de listar e buscar cards, o corpo real do PUT de
+pipeline, e o que acontece ao remover um estágio com card dentro.

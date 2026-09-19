@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.6.0 — 2026-09-19
+
+Oportunidades: os funis e os cards da subconta, lidos e escritos ao vivo.
+
+- **`oportunidades`**: pipelines e seus estágios, cards com filtro de pipeline, estágio,
+  status e contato, busca por termo livre, e um card pelo id. Só leitura, sempre ao vivo —
+  não usa o dump.
+- **`oportunidade_acao`**: cria, edita, move de estágio, muda o status, apaga e restaura um
+  card. Exige `confirmo=true`; registro em `<dumps>/_oportunidades/`. O contato de um card
+  se define na criação e não se troca depois — a tool recusa a tentativa e explica.
+- **`pipeline`**: cria, edita e apaga pipeline. A lista de estágios é substitutiva, então
+  estágio omitido é removido junto com os cards dele — a tool conta os cards antes e
+  recusa, a menos que `apagar_com_cards=true`. Apagar pipeline não tem restore.
+
+Nenhuma das três foi exercitada contra a API ao vivo ainda: as rotas seguem o contrato
+público da v3 pela sessão do app. Validação pendente em `docs/endpoints.md`.
+
+CLI: oportunidades, oportunidade-acao, pipeline.
+
 ## 0.5.0 — 2026-09-19
 
 Fecha as cinco áreas de conversas que a 0.4.0 tinha deixado de fora.
