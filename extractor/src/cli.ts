@@ -55,6 +55,7 @@ function latestDumpEntity(locationId: string, name: string): unknown {
 async function withClient(
   locationId: string,
   log: (msg: string) => void,
+  // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
   fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
 ): Promise<void> {
   const { context, page } = await openSession();
@@ -119,7 +120,8 @@ async function runDiscover(opts: { location: string; area: string }): Promise<vo
   );
   page.on("request", (req) => {
     const url = req.url();
-    if (!url.includes("leadconnectorhq.com") || url.includes("google-analytics")) return;
+    // OPTIONS é preflight de CORS: mesma URL do request real, nenhuma informação nova
+    if (!url.includes("leadconnectorhq.com") || url.includes("google-analytics") || req.method() === "OPTIONS") return;
     console.log(`${req.method()} ${url}`);
     if (req.method() !== "GET") {
       const h = req.headers();
@@ -304,7 +306,12 @@ function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<
       if (!bodyKey) throw new Error(`campo padrão ${JSON.stringify(f.fieldKey)} sem mapeamento conhecido para o corpo do PUT; adicione em STANDARD_FIELD_BODY_KEY antes de usar`);
       // string vazia no campo padrão é ignorada pela API; `null` é o que a UI manda para limpar
       body[bodyKey] = value === "" ? null : value;
-    } else custom.push({ id: ids.get(name), value: parseCustomValue(value) });
+    } else {
+      // FILE_UPLOAD: a API aceita qualquer URL e forja o meta do anexo (size 1, mimetype pelo
+      // sufixo) sem baixar nada — grava um anexo que não existe. Só a UI sabe subir o arquivo.
+      if (f?.dataType === "FILE_UPLOAD") throw new Error(`campo ${JSON.stringify(name)} é FILE_UPLOAD: escrever por aqui grava um anexo falso (a API inventa o metadado a partir da URL). Suba o arquivo pela interface do GHL.`);
+      custom.push({ id: ids.get(name), value: parseCustomValue(value) });
+    }
   }
   if (custom.length) body.customFields = custom;
   return body;

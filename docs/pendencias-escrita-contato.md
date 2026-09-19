@@ -15,8 +15,11 @@ necessário.
 A tool MCP `editar` foi exercitada de dentro do Claude Code em 2026-09-18: o
 caminho tool → subprocess → CLI, o snapshot, os `avisos` e o `dispara` (dois
 workflows, entre eles um com trigger "Contato Alterado") vieram como a spec
-previa. O que não conectou foi o servidor `automaster` declarado no `.mcp.json`
-do repo (ENOENT); as tools vieram pelo plugin instalado.
+previa. O servidor `automaster` declarado no `.mcp.json` do repo falhava com ENOENT
+(`${CLAUDE_PLUGIN_ROOT}` não expande quando o Claude Code carrega o arquivo como
+servidor **de projeto**); corrigido movendo a config para
+`.claude-plugin/mcp.json`, apontada pelo campo `mcpServers` do plugin.json —
+plugin 0.2.1.
 
 Detalhes que a validação produziu estão em `docs/endpoints.md` seção
 `## Escrita`: a normalização por tipo, a regra de limpar campo e o falso positivo
@@ -28,9 +31,8 @@ do aviso em telefone.
   sem campo, não há o que escrever. Único tipo da lista sem prova ao vivo.
   (`EMAIL` não é um tipo válido de custom field — a pendência antiga partia de
   premissa errada.)
-- **`FILE_UPLOAD` aceita qualquer URL e forja o `meta`** (`size: 1`, mimetype
-  pelo sufixo) sem baixar nada. Escrita por essa via grava um anexo que não
-  existe; ninguém deveria usar `--set` nesse tipo. Não há guarda na CLI.
+- ~~`FILE_UPLOAD` sem guarda~~ — fechado: `buildFieldsBody` recusa o tipo com
+  erro explícito, mandando subir o arquivo pela interface do GHL.
 
 ## Limites conhecidos do desenho
 
@@ -62,21 +64,19 @@ do aviso em telefone.
   provavam já foram absorvidos por `docs/endpoints.md`.
 - Branch `docs/mapa-plugin-claude-code`, já inteira no `master`.
 
+## Minors — fechados nesta rodada
+
+Comentário do `loc` em `contacts.ts`, guarda de `_run_extractor` sem argumentos,
+filtro de `OPTIONS` no `discover`, comentário do `tokens` em `withClient`, e o
+`serverInfo.version` do MCP lido do plugin.json em vez de fixo em `0.1.0`.
+
+`dispara` colapsar dois triggers homônimos do mesmo workflow fica como está: a
+saída responde "quais workflows reagem", e nesse recorte o colapso é o
+comportamento certo. `_head_tail` descartar linhas repetidas da cauda idem — só
+muda a leitura do texto de erro.
+
 ## Minors adiados (nenhum bloqueia uso)
 
-- `extractor/src/api/contacts.ts`: parâmetro `loc` não é usado por nenhuma das
-  quatro funções — nenhuma rota de contato leva `locationId`. Falta um
-  comentário dizendo isso.
-- `auditor/src/automaster_audit/mcp_server.py`: `dispara` deduplica por
-  (workflow, nome do workflow, nome do trigger), não pelo id do trigger; dois
-  triggers homônimos no mesmo workflow colapsam.
-- `_run_extractor` chamado sem argumentos levanta `IndexError` em vez de
-  `ToolError`. Hoje inalcançável.
-- `_head_tail` descarta do bloco da cauda linhas idênticas às guardadas; só
-  afeta a leitura do texto do erro.
-- `discover --area contatos` também loga requests `OPTIONS` (preflight).
-- `withClient` recebe `tokens` no callback sem um comentário explicando por quê
-  (`runExtract` precisa do `tokenId` para o `companyId`).
 - Aviso de "escrita possivelmente ignorada" dispara em valor que o GHL
   normaliza (telefone em E.164, data em ISO). É falso positivo esperado,
   confirmado ao vivo com `contact.phone`.

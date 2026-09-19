@@ -233,6 +233,8 @@ def _head_tail(err: str | None, head: int = 2, tail: int = 600) -> str:
 
 def _run_extractor(*args: str) -> dict:
     """Roda `tsx src/cli.ts <args>` no extractor (abre Chrome; espera segundos). Só a última linha do stdout é JSON."""
+    if not args:
+        raise ToolError("uso interno: _run_extractor exige ao menos o nome do subcomando")
     tsx = EXTRACTOR_DIR / "node_modules" / ".bin" / "tsx"
     if not tsx.is_file():
         raise ToolError("extractor não provisionado: rode /automaster-extract uma vez "
@@ -349,11 +351,22 @@ def _tool_list() -> list[dict]:
             for n, (_, d, p, r) in TOOLS.items()]
 
 
+def _version() -> str:
+    """Versão do plugin.json (a raiz vem do shim); "0" quando o servidor roda fora do plugin."""
+    root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if not root:
+        return "0"
+    try:
+        return json.loads((Path(root) / ".claude-plugin" / "plugin.json").read_text())["version"]
+    except Exception:
+        return "0"
+
+
 def handle(req: dict) -> dict | None:
     rid, method, params = req.get("id"), req.get("method"), req.get("params") or {}
     if method == "initialize":
         result = {"protocolVersion": PROTOCOL, "capabilities": {"tools": {}},
-                  "serverInfo": {"name": "automaster", "version": "0.1.0"}}
+                  "serverInfo": {"name": "automaster", "version": _version()}}
     elif method == "tools/list":
         result = {"tools": _tool_list()}
     elif method == "tools/call":

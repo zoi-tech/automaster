@@ -3,6 +3,9 @@ import type { GhlClient } from "./client.js";
 const BACKEND = "https://backend.leadconnectorhq.com";
 const SERVICES = "https://services.leadconnectorhq.com";
 
+// `loc` não entra em nenhuma das rotas abaixo — nenhuma leva locationId, o escopo vem dos
+// tokens. Fica na assinatura por simetria com o resto da API e para o dia em que levar.
+
 /** Contato inteiro (snapshot). GET validado ao vivo, host `services`. */
 export function getContact(client: GhlClient, loc: string, id: string): Promise<unknown> {
   return client.getJson(`${SERVICES}/contacts/${id}`);
