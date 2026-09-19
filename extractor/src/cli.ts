@@ -518,6 +518,14 @@ const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
 const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "ver", "notas"];
 
+/** `--limite abc` vira NaN; `--limite 500` passa do teto documentado. Clampa 1..20,
+ * caindo para 20 em valor não numérico. */
+function clampLimite(v?: string): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 20;
+  return Math.min(20, Math.max(1, Math.trunc(n)));
+}
+
 async function runAgenda(opts: {
   location: string; o: string; id?: string; calendario?: string; usuario?: string;
   grupo?: string; contato?: string; inicio?: string; fim?: string; timezone?: string;
@@ -565,13 +573,15 @@ async function runAgenda(opts: {
       case "ver":
         out = await getAppointment(client, opts.id!);
         break;
-      case "notas":
+      case "notas": {
+        const limite = clampLimite(opts.limite);
         out = await listNotes(
           client, opts.id!,
-          opts.limite ? Number(opts.limite) : 20,
-          opts.pagina ? (Number(opts.pagina) - 1) * 20 : 0,
+          limite,
+          opts.pagina ? (Number(opts.pagina) - 1) * limite : 0,
         );
         break;
+      }
     }
     if (opts.json) console.log(JSON.stringify(out));
     else console.log(JSON.stringify(out, null, 2));
@@ -606,6 +616,12 @@ async function runAgendaAcao(opts: {
   } else if (!opts.id) {
     throw new Error(`${opts.acao} exige --id`);
   }
+  if (opts.acao === "remarcar" && !opts.inicio) {
+    throw new Error("remarcar exige --inicio");
+  }
+  if (opts.acao === "situacao" && !opts.situacao) {
+    throw new Error("situacao exige --situacao");
+  }
   if (opts.situacao && !AGENDA_SITUACOES.includes(opts.situacao as never)) {
     throw new Error(
       `--situacao inválida: ${opts.situacao}. Aceitas: ${AGENDA_SITUACOES.join(", ")}. ` +
@@ -632,7 +648,11 @@ async function runAgendaAcao(opts: {
     let alvoId = opts.id;
     if (["remarcar", "situacao", "cancelar"].includes(opts.acao)) {
       const atual = await getAppointment(client, opts.id!).catch((e) => {
-        log(`aviso: não deu para checar se ${opts.id} é série (${String(e)}); seguindo como instância única.`);
+        // guarda falha aberta se devolver null incondicionalmente: 401/429/rede fariam a
+        // execução seguir para o PUT sem saber se é série. Só aceitamos seguir cego quando
+        // o usuário já declarou --alvo explicitamente.
+        if (!opts.alvo) throw e;
+        log(`aviso: não deu para checar se ${opts.id} é série (${String(e)}); seguindo com --alvo ${opts.alvo}, como pedido.`);
         return null;
       }) as Record<string, unknown> | null;
       // a rota devolve `{appointment:{...}}` (observado ao vivo); `{event:...}` nunca
@@ -644,12 +664,25 @@ async function runAgendaAcao(opts: {
         if (!opts.alvo) {
           throw new Error(
             "este compromisso faz parte de uma série que se repete. Diga o alvo: " +
-            "--alvo instancia (só esta ocorrência) ou --alvo serie (todas). " +
-            "Sem isso a chamada pode remarcar o ano inteiro.",
+            "--alvo instancia (destaca só este dia, virando compromisso solto) ou " +
+            "--alvo serie (todas). Sem isso a chamada pode remarcar o ano inteiro.",
           );
         }
-        if (opts.alvo === "serie" && serie) alvoId = serie;
+        if (opts.alvo === "serie") {
+          if (!serie) {
+            throw new Error(
+              "--alvo serie foi pedido mas este compromisso não tem id-mestre " +
+              "(masterEventId) para achar a série; confira o --id.",
+            );
+          }
+          alvoId = serie;
+        }
       }
+    }
+    if (opts.alvo === "instancia") {
+      log("aviso: --alvo instancia DESTACA a ocorrência — o servidor devolve um id novo " +
+          "avulso e a série perde aquele dia para sempre. Não é 'edita só esta e mantém a " +
+          "série igual', é remover do recorrente e criar um compromisso independente.");
     }
 
     const corpo: Record<string, unknown> = {

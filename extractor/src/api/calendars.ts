@@ -150,10 +150,6 @@ export function updateAppointment(
   );
 }
 
-export function deleteEvent(client: GhlClient, eventId: string): Promise<unknown> {
-  return client.deleteJson(`${BASE}/calendars/events/${encodeURIComponent(eventId)}`);
-}
-
 export function createNote(
   client: GhlClient, appointmentId: string, body: string, userId?: string,
 ): Promise<unknown> {

@@ -683,6 +683,10 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
             raise ToolError("marcar exige calendario, contato, inicio e situacao")
     elif not id:
         raise ToolError(f"{acao} exige o id do compromisso")
+    if acao == "remarcar" and not inicio:
+        raise ToolError("remarcar exige inicio")
+    if acao == "situacao" and not situacao:
+        raise ToolError("situacao exige situacao")
     if situacao and situacao not in AGENDA_SITUACOES:
         raise ToolError(
             f"situacao inválida: {situacao}. Aceitas: {', '.join(AGENDA_SITUACOES)}. "
@@ -898,7 +902,9 @@ TOOLS = {
                     "Marcar, remarcar e cancelar disparam e-mail ou SMS para o contato e "
                     "acordam as automações do compromisso; não há desfazer. Exige "
                     "confirmo=true; registro em <dumps>/_agenda/. Em compromisso que se "
-                    "repete, `alvo` é obrigatório: instancia (só aquele dia) ou serie (todos). "
+                    "repete, `alvo` é obrigatório: instancia (DESTACA aquele dia — o servidor "
+                    "devolve um id novo avulso e a série perde aquele dia para sempre, não é "
+                    "uma edição no lugar) ou serie (todos). "
                     "`silenciar` evita a notificação mas também desliga os workflows, e pode "
                     "não impedir o e-mail que o próprio calendário manda.",
                     {"loc": _LOC, "acao": {"type": "string", "enum": list(AGENDA_ACOES)},

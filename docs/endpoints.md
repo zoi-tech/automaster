@@ -524,9 +524,10 @@ O cliente manda os dois de qualquer forma; nada a mudar. ✓
 |---|---|---|
 | `GET /calendars/?locationId=<loc>` | — | ✓ 200, `{calendars:[...]}` (já usado por `fetchCalendars`) |
 | `GET /calendars/groups?locationId=<loc>` | — | ✓ 200, `{groups:[...]}` |
+| `GET /calendars/<calendarId>` | — | ✓ 200, `{calendar:{...}}` (usada por `getCalendar`) |
 | `GET /calendars/events` | `locationId` **e** um de `calendarId`/`userId`/`groupId`; `startTime`,`endTime` em ms | ✓ 200, `{events:[...]}` |
 | `GET /calendars/blocked-slots` | idem | ✓ 200 (só recortes vazios na Instaltech) |
-| `GET /calendars/<calendarId>/free-slots` | `startDate`,`endDate` em ms; `timezone` IANA opcional | ✓ 200, `{"<YYYY-MM-DD>":{slots:[ISO com fuso]}}` |
+| `GET /calendars/<calendarId>/free-slots` | `startDate`,`endDate` em ms; `timezone` IANA opcional | ✓ 200, `{"<YYYY-MM-DD>":{slots:[ISO com fuso]}}` (teto de 31 dias entre `startDate`/`endDate` é guarda nossa em `freeSlots`, nunca observada como limite do servidor — não documentada na referência) |
 | `GET /calendars/events/appointments/<eventId>` | — | ✓ 200, `{appointment:{...}}` |
 | `GET /calendars/appointments/<appointmentId>/notes?limit&offset` | — | ✓ 200, `{notes:[],hasMore:false}` |
 

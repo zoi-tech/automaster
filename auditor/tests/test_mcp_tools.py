@@ -638,6 +638,20 @@ def test_agenda_acao_repeticao_exige_dono(root, monkeypatch):
                         repeticao="FREQ=WEEKLY;COUNT=3", confirmo=True)
 
 
+def test_agenda_acao_remarcar_exige_inicio(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inicio"):
+        srv.agenda_acao(LOC, acao="remarcar", id="e1", alvo="instancia", confirmo=True)
+
+
+def test_agenda_acao_situacao_exige_situacao(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="situacao"):
+        srv.agenda_acao(LOC, acao="situacao", id="e1", confirmo=True)
+
+
 def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
