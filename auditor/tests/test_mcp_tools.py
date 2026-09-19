@@ -628,6 +628,16 @@ def test_agenda_acao_recusa_situacao_fora_do_enum(root, monkeypatch):
         srv.agenda_acao(LOC, acao="situacao", id="e1", situacao="remarcado", confirmo=True)
 
 
+def test_agenda_acao_repeticao_exige_dono(root, monkeypatch):
+    """422 ao vivo: "A team member needs to be selected. assignedUserId is missing"."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="dono"):
+        srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
+                        inicio="2026-10-02T14:00:00-03:00", situacao="confirmed",
+                        repeticao="FREQ=WEEKLY;COUNT=3", confirmo=True)
+
+
 def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}

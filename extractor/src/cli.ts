@@ -621,6 +621,11 @@ async function runAgendaAcao(opts: {
   if (opts.alvo && !["instancia", "serie"].includes(opts.alvo)) {
     throw new Error("--alvo aceita instancia ou serie");
   }
+  // 422 observado ao vivo: "A team member needs to be selected. assignedUserId is missing".
+  // Só a série exige dono; compromisso avulso o servidor resolve sozinho.
+  if (opts.repeticao && !opts.dono) {
+    throw new Error("--repeticao exige --dono: o servidor recusa série sem responsável");
+  }
 
   await withClient(opts.location, log, async (client) => {
     // série: a API distingue pelo id enviado. Sem --alvo a tool recusa em vez de adivinhar.
@@ -629,10 +634,11 @@ async function runAgendaAcao(opts: {
       const atual = await getAppointment(client, opts.id!).catch((e) => {
         log(`aviso: não deu para checar se ${opts.id} é série (${String(e)}); seguindo como instância única.`);
         return null;
-      }) as { event?: Record<string, unknown> } | Record<string, unknown> | null;
-      const ev = (atual && "event" in (atual as object)
-        ? (atual as { event?: Record<string, unknown> }).event
-        : atual) as Record<string, unknown> | null;
+      }) as Record<string, unknown> | null;
+      // a rota devolve `{appointment:{...}}` (observado ao vivo); `{event:...}` nunca
+      // apareceu, mas custa uma linha aceitar os dois.
+      const ev = ((atual?.appointment ?? atual?.event ?? atual) ??
+        null) as Record<string, unknown> | null;
       const serie = ev?.masterEventId as string | undefined;
       if (ev?.isRecurring || serie) {
         if (!opts.alvo) {

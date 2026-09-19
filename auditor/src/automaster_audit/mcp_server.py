@@ -693,6 +693,8 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
         raise ToolError(f"{acao} exige nota com o id da nota")
     if alvo and alvo not in ("instancia", "serie"):
         raise ToolError("alvo aceita instancia ou serie")
+    if repeticao and not dono:
+        raise ToolError("repeticao exige dono: o servidor recusa série sem responsável")
     _, meta = _load(loc, snapshot)
     args = ["agenda-acao", "-l", loc, "--acao", acao, "--confirmo"]
     for flag, val in (("-i", id), ("--calendario", calendario), ("--contato", contato),

@@ -547,9 +547,55 @@ deleted, type, google{...}, startTime/endTime (ISO com fuso), dateAdded, dateUpd
 selectedTimezone, source, version, assignedResources, appointmentMeta{slotType,bookedDuration}
 ```
 
-### Rotas de escrita (da referência, nenhuma exercitada) ✗
+### Rotas de escrita — validadas ao vivo 2026-09-19
 
-`POST /calendars/events/appointments`, `PUT /calendars/events/appointments/<eventId>`,
-`DELETE /calendars/events/<eventId>`, `POST /calendars/events/block-slots`,
-`PUT /calendars/events/block-slots/<eventId>`,
-`POST|PUT|DELETE /calendars/appointments/<appointmentId>/notes[/<noteId>]`.
+Exercitadas na Instaltech, num calendário descartável criado e apagado na hora
+(`ZZ TESTE AUTOMASTER`, id `fuqBFE5vmoRDGK6u6Vpj`), com o contato de teste
+`uWqujqll20tRuglV3mLt`. Nenhum calendário de produção foi tocado.
+
+| Rota | Status | O que o servidor ensinou |
+|---|---|---|
+| `POST /calendars/events/appointments` | ✓ 200 | Corpo `{calendarId, locationId, contactId, startTime, endTime, title, appointmentStatus, toNotify}` com datas **ISO com fuso** (aqui, ao contrário da listagem, epoch não é necessário). **Com `rrule` o servidor exige `assignedUserId`**: 422 `A team member needs to be selected. assignedUserId is missing`. Virou guarda na CLI (`--repeticao` exige `--dono`) e na tool. |
+| `PUT /calendars/events/appointments/<eventId>` | ✓ 200 | Serve para remarcar, mudar situação e cancelar (`appointmentStatus: cancelled` — `status` continua `booked` e `isCancelled` continua `false`; quem lê tem que olhar o `appointmentStatus`). Em série, o **id enviado é que decide o alvo** (ver abaixo). |
+| `DELETE /calendars/events/<eventId>` | ✓ 200 `{succeeded:true}` | Usada só na limpeza, por script descartável — a CLI não expõe apagar por decisão de desenho (cancelar deixa rastro). Apagar o id-mestre apaga a série inteira. |
+| `POST /calendars/appointments/<id>/notes` | ✓ 200 | Corpo `{body}`; a resposta é `{note:{...}}` e traz `relations:[{objectKey:"appointment", recordId:<eventId>}]` e `contactId` preenchidos pelo servidor. |
+| `PUT /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 | Corpo `{body}`; devolve a nota inteira já editada. |
+| `DELETE /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 `{success:true}` | Some do `GET .../notes` na hora. |
+| `POST /calendars/events/block-slots` | ✗ | Não exercitada: bloqueio não faz parte da superfície da CLI e não havia bloqueio para conferir. |
+| `PUT /calendars/events/block-slots/<eventId>` | ✗ | Idem. |
+| `POST /calendars/` e `DELETE /calendars/<id>` | ✓ 200 | Fora da superfície do projeto, exercitadas para criar e apagar o calendário do teste. POST mínimo: `{locationId, name, calendarType:"personal", slotDuration, slotDurationUnit, teamMembers:[{userId, priority, isPrimary}]}`. DELETE devolve `{message:"calendar deleted"}`. |
+
+### Série recorrente — o id é o alvo (observado ao vivo)
+
+`rrule` vira `RRULE:FREQ=...` na resposta. A série tem um **id-mestre**; cada ocorrência
+aparece no `GET /calendars/events` com id composto `<mestre>_<epochMs>_<duracaoSeg>` e
+`masterEventId` apontando para o mestre. O `GET /calendars/events/appointments/<id>` aceita
+os dois ids e devolve `isRecurring: true` em ambos.
+
+- PUT no **id-mestre** (`--alvo serie`) move as três ocorrências de uma vez.
+- PUT no **id composto** (`--alvo instancia`) **destaca** aquela ocorrência: o servidor
+  responde com um **id novo, avulso** (`isRecurring:false`, sem `masterEventId`) e a série
+  perde aquele dia. Não é edição no lugar — é uma exceção materializada como compromisso
+  independente.
+
+**Bug achado e corrigido pela validação:** a checagem de série na CLI lia o envelope errado
+(`{event:...}`); a rota devolve `{appointment:...}`. Com isso a guarda de `--alvo` nunca
+disparava e um `remarcar` sem alvo destacou uma ocorrência sem avisar. Corrigido em
+`extractor/src/cli.ts`; com a correção, `remarcar` sem `--alvo` recusa, `--alvo instancia`
+mexe em uma só e `--alvo serie` nas três — os três casos exercitados ao vivo.
+
+### `--silenciar` (`toNotify: false`) — **não dá para afirmar**
+
+Todas as escritas foram feitas com `--silenciar` e a conversa do contato de teste terminou o
+teste com as mesmas 5 mensagens de antes (a última de 14:14Z, anterior às escritas, que
+começaram 19:42Z). Mas isso **não prova** que o flag funcionou: o calendário descartável foi
+criado sem nenhuma notificação configurada (`notifications: []`), então não havia mensagem a
+impedir. Um teste honesto do `toNotify` precisa de um calendário com notificação ligada — e
+esse teste manda mensagem de verdade para o contato, então não foi feito. Trate `--silenciar`
+como não provado.
+
+### Rastro de escrita
+
+Cada escrita gravou `<dumps>/_agenda/<loc>/<chave>/<ts>.json` com `antes`, `corpo` e
+`aplicado`. O 422 da série foi gravado com `aplicado: false` e o `erro` do servidor, como
+projetado.
