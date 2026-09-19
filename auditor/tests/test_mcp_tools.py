@@ -470,3 +470,94 @@ def test_grupo_escrita_exige_confirmo_leitura_nao(root, monkeypatch):
     assert args[args.index("--desde") + 1] == "-1"
     with pytest.raises(srv.ToolError):
         srv.grupo(LOC, "inventado")
+
+
+def test_oportunidades_recusa_operacao_invalida(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.oportunidades(LOC, o="inventar")
+    assert "inventar" in str(e.value)
+
+
+def test_oportunidades_ver_exige_id(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.oportunidades(LOC, o="ver")
+    assert "id" in str(e.value)
+
+
+def test_oportunidades_buscar_passa_termo_ao_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
+    r = srv.oportunidades(LOC, o="buscar", termo="teto solar")
+    assert r["resultado"] == {"ok": True}
+    assert "--termo" in visto["args"] and "teto solar" in visto["args"]
+
+
+def test_oportunidade_acao_exige_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.oportunidade_acao(LOC, acao="apagar", id="o1")
+    assert "confirmo=true" in str(e.value)
+
+
+def test_oportunidade_acao_recusa_trocar_contato(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.oportunidade_acao(LOC, acao="editar", id="o1", contato="c9", confirmo=True)
+    assert "contato" in str(e.value)
+
+
+def test_oportunidade_acao_criar_exige_os_tres_campos(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.oportunidade_acao(LOC, acao="criar", nome="Teto solar", confirmo=True)
+    assert "pipeline" in str(e.value)
+
+
+def test_oportunidade_acao_mover_chama_o_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    r = srv.oportunidade_acao(LOC, acao="mover", id="o1", estagio="s2", confirmo=True)
+    assert r["aplicado"] is True
+    assert "--estagio" in visto["args"] and "s2" in visto["args"]
+
+
+def test_pipeline_exige_confirmo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.pipeline(LOC, acao="apagar", id="p1")
+    assert "confirmo=true" in str(e.value)
+
+
+def test_pipeline_editar_exige_lista_de_estagios(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError) as e:
+        srv.pipeline(LOC, acao="editar", id="p1", confirmo=True)
+    assert "estagios" in str(e.value)
+
+
+def test_pipeline_serializa_estagios_como_json(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    srv.pipeline(LOC, acao="criar", nome="zz", estagios=[{"name": "Novo"}], confirmo=True)
+    assert '[{"name": "Novo"}]' in visto["args"]
+
+
+def test_pipeline_passa_apagar_com_cards(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    srv.pipeline(LOC, acao="editar", id="p1", estagios=[{"id": "s1", "name": "A"}],
+                 confirmo=True, apagar_com_cards=True)
+    assert "--apagar-com-cards" in visto["args"]
