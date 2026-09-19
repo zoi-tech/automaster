@@ -98,8 +98,10 @@ o host novo e a resposta é comparada com a do host antigo. Divergência em qual
 cancela a unificação e a leitura fica onde está — a extração roda em onze subcontas e não
 se quebra por arrumação.
 
-A escrita manda só o header `token-id`, sem `authorization: Bearer`, mais os headers fixos
-`channel: APP`, `source: WEB_USER` e `version: 2021-07-28`, que o cliente atual não envia.
+O app manda só `token-id` na escrita, sem `authorization: Bearer`. O cliente do extractor
+manda os dois, mais `channel: APP`, `source: WEB_USER`, `version: 2021-07-28` e UA de
+browser (`extractor/src/api/client.ts:26-34`) — nada a acrescentar. O `Bearer` a mais não
+deve incomodar; se incomodar, o cliente ganha um modo que o omite.
 
 ### Superfície
 
