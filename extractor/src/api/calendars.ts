@@ -177,3 +177,45 @@ export function deleteNote(
     `/notes/${encodeURIComponent(noteId)}`,
   );
 }
+
+/** Bloqueio de horário. Não tem contato nem situação — a rota só aceita estes campos. */
+export interface BloqueioCorpo {
+  calendarId?: string;
+  locationId?: string;
+  startTime?: string;
+  endTime?: string;
+  title?: string;
+  assignedUserId?: string;
+}
+
+export function createBlockSlot(
+  client: GhlClient, corpo: BloqueioCorpo,
+): Promise<unknown> {
+  return client.postJson(`${BASE}/calendars/events/block-slots`, corpo);
+}
+
+export function updateBlockSlot(
+  client: GhlClient, eventId: string, corpo: BloqueioCorpo,
+): Promise<unknown> {
+  return client.putJson(
+    `${BASE}/calendars/events/block-slots/${encodeURIComponent(eventId)}`, corpo,
+  );
+}
+
+/** Bloqueios do período. Mesmo envelope de `listEvents`, filtro da mesma coleção. */
+export function listBlockedSlots(
+  client: GhlClient, locationId: string, f: EventoFiltro,
+): Promise<unknown> {
+  if (!f.calendario && !f.usuario && !f.grupo) {
+    throw new Error("a listagem exige um de calendário, usuário ou grupo");
+  }
+  const p = new URLSearchParams({
+    locationId,
+    startTime: String(epochMs(f.inicio)),
+    endTime: String(epochMs(f.fim)),
+  });
+  if (f.calendario) p.set("calendarId", f.calendario);
+  if (f.usuario) p.set("userId", f.usuario);
+  if (f.grupo) p.set("groupId", f.grupo);
+  return client.getJson(`${BASE}/calendars/blocked-slots?${p.toString()}`);
+}

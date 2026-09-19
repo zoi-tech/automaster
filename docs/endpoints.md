@@ -494,16 +494,16 @@ a autenticação.
    lado em `/calendars/`, `/calendars/events`, `/calendars/<id>/free-slots` e
    `/calendars/groups` — mesmos status e mesmos corpos. Usar `services` (é o host que a
    referência pública documenta). ✓
-2. **Compromisso vs. bloqueio:** `/calendars/events` e `/calendars/blocked-slots` são
-   filtros da mesma coleção e devolvem o mesmo envelope `{events:[...]}`. O compromisso traz
-   `contactId`, `appointmentStatus` e `appointmentMeta`; o bloqueio não. Na Instaltech não
-   existe bloqueio nenhum — `blocked-slots` devolveu `{"events":[]}` em todos os recortes,
-   então o discriminante está inferido da forma do compromisso e da referência, **não
-   observado num bloqueio real**. ✗
-3. **`toNotify`, `ignoreFreeSlotValidation`, `ignoreDateRange`:** os três nomes aparecem com
-   esse case exato na referência de `create-appointment` e `edit-appointment`, junto de
-   `rrule` e `isRecurring`. Nenhum foi exercitado — são corpo de escrita, fora do escopo da
-   Tarefa 1. ✗
+2. **Compromisso vs. bloqueio — resolvido com um bloqueio de verdade (2026-09-19):** o
+   discriminante é o **`status`**: `"booked"` no compromisso, `"unavailable"` no bloqueio. A
+   inferência antiga (`contactId` presente ou ausente) estava fraca e foi trocada por essa no
+   `_tipo` da CLI. Mais: `/calendars/events` e `/calendars/blocked-slots` **não** são dois
+   filtros da mesma lista — com um bloqueio criado no período, `/calendars/events` devolveu
+   `{"events":[]}` (tanto por `userId` quanto por `calendarId`) e só `blocked-slots` o
+   trouxe. Bloqueio não aparece na listagem de eventos. ✓
+3. **`toNotify`, `ignoreFreeSlotValidation`, `ignoreDateRange`:** `toNotify: false`
+   (`--silenciar`) e `ignoreFreeSlotValidation`/`ignoreDateRange` (`--forcar`) exercitados ao
+   vivo em 2026-09-19 — ver as duas seções abaixo. ✓
 4. **Datas — e esta é a armadilha da agenda:** `startTime`/`endTime` de `/calendars/events`
    e `startDate`/`endDate` de `free-slots` aceitam **só milissegundos desde 1970**.
    `free-slots` com texto ISO recusa explicitamente
@@ -526,7 +526,7 @@ O cliente manda os dois de qualquer forma; nada a mudar. ✓
 | `GET /calendars/groups?locationId=<loc>` | — | ✓ 200, `{groups:[...]}` |
 | `GET /calendars/<calendarId>` | — | ✓ 200, `{calendar:{...}}` (usada por `getCalendar`) |
 | `GET /calendars/events` | `locationId` **e** um de `calendarId`/`userId`/`groupId`; `startTime`,`endTime` em ms | ✓ 200, `{events:[...]}` |
-| `GET /calendars/blocked-slots` | idem | ✓ 200 (só recortes vazios na Instaltech) |
+| `GET /calendars/blocked-slots` | idem | ✓ 200, `{events:[...]}` com os bloqueios (`status:"unavailable"`). É a **única** rota que os devolve — `/calendars/events` os omite. |
 | `GET /calendars/<calendarId>/free-slots` | `startDate`,`endDate` em ms; `timezone` IANA opcional | ✓ 200, `{"<YYYY-MM-DD>":{slots:[ISO com fuso]}}` (teto de 31 dias entre `startDate`/`endDate` é guarda nossa em `freeSlots`, nunca observada como limite do servidor — não documentada na referência) |
 | `GET /calendars/events/appointments/<eventId>` | — | ✓ 200, `{appointment:{...}}` |
 | `GET /calendars/appointments/<appointmentId>/notes?limit&offset` | — | ✓ 200, `{notes:[],hasMore:false}` |
@@ -562,8 +562,8 @@ Exercitadas na Instaltech, num calendário descartável criado e apagado na hora
 | `POST /calendars/appointments/<id>/notes` | ✓ 200 | Corpo `{body}`; a resposta é `{note:{...}}` e traz `relations:[{objectKey:"appointment", recordId:<eventId>}]` e `contactId` preenchidos pelo servidor. |
 | `PUT /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 | Corpo `{body}`; devolve a nota inteira já editada. |
 | `DELETE /calendars/appointments/<id>/notes/<noteId>` | ✓ 200 `{success:true}` | Some do `GET .../notes` na hora. |
-| `POST /calendars/events/block-slots` | ✗ | Não exercitada: bloqueio não faz parte da superfície da CLI e não havia bloqueio para conferir. |
-| `PUT /calendars/events/block-slots/<eventId>` | ✗ | Idem. |
+| `POST /calendars/events/block-slots` | ✓ 200 | Corpo `{locationId, startTime, endTime, title, assignedUserId}`, datas ISO com fuso. **`assignedUserId` é obrigatório na prática:** com `calendarId` de um calendário comum o servidor responde `400 The calendar is not an event calendar.` — bloqueio é da agenda de um usuário, não de um calendário de captação. Por isso `--acao bloquear` exige `--dono`. A resposta traz `status: "unavailable"`, sem `contactId` e sem `appointmentStatus`. |
+| `PUT /calendars/events/block-slots/<eventId>` | ✓ 200 | Mesmo corpo; devolve o bloqueio já editado. `GET /calendars/events/appointments/<id>` **aceita o id de um bloqueio** e devolve `{appointment:{... status:"unavailable"}}` — é o que o rastro usa como `antes`. |
 | `POST /calendars/` e `DELETE /calendars/<id>` | ✓ 200 | Fora da superfície do projeto, exercitadas para criar e apagar o calendário do teste. POST mínimo: `{locationId, name, calendarType:"personal", slotDuration, slotDurationUnit, teamMembers:[{userId, priority, isPrimary}]}`. DELETE devolve `{message:"calendar deleted"}`. |
 
 ### Série recorrente — o id é o alvo (observado ao vivo)
@@ -592,15 +592,42 @@ envelope merece cuidado em qualquer mudança futura: se a rota trocar de chave, 
 mexer no desembrulho, a guarda de `--alvo` volta a nunca disparar e um `remarcar` sem alvo
 destaca uma ocorrência em silêncio — exatamente o bug acima, e nada quebra para avisar.
 
-### `--silenciar` (`toNotify: false`) — **não dá para afirmar**
+### `--forcar` (`ignoreFreeSlotValidation` + `ignoreDateRange`) — validado ao vivo 2026-09-19 ✓
 
-Todas as escritas foram feitas com `--silenciar` e a conversa do contato de teste terminou o
-teste com as mesmas 5 mensagens de antes (a última de 14:14Z, anterior às escritas, que
-começaram 19:42Z). Mas isso **não prova** que o flag funcionou: o calendário descartável foi
-criado sem nenhuma notificação configurada (`notifications: []`), então não havia mensagem a
-impedir. Um teste honesto do `toNotify` precisa de um calendário com notificação ligada — e
-esse teste manda mensagem de verdade para o contato, então não foi feito. Trate `--silenciar`
-como não provado.
+Num calendário descartável, com um bloqueio criado às 09:00–10:00 do dia alvo (o bloqueio
+**some os horários da resposta de `free-slots`** — 09:00 e 09:30 deixaram de ser listados):
+
+- marcar às 09:00 **sem** `--forcar` → `400 The slot you have selected is no longer available.`
+- marcar às 09:00 **com** `--forcar` → **422** `A team member needs to be selected.
+  assignedUserId is missing`. Mesmo 422 da série: sem a checagem de horário livre o servidor
+  não escolhe o responsável sozinho. Virou guarda — `--forcar` em `marcar` exige `--dono`.
+- marcar às 09:00 com `--forcar` **e** `--dono` → **200**, compromisso criado em cima do
+  bloqueio (`status: "booked"`).
+
+### `--silenciar` (`toNotify: false`) — lado seguro provado ao vivo 2026-09-19 ✓/✗
+
+Calendário descartável criado **com** notificação ao contato ligada
+(`notifications: [{type:"email", shouldSendToContact:true, templateId:"default"}]`, confirmado
+na resposta do POST). Com esse calendário, um compromisso marcado **com `--silenciar`**
+(`toNotify: false`) para o contato de teste: a conversa do contato continuou com as mesmas 5
+mensagens, a última de 14:14Z, seis horas antes da escrita (20:25Z). A leitura é boa prova
+porque e-mail de confirmação de calendário **aparece** nessa conversa — as duas mensagens
+`EMAIL` "REUNIÃO CONFIRMADA!" de 2026-08-24 do mesmo contato são exatamente isso.
+
+**Provado:** com `--silenciar`, num calendário com notificação ligada, nada saiu para o
+contato. **Continua sem prova ✗:** o caso **não** silenciado. Confirmar exigiria mandar
+e-mail de verdade para uma pessoa real, e essa autorização não foi dada — decisão de
+segurança, não lacuna de mapeamento.
+
+Registro histórico: a rodada anterior (calendário descartável com `notifications: []`) não
+provava nada, porque não havia mensagem a impedir. Foi essa lacuna que a rodada acima fechou.
+
+### Resíduo
+
+Nenhum. O calendário de teste (`sxT3Q04MFNLfdqvFgw6u`, `ZZ TESTE AUTOMASTER lacunas`), o
+bloqueio (`SwNMriJoH6FtUkOEGg1H`) e o compromisso forçado (`I5ON7znc4qgmYlFq3VpX`) foram
+apagados; a releitura do período devolveu `{"events":[]}` em `eventos` e em `bloqueios`, e a
+subconta voltou aos 7 calendários de produção.
 
 ### Rastro de escrita
 

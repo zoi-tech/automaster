@@ -88,10 +88,20 @@ calendário, para resolver referência de workflow. Compromisso não está lá.
 
 **Marcar ou cancelar fala com o cliente.** A escrita dispara o e-mail ou SMS que o
 calendário tem configurado e acorda as automações ligadas ao compromisso. `silenciar`
-desliga as automações junto, e pode não impedir o e-mail — não é um botão de "sem efeito".
+desliga as automações junto. Provado ao vivo num calendário com notificação ao contato
+ligada: com `silenciar` nenhuma mensagem saiu. O caso **sem** `silenciar` nunca foi testado
+(mandaria mensagem de verdade), então trate a escrita não silenciada como quem fala com o
+cliente.
 
 **Compromisso que se repete exige dizer o alvo.** Sem `alvo`, a tool recusa em vez de
 escolher: a mesma chamada remarca uma terça ou o ano inteiro, conforme o id enviado.
 
-**A lista de eventos mistura compromisso e bloqueio de agenda.** O campo `_tipo` separa os
-dois; bloqueio não tem contato e não é reunião com ninguém.
+**Bloqueio de horário não aparece em `o=eventos`.** Ele só vem em `o=bloqueios`
+(`/calendars/blocked-slots`). O que separa os dois é o `status` — `booked` no compromisso,
+`unavailable` no bloqueio — e é isso que o campo `_tipo` traduz. Bloqueio não tem contato,
+não tem situação e não é reunião com ninguém: é a agenda de um usuário fechada num horário.
+Por isso `bloquear` exige `dono` e recusa `contato`/`situacao`.
+
+**`forcar` marca por cima da disponibilidade.** Sem ele o servidor recusa horário ocupado
+(`400 The slot you have selected is no longer available.`); com ele, passa — e exige `dono`,
+porque sem a checagem de horário o servidor não escolhe responsável sozinho.

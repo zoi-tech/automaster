@@ -58,8 +58,9 @@ npm run conversas-mensagem -- -l <loc> --acao cancelar --id <msgId>  # cancela a
 npm run oportunidades -- -l <loc> -o pipelines --json     # funis, cards, busca (leitura ao vivo)
 npm run oportunidade-acao -- -l <loc> --acao mover -i <id> --estagio <sid> --confirmo --json  # ESCREVE: card
 npm run pipeline -- -l <loc> --acao editar -i <id> --estagios '[...]' --confirmo --json       # ESCREVE: estrutura do funil
-npm run agenda -- -l <loc> -o eventos --calendario <id> --inicio <isoComFuso> --fim <isoComFuso> --json  # calendários, livres, eventos, notas (leitura ao vivo)
+npm run agenda -- -l <loc> -o eventos --calendario <id> --inicio <isoComFuso> --fim <isoComFuso> --json  # calendários, livres, eventos, bloqueios, notas (leitura ao vivo)
 npm run agenda-acao -- -l <loc> --acao marcar --calendario <id> --contato <contactId> --inicio <isoComFuso> --fim <isoComFuso> --situacao new --confirmo --json  # ESCREVE: marca/remarca/situacao/cancela/notas
+npm run agenda-acao -- -l <loc> --acao bloquear --dono <userId> --inicio <isoComFuso> --fim <isoComFuso> --confirmo --json  # ESCREVE: bloqueia horário na agenda de um usuário
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 

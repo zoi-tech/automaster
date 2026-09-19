@@ -46,6 +46,7 @@ import {
 import {
   listCalendars, getCalendar, freeSlots, listEvents, getAppointment, listNotes,
   AGENDA_SITUACOES, isoComFuso, createAppointment, updateAppointment,
+  createBlockSlot, updateBlockSlot, listBlockedSlots,
   createNote, updateNote, deleteNote,
 } from "./api/calendars.js";
 import fs from "node:fs";
@@ -516,7 +517,7 @@ function registroEscrita(loc: string, pasta: string, chave: string, dados: unkno
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
-const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "ver", "notas"];
+const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "bloqueios", "ver", "notas"];
 
 /** Fora da faixa 1..20 (incluindo não numérico) cai para 20, com aviso via `log`. */
 function clampLimite(v: string | undefined, log: (msg: string) => void): number {
@@ -529,6 +530,16 @@ function clampLimite(v: string | undefined, log: (msg: string) => void): number 
   return Math.trunc(n);
 }
 
+/**
+ * O que separa compromisso de bloqueio é o `status` (observado ao vivo em 2026-09-19 com um
+ * bloqueio de verdade): `unavailable` no bloqueio, `booked` no compromisso. Não é a presença
+ * de `contactId` — e, de todo modo, `/calendars/events` nem devolve bloqueio: ele só aparece
+ * em `/calendars/blocked-slots`.
+ */
+function marcarTipo(e: Record<string, unknown>): Record<string, unknown> {
+  return { ...e, _tipo: e.status === "unavailable" ? "bloqueio" : "compromisso" };
+}
+
 async function runAgenda(opts: {
   location: string; o: string; id?: string; calendario?: string; usuario?: string;
   grupo?: string; contato?: string; inicio?: string; fim?: string; timezone?: string;
@@ -538,7 +549,7 @@ async function runAgenda(opts: {
   if (!AGENDA_LEITURA.includes(opts.o)) {
     throw new Error(`-o inválido: ${opts.o}. Aceitos: ${AGENDA_LEITURA.join(", ")}`);
   }
-  if ((opts.o === "livres" || opts.o === "eventos") && !(opts.inicio && opts.fim)) {
+  if (["livres", "eventos", "bloqueios"].includes(opts.o) && !(opts.inicio && opts.fim)) {
     throw new Error(`${opts.o} exige --inicio e --fim em ISO com fuso`);
   }
   if (opts.o === "livres" && !opts.calendario) throw new Error("livres exige --calendario");
@@ -565,12 +576,15 @@ async function runAgenda(opts: {
           inicio: opts.inicio!, fim: opts.fim!, calendario: opts.calendario,
           usuario: opts.usuario, grupo: opts.grupo, contato: opts.contato,
         }) as { events?: Record<string, unknown>[] };
-        // compromisso e bloqueio vivem na mesma lista; marcamos cada um para o leitor
-        out = {
-          events: (r.events ?? []).map((e) => ({
-            ...e, _tipo: e.contactId ? "compromisso" : "bloqueio",
-          })),
-        };
+        out = { events: (r.events ?? []).map(marcarTipo) };
+        break;
+      }
+      case "bloqueios": {
+        const r = await listBlockedSlots(client, opts.location, {
+          inicio: opts.inicio!, fim: opts.fim!, calendario: opts.calendario,
+          usuario: opts.usuario, grupo: opts.grupo,
+        }) as { events?: Record<string, unknown>[] };
+        out = { events: (r.events ?? []).map(marcarTipo) };
         break;
       }
       case "ver":
@@ -592,8 +606,12 @@ async function runAgenda(opts: {
 }
 
 const AGENDA_ACOES = [
-  "marcar", "remarcar", "situacao", "cancelar", "nota-criar", "nota-editar", "nota-apagar",
+  "marcar", "remarcar", "situacao", "cancelar", "bloquear", "bloqueio-editar",
+  "nota-criar", "nota-editar", "nota-apagar",
 ];
+
+/** Bloqueio não tem contato nem situação: a rota não aceita esses campos. */
+const AGENDA_ACOES_BLOQUEIO = ["bloquear", "bloqueio-editar"];
 
 async function runAgendaAcao(opts: {
   location: string; acao: string; id?: string; calendario?: string; contato?: string;
@@ -616,8 +634,18 @@ async function runAgendaAcao(opts: {
     if (!(opts.calendario && opts.contato && opts.inicio && opts.situacao)) {
       throw new Error("marcar exige --calendario, --contato, --inicio e --situacao");
     }
+  } else if (opts.acao === "bloquear") {
+    if (!(opts.inicio && opts.fim)) {
+      throw new Error("bloquear exige --inicio e --fim");
+    }
+    // 400 ao vivo com --calendario de calendário comum: "The calendar is not an event
+    // calendar." O bloqueio normal é do dono da agenda, não de um calendário de captação.
+    if (!opts.dono) throw new Error("bloquear exige --dono: o bloqueio é da agenda de um usuário");
   } else if (!opts.id) {
     throw new Error(`${opts.acao} exige --id`);
+  }
+  if (AGENDA_ACOES_BLOQUEIO.includes(opts.acao) && (opts.contato || opts.situacao)) {
+    throw new Error("bloqueio não tem contato nem situação: a rota não aceita esses campos");
   }
   if (opts.acao === "remarcar" && !opts.inicio) {
     throw new Error("remarcar exige --inicio");
@@ -644,6 +672,11 @@ async function runAgendaAcao(opts: {
   // Só a série exige dono; compromisso avulso o servidor resolve sozinho.
   if (opts.repeticao && !opts.dono) {
     throw new Error("--repeticao exige --dono: o servidor recusa série sem responsável");
+  }
+  // mesmo 422, observado ao vivo também com --forcar: sem checar horário livre o servidor
+  // não escolhe o responsável sozinho.
+  if (opts.forcar && opts.acao === "marcar" && !opts.dono) {
+    throw new Error("--forcar exige --dono: sem a checagem de horário o servidor recusa marcar sem responsável");
   }
 
   await withClient(opts.location, log, async (client) => {
@@ -722,10 +755,21 @@ async function runAgendaAcao(opts: {
           "em cima de outro que já existe.");
     }
 
+    const bloqueio = AGENDA_ACOES_BLOQUEIO.includes(opts.acao);
+    const corpoBloqueio: Record<string, unknown> = {
+      ...(opts.calendario ? { calendarId: opts.calendario } : {}),
+      locationId: opts.location,
+      ...(opts.inicio ? { startTime: isoComFuso(opts.inicio) } : {}),
+      ...(opts.fim ? { endTime: isoComFuso(opts.fim) } : {}),
+      ...(opts.titulo ? { title: opts.titulo } : {}),
+      ...(opts.dono ? { assignedUserId: opts.dono } : {}),
+    };
+
     const chave = alvoId ?? "novo";
     const antes = alvoId ? await getAppointment(client, alvoId).catch(() => null) : null;
     const registro = registroEscrita(opts.location, "_agenda", chave, {
-      acao: opts.acao, alvo: opts.alvo ?? null, corpo, antes, aplicado: false,
+      acao: opts.acao, alvo: opts.alvo ?? null, corpo: bloqueio ? corpoBloqueio : corpo,
+      antes, aplicado: false,
     });
     log(`snapshot: ${registro}`);
 
@@ -736,6 +780,9 @@ async function runAgendaAcao(opts: {
         case "remarcar":
         case "situacao":
         case "cancelar": r = await updateAppointment(client, alvoId!, corpo); break;
+        case "bloquear": r = await createBlockSlot(client, corpoBloqueio); break;
+        case "bloqueio-editar":
+          r = await updateBlockSlot(client, opts.id!, corpoBloqueio); break;
         case "nota-criar": r = await createNote(client, opts.id!, opts.texto!, opts.dono); break;
         case "nota-editar": r = await updateNote(client, opts.id!, opts.nota!, opts.texto!); break;
         case "nota-apagar": r = await deleteNote(client, opts.id!, opts.nota!); break;
@@ -743,13 +790,13 @@ async function runAgendaAcao(opts: {
     } catch (e) {
       fs.writeFileSync(registro, JSON.stringify({
         em: new Date().toISOString(), acao: opts.acao, alvo: opts.alvo ?? null,
-        corpo, antes, aplicado: false, erro: String(e),
+        corpo: bloqueio ? corpoBloqueio : corpo, antes, aplicado: false, erro: String(e),
       }, null, 2));
       throw e;
     }
     fs.writeFileSync(registro, JSON.stringify({
       em: new Date().toISOString(), acao: opts.acao, alvo: opts.alvo ?? null,
-      corpo, antes, aplicado: true, resposta: r,
+      corpo: bloqueio ? corpoBloqueio : corpo, antes, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
     if (opts.json) console.log(JSON.stringify(out));
@@ -1450,7 +1497,7 @@ program
   .command("agenda")
   .description("Leitura ao vivo de calendários, horários livres e compromissos")
   .requiredOption("-l, --location <id>", "locationId da subconta")
-  .option("-o, --o <op>", "calendarios | calendario | livres | eventos | ver | notas", "calendarios")
+  .option("-o, --o <op>", "calendarios | calendario | livres | eventos | bloqueios | ver | notas", "calendarios")
   .option("-i, --id <id>", "id do calendário, compromisso ou dono das notas")
   .option("--calendario <id>", "filtra por calendário")
   .option("--usuario <id>", "filtra pelo dono")
@@ -1466,10 +1513,10 @@ program
 
 program
   .command("agenda-acao")
-  .description("ESCREVE: marca, remarca, muda a situação ou cancela compromisso; notas")
+  .description("ESCREVE: marca, remarca, muda a situação ou cancela compromisso; bloqueia horário; notas")
   .requiredOption("-l, --location <id>", "locationId da subconta")
-  .requiredOption("--acao <a>", "marcar | remarcar | situacao | cancelar | nota-criar | nota-editar | nota-apagar")
-  .option("-i, --id <id>", "id do compromisso (tudo menos marcar)")
+  .requiredOption("--acao <a>", "marcar | remarcar | situacao | cancelar | bloquear | bloqueio-editar | nota-criar | nota-editar | nota-apagar")
+  .option("-i, --id <id>", "id do compromisso ou do bloqueio (tudo menos marcar e bloquear)")
   .option("--calendario <id>", "calendário do compromisso")
   .option("--contato <id>", "contato, só em marcar")
   .option("--inicio <iso>", "início, ISO com fuso: 2026-10-02T14:00:00-03:00")

@@ -629,9 +629,10 @@ def pipeline(loc: str, acao: str, id: str | None = None, nome: str | None = None
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
-AGENDA_LEITURA = ("calendarios", "calendario", "livres", "eventos", "ver", "notas")
-AGENDA_ACOES = ("marcar", "remarcar", "situacao", "cancelar",
+AGENDA_LEITURA = ("calendarios", "calendario", "livres", "eventos", "bloqueios", "ver", "notas")
+AGENDA_ACOES = ("marcar", "remarcar", "situacao", "cancelar", "bloquear", "bloqueio-editar",
                 "nota-criar", "nota-editar", "nota-apagar")
+AGENDA_ACOES_BLOQUEIO = ("bloquear", "bloqueio-editar")
 AGENDA_SITUACOES = ("new", "confirmed", "cancelled", "showed",
                     "noshow", "invalid", "completed", "active")
 
@@ -645,7 +646,7 @@ def agenda(loc: str, o: str = "calendarios", id: str | None = None,
     """Leitura ao vivo de calendários, horários livres e compromissos da subconta."""
     if o not in AGENDA_LEITURA:
         raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(AGENDA_LEITURA)}")
-    if o in ("livres", "eventos") and not (inicio and fim):
+    if o in ("livres", "eventos", "bloqueios") and not (inicio and fim):
         raise ToolError(f"o={o} exige inicio e fim em ISO com fuso, ex.: 2026-10-02T00:00:00-03:00")
     if o == "livres" and not calendario:
         raise ToolError("o=livres exige calendario")
@@ -681,8 +682,15 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
     if acao == "marcar":
         if not (calendario and contato and inicio and situacao):
             raise ToolError("marcar exige calendario, contato, inicio e situacao")
+    elif acao == "bloquear":
+        if not (inicio and fim):
+            raise ToolError("bloquear exige inicio e fim")
+        if not dono:
+            raise ToolError("bloquear exige dono: o bloqueio é da agenda de um usuário")
     elif not id:
         raise ToolError(f"{acao} exige o id do compromisso")
+    if acao in AGENDA_ACOES_BLOQUEIO and (contato or situacao):
+        raise ToolError("bloqueio não tem contato nem situação: a rota não aceita esses campos")
     if acao == "remarcar" and not inicio:
         raise ToolError("remarcar exige inicio")
     if acao == "situacao" and not situacao:
@@ -699,6 +707,9 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
         raise ToolError("alvo aceita instancia ou serie")
     if repeticao and not dono:
         raise ToolError("repeticao exige dono: o servidor recusa série sem responsável")
+    if forcar and acao == "marcar" and not dono:
+        raise ToolError("forcar exige dono: sem a checagem de horário o servidor recusa "
+                        "marcar sem responsável")
     _, meta = _load(loc, snapshot)
     args = ["agenda-acao", "-l", loc, "--acao", acao, "--confirmo"]
     for flag, val in (("-i", id), ("--calendario", calendario), ("--contato", contato),
@@ -883,7 +894,7 @@ TOOLS = {
                "`calendarios` (os calendários da subconta), `calendario` (um pelo id), "
                "`livres` (horários livres de um calendário num período, teto de 31 dias), "
                "`eventos` (compromissos e bloqueios do período — cada item vem marcado em "
-               "`_tipo`), `ver` (um compromisso pelo id), `notas` (as notas de um "
+               "`_tipo`), `bloqueios` (só os bloqueios do período), `ver` (um compromisso pelo id), `notas` (as notas de um "
                "compromisso). Datas em ISO com fuso: 2026-10-02T14:00:00-03:00.",
                {"loc": _LOC, "o": {"type": "string", "enum": list(AGENDA_LEITURA),
                                    "default": "calendarios"},
@@ -898,7 +909,9 @@ TOOLS = {
                 "snapshot": _SNAP},
                ["loc"]),
     "agenda_acao": (agenda_acao, "ESCREVE EM PRODUÇÃO E FALA COM O CLIENTE: marca, remarca, "
-                    "muda a situação ou cancela um compromisso, e cria, edita ou apaga notas. "
+                    "muda a situação ou cancela um compromisso, bloqueia um horário (`bloquear`, "
+                    "`bloqueio-editar` — bloqueio não tem contato nem situação e exige `dono`), e cria, "
+                    "edita ou apaga notas. "
                     "Marcar, remarcar e cancelar disparam e-mail ou SMS para o contato e "
                     "acordam as automações do compromisso; não há desfazer. Exige "
                     "confirmo=true; registro em <dumps>/_agenda/. Em compromisso que se "
@@ -908,7 +921,8 @@ TOOLS = {
                     "`silenciar` evita a notificação mas também desliga os workflows, e pode "
                     "não impedir o e-mail que o próprio calendário manda.",
                     {"loc": _LOC, "acao": {"type": "string", "enum": list(AGENDA_ACOES)},
-                     "id": {"type": "string", "description": "id do compromisso (tudo menos marcar)"},
+                     "id": {"type": "string",
+                            "description": "id do compromisso ou do bloqueio (tudo menos marcar e bloquear)"},
                      "calendario": {"type": "string"}, "contato": {"type": "string",
                                                                    "description": "só em marcar"},
                      "inicio": {"type": "string", "description": "ISO com fuso"},

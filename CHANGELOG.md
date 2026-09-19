@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.7.1 — 2026-09-19
+
+Fecha as quatro lacunas que a 0.7.0 deixou sem prova ao vivo na agenda.
+
+- **`agenda_acao` ganha `bloquear` e `bloqueio-editar`** (`POST`/`PUT
+  /calendars/events/block-slots`), e `agenda` ganha `o=bloqueios`. Bloqueio não tem contato
+  nem situação — a tool recusa os dois — e exige `dono`: com `calendario` de um calendário
+  comum o servidor responde `400 The calendar is not an event calendar.` Sem tool nova: o
+  plugin continua com 23 tools.
+- **`_tipo` corrigido.** O que separa compromisso de bloqueio é o `status` (`booked` vs.
+  `unavailable`), não a presença de `contactId`. E bloqueio **não aparece** em `o=eventos`:
+  só em `o=bloqueios`. Os dois fatos foram observados com um bloqueio de verdade.
+- **`forcar` agora exige `dono`**: com `ignoreFreeSlotValidation` o servidor devolve
+  `422 A team member needs to be selected`. Exercitado ao vivo: sem `forcar` o horário
+  ocupado é recusado (`400`), com `forcar` + `dono` passa.
+- **`silenciar` provado do lado seguro**: em calendário com notificação ao contato ligada,
+  compromisso marcado com `silenciar` não gerou nenhuma mensagem na conversa do contato. O
+  caso não silenciado segue sem prova, por decisão de segurança.
+
 ## 0.7.0 — 2026-09-19
 
 Agenda: calendários, compromissos e notas, lidos e escritos ao vivo.

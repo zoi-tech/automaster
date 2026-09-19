@@ -661,3 +661,68 @@ def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
     assert r["aplicado"] is True
     assert "--alvo" in visto["args"] and "instancia" in visto["args"]
     assert "--confirmo" in visto["args"]
+
+
+def test_agenda_acao_bloquear_exige_periodo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inicio e fim"):
+        srv.agenda_acao(LOC, acao="bloquear", dono="u1",
+                        inicio="2026-10-02T14:00:00-03:00", confirmo=True)
+
+
+def test_agenda_acao_bloquear_recusa_contato_e_situacao(root, monkeypatch):
+    """A rota de block-slots não aceita contactId nem appointmentStatus."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="contato nem situação"):
+        srv.agenda_acao(LOC, acao="bloquear", dono="u1", contato="k1",
+                        inicio="2026-10-02T14:00:00-03:00",
+                        fim="2026-10-02T15:00:00-03:00", confirmo=True)
+
+
+def test_agenda_acao_bloquear_chama_o_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    r = srv.agenda_acao(LOC, acao="bloquear", dono="u1",
+                        inicio="2026-10-02T14:00:00-03:00",
+                        fim="2026-10-02T15:00:00-03:00", titulo="fora", confirmo=True)
+    assert r["aplicado"] is True
+    assert "bloquear" in visto["args"] and "--confirmo" in visto["args"]
+    assert "--titulo" in visto["args"] and "fora" in visto["args"]
+
+
+def test_agenda_acao_bloqueio_editar_exige_id(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="id"):
+        srv.agenda_acao(LOC, acao="bloqueio-editar",
+                        inicio="2026-10-02T14:00:00-03:00", confirmo=True)
+
+
+def test_agenda_bloqueios_exige_periodo(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="inicio"):
+        srv.agenda(LOC, o="bloqueios", calendario="c1")
+
+
+def test_agenda_acao_bloquear_exige_dono(root, monkeypatch):
+    """400 ao vivo com calendário comum: "The calendar is not an event calendar."."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="dono"):
+        srv.agenda_acao(LOC, acao="bloquear", calendario="c1",
+                        inicio="2026-10-02T14:00:00-03:00",
+                        fim="2026-10-02T15:00:00-03:00", confirmo=True)
+
+
+def test_agenda_acao_forcar_exige_dono(root, monkeypatch):
+    """422 ao vivo: "A team member needs to be selected. assignedUserId is missing"."""
+    root(workflows=[wf()])
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="dono"):
+        srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
+                        inicio="2026-10-02T14:00:00-03:00", situacao="confirmed",
+                        forcar=True, confirmo=True)
