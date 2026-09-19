@@ -4,6 +4,7 @@ import { openSession } from "./auth/session.js";
 import { captureTokens, decodeCompanyId, type Tokens } from "./auth/token.js";
 import type { Page } from "playwright";
 import { GhlClient } from "./api/client.js";
+import { searchConversations, fetchMessages, typeName, isActivity } from "./api/conversations.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
 import {
   fetchPipelines,
@@ -400,6 +401,51 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
 }
 
 const program = new Command();
+async function runConversas(opts: {
+  location: string; id: string; max: string; atividades?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  await withClient(opts.location, log, async (client) => {
+    const convs = await searchConversations(client, opts.location, opts.id);
+    if (!convs.length) {
+      const vazio = { contactId: opts.id, conversas: [], mensagens: [], maisPaginas: false, proximo: null };
+      if (opts.json) console.log(JSON.stringify(vazio));
+      else log("Nenhuma conversa para este contato.");
+      return;
+    }
+    const conv = convs[0];
+    log(`Conversa ${conv.id} — lendo mensagens...`);
+    const { mensagens, maisPaginas, proximo } = await fetchMessages(client, conv.id, Number(opts.max) || 100);
+    const itens = mensagens
+      .filter((m) => opts.atividades || !isActivity(m.type))
+      .map((m) => ({
+        id: m.id,
+        data: m.dateAdded,
+        tipo: typeName(m.type),
+        direcao: m.direction,
+        autor: m.userId ?? null,
+        // campo da API: app | workflow | campaign | api | bulk_actions. Nem toda mensagem traz.
+        origem: (m as { source?: string }).source ?? null,
+        corpo: m.body ?? m.activity?.title ?? "",
+      }));
+    const payload = {
+      contactId: opts.id,
+      conversationId: conv.id,
+      conversas: convs.map((c) => ({ id: c.id, ultimoTipo: c.lastMessageType, naoLidas: c.unreadCount })),
+      n: itens.length,
+      mensagens: itens,
+      maisPaginas,
+      proximo,
+    };
+    if (opts.json) { console.log(JSON.stringify(payload)); return; }
+    for (const m of itens.slice().reverse()) {
+      const quem = m.direcao === "inbound" ? "contato" : (m.origem ?? "saída");
+      console.log(`${m.data}  ${m.tipo.padEnd(10)} ${quem.padEnd(9)} ${m.corpo.replace(/\s+/g, " ").slice(0, 120)}`);
+    }
+    console.log(`\n${itens.length} mensagens${maisPaginas ? " (há mais páginas)" : ""}`);
+  });
+}
+
 program.name("automaster-extract").description("Extrai workflows GHL via API interna");
 
 program
@@ -425,6 +471,16 @@ program
   .option("--rota <path>", "rota livre depois de /v2/location/<id>/ (ignora --area)")
   .option("--filtro <substr>", "também mostra a resposta dos GET cuja URL contenha esta substring")
   .action(runDiscover);
+
+program
+  .command("conversas")
+  .description("Mensagens trocadas com um contato (leitura ao vivo pela API interna)")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("-i, --id <id>", "id do contato")
+  .option("--max <n>", "máximo de mensagens", "100")
+  .option("--atividades", "inclui eventos de timeline (ACTIVITY_*), que não são mensagem")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runConversas(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("contato-editar")

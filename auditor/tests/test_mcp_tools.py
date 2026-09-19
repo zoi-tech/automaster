@@ -279,3 +279,26 @@ def test_editar_requires_something_to_change(root):
     root(workflows=[wf()])
     with pytest.raises(srv.ToolError, match="set"):
         srv.editar(LOC, "c1")
+
+
+def test_conversas_trunca_corpo_e_marca_truncado(root, monkeypatch):
+    root(workflows=[wf()])
+    longo = "x" * (srv.CONVERSAS_CORPO + 50)
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: {
+        "contactId": "c1", "conversationId": "k1", "maisPaginas": True,
+        "mensagens": [{"id": "m1", "tipo": "EMAIL", "direcao": "outbound",
+                       "origem": "workflow", "corpo": longo}]})
+    out = srv.conversas(LOC, "c1")
+    m = out["mensagens"][0]
+    assert len(m["corpo"]) == srv.CONVERSAS_CORPO and m["corpo_truncado"]
+    assert m["origem"] == "workflow"
+    assert out["truncado"] is True  # maisPaginas
+
+
+def test_conversas_passa_atividades_ao_extractor(root, monkeypatch):
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.setdefault("args", a) and {} or {"mensagens": []})
+    srv.conversas(LOC, "c1", max=5, atividades=True)
+    assert seen["args"][:6] == ("conversas", "-l", LOC, "-i", "c1", "--max")
+    assert "--atividades" in seen["args"]

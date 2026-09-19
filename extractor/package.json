@@ -12,7 +12,8 @@
     "extract": "tsx src/cli.ts extract",
     "discover": "tsx src/cli.ts discover",
     "timeline": "tsx src/cli.ts timeline",
-    "contato-editar": "tsx src/cli.ts contato-editar"
+    "contato-editar": "tsx src/cli.ts contato-editar",
+    "conversas": "tsx src/cli.ts conversas"
   },
   "dependencies": {
     "commander": "^12.1.0",

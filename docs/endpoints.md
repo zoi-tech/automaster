@@ -252,3 +252,53 @@ DELETE backend.leadconnectorhq.com/contacts/<contactId>/tags     corpo: { tags: 
 POST backend.leadconnectorhq.com/contacts/<contactId>/customFields/refresh
 ```
 - Recalcula campo computado. Sem corpo observado, sem uso previsto por ora.
+
+## Conversas — leitura validada ao vivo (2026-09-19)
+
+Subconta Instaltech, contato `uWqujqll20tRuglV3mLt`. Host **`services`**, não `backend`
+(o `backend` responde igual no search, mas o app usa o `services`). Auth: **só `token-id`**
+— as respostas vieram com `authorization` ausente nos requests reais do app; o `GhlClient`
+manda os dois e funciona.
+
+### Achar a conversa de um contato
+```
+GET services.leadconnectorhq.com/conversations/search?locationId=<loc>&contactId=<id>&limit=20
+```
+- Resposta: `{conversations: [...]}`. Cada item traz `lastMessageType` (string `TYPE_*`),
+  `lastMessageBody` (prévia), `lastMessageDirection`, `lastOutboundMessageAction`
+  (`automated`/`manual`), `unreadCount`, `tags`, `messageTypes` (números).
+- Normalmente há **uma conversa por contato**, agregando todos os canais.
+- É indexado (ES) com atraso: conversa nova leva ~1 min para aparecer aqui.
+
+### Ler as mensagens
+```
+GET services.leadconnectorhq.com/conversations/<conversationId>/messages?limit=50[&lastMessageId=<id>]
+GET services.leadconnectorhq.com/f1/conversations/<conversationId>/messages?limit=50
+```
+- As duas funcionam e devolvem o mesmo conteúdo. **Use a sem `/f1`**: só ela traz
+  `nextPage`. O app usa a `/f1`.
+- Resposta: `{messages: {messages: [...], lastMessageId, nextPage}}`. Ordem: **mais recente
+  primeiro**. Paginação por `lastMessageId`, não por offset; páginas não se sobrepõem.
+- O corpo do e-mail já vem em texto plano no `body` (há também `bodyStorageUrl`, não
+  necessário). `GET /conversations/messages/email/<id>` responde **400** com id de mensagem
+  — não é o caminho.
+
+### O `type` é numérico na interna
+A API pública usa as strings `TYPE_SMS`, `TYPE_EMAIL`…; a interna manda **números**. Mapa
+completo (53 valores) extraído do bundle `conversations-new-ui` e fixado em
+`extractor/src/api/conversations.ts`. Os principais: 1 CALL, 2 SMS, 3 EMAIL, 19 WHATSAPP,
+20 CUSTOM_SMS, 22 CUSTOM_PROVIDER_SMS, 29 LIVE_CHAT, 37 INTERNAL_COMMENT, 50 FORM_SUBMISSION.
+Os `ACTIVITY_*` (25–28, 31, 38, 44, 51) **não são mensagem** — são eventos de timeline
+misturados no mesmo array; o comando `conversas` os esconde salvo `--atividades`.
+
+### Quem mandou: use `source`, não o `userId`
+A mensagem traz `source` com `app | workflow | campaign | api | bulk_actions`. **Mensagem
+disparada por workflow vem com `userId` preenchido** (o dono do workflow), então deduzir
+automação pela ausência de autor erra — medido ao vivo: e-mail com `userId` e
+`source: "workflow"`. Nem toda mensagem traz `source`.
+
+### Como o bundle foi lido (atalho reaproveitável)
+Os arquivos de `appcdn.leadconnectorhq.com/crm/<app>/<build>/static/js/*.js` são públicos,
+mas respondem **403 sem UA de browser**. Com `curl -A "<UA de Chrome>"` baixam normalmente.
+É o caminho mais rápido para enums e templates de rota (`grep -oh '\`/[^\`]*\`'`), sem
+sessão e sem clicar na interface.

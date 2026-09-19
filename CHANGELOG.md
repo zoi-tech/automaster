@@ -4,6 +4,23 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.3.0 — 2026-09-19
+
+### Novidade
+
+- **Tool `conversas`**: lê ao vivo as mensagens trocadas com um contato (SMS, e-mail,
+  WhatsApp, chat). Cada mensagem traz tipo, direção, autor e `origem`
+  (`app`/`workflow`/`campaign`/`api`) — é a `origem` que diz se a mensagem saiu de uma
+  automação ou de uma pessoa. Corpo cortado em 400 caracteres; eventos de timeline ficam
+  de fora salvo `atividades=true`. Na CLI: `npm run conversas`.
+- `discover` ganhou `--rota` (abre qualquer tela) e `--filtro` (mostra também a resposta
+  dos GET), que era o que faltava para mapear leitura da API interna.
+
+### Cuidado
+
+Automação não se reconhece pela falta de autor: e-mail disparado por workflow vem com
+`userId` preenchido. Use `origem`.
+
 ## 0.2.1 — 2026-09-18 (`289beb9`)
 
 - **Corrige o servidor MCP não conectar em sessões abertas no próprio repo.** A

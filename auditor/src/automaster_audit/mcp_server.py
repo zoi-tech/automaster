@@ -23,6 +23,8 @@ from .path_report import workflow_paths_lines
 
 PROTOCOL = "2025-06-18"
 PATHS_MAX_CHARS = 6000  # ~1.500 tokens; a mediana do paths.md é 173 tok, o maior 18.665
+CONVERSAS_MAX_CHARS = 30000  # ~7,5k tokens
+CONVERSAS_CORPO = 400     # corpo de e-mail passa de 4 KB; o começo basta para reconhecer a mensagem
 CONTATO_MAX_CHARS = 40000  # ~10k tokens; medido: ~180 tok/evento depois de tirar o ruído → ~55 eventos
 CONTATO_NOISE = ("traceId", "commonPrimaryId", "_id", "shardId", "secondaryId", "apiVersion",
                  "chPublished", "externalChange")  # 40% do payload bruto, nada que o agente use
@@ -282,6 +284,28 @@ def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot:
             "proximo_ate": kept[-1].get("createdAt") if truncated else None, "_snapshot": meta}
 
 
+def conversas(loc: str, id: str, max: int = 100, atividades: bool = False,
+              snapshot: str | None = None) -> dict:
+    _, meta = _load(loc, snapshot)
+    args = ["conversas", "-l", loc, "-i", id, "--max", str(int(max))]
+    if atividades:
+        args.append("--atividades")
+    out = _run_extractor(*args, "--json")
+
+    todas = out.get("mensagens", [])
+    kept, size = [], 0
+    for m in todas:
+        corpo = (m.get("corpo") or "").strip()
+        m = m | {"corpo": corpo[:CONVERSAS_CORPO], "corpo_truncado": len(corpo) > CONVERSAS_CORPO}
+        size += len(json.dumps(m, ensure_ascii=False))
+        if kept and size > CONVERSAS_MAX_CHARS:
+            break
+        kept.append(m)
+    out["mensagens"] = kept
+    out["truncado"] = len(kept) < len(todas) or bool(out.get("maisPaginas"))
+    return out | {"_snapshot": meta}
+
+
 def editar(loc: str, id: str, set: dict | None = None, tags_adicionar: list | None = None,
            tags_remover: list | None = None, snapshot: str | None = None) -> dict:
     set, tags_adicionar, tags_remover = set or {}, tags_adicionar or [], tags_remover or []
@@ -334,6 +358,14 @@ TOOLS = {
                  "days": {"type": "integer", "default": 60},
                  "ate": {"type": "string", "description": "só eventos antes deste ISO (paginação)"}, "snapshot": _SNAP},
                 ["loc", "id"]),
+    "conversas": (conversas, "AO VIVO: abre Chrome e lê as mensagens trocadas com um contato (SMS, e-mail, "
+                  "WhatsApp...). Cada mensagem traz tipo, direcao, autor e `origem` (app/workflow/campaign/api) — "
+                  "é `origem` que diz se veio de automação. Corpo cortado em 400 chars; eventos de timeline "
+                  "(ACTIVITY_*) ficam de fora salvo atividades=true.",
+                  {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
+                   "max": {"type": "integer", "default": 100},
+                   "atividades": {"type": "boolean", "default": False}, "snapshot": _SNAP},
+                  ["loc", "id"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",
