@@ -10,6 +10,8 @@ Contrato do dump (gerado pelo extractor):
       custom_fields.json            {fetchedAt, raw:<resposta API: {customFields:[...]}>}
       message_templates.json        {fetchedAt, raw:{templates:[...]}}   (opcional)
       whatsapp_templates.json       {fetchedAt, raw:[...]}               (opcional)
+      forms.json                    {fetchedAt, raw:{forms:[...],total:n}}   (opcional)
+      surveys.json                  {fetchedAt, raw:{surveys:[...],total:n}} (opcional)
 
 As actions de cada workflow vivem em raw.steps.templates (baixadas do Firebase).
 """
@@ -81,6 +83,9 @@ class DumpContext:
     # templates por canal (ausentes em dumps anteriores; lista vazia = regra no-op)
     template_ids: dict[str, set[str]] = field(default_factory=dict)
     template_names: dict[str, str] = field(default_factory=dict)
+    # formulários e surveys (ausentes em dumps anteriores; chave ausente = regra no-op)
+    form_ids: dict[str, set[str]] = field(default_factory=dict)
+    form_names: dict[str, str] = field(default_factory=dict)
     users: list[dict] = field(default_factory=list)
     calendars: list[dict] = field(default_factory=list)
     custom_values: list[dict] = field(default_factory=list)
@@ -167,6 +172,7 @@ def load_dump(path: Path) -> DumpContext:
             ctx.cv_keys.add(key)
 
     _load_templates(ctx, path)
+    _load_forms(ctx, path)
 
     ctx.pipeline_ids.discard(None)
     ctx.stage_ids.discard(None)
@@ -201,6 +207,27 @@ def _load_templates(ctx: DumpContext, path: Path) -> None:
                 ids.add(str(tid))
                 ctx.template_names[str(tid)] = t.get("name", str(tid))
         ctx.template_ids[canal] = ids
+
+
+def _load_forms(ctx: DumpContext, path: Path) -> None:
+    """Preenche form_ids com as chaves 'form' e 'survey' (as duas listas são opcionais).
+
+    Chave ausente = lista ausente do dump, e a regra que depende dela fica no-op.
+    Pasta não aparece nessas listas: o servidor só a devolve com `type=folder`.
+    """
+    for chave, arquivo, campo in (
+        ("form", path / "forms.json", "forms"),
+        ("survey", path / "surveys.json", "surveys"),
+    ):
+        if not arquivo.exists():
+            continue
+        ids = set()
+        for item in _entity_raw_optional(arquivo).get(campo, []) or []:
+            fid = item.get("id") or item.get("_id")
+            if fid:
+                ids.add(str(fid))
+                ctx.form_names[str(fid)] = item.get("name", str(fid))
+        ctx.form_ids[chave] = ids
 
 
 _CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")

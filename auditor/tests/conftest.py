@@ -31,6 +31,7 @@ def make_dump(tmp_path):
     def _build(workflows=None, tags=None, pipelines=None, fields=None,
                users=None, custom_values=None, calendars=None,
                message_templates=None, whatsapp_templates=None,
+               forms=None, surveys=None,
                extracted_at="2026-06-10T00:00:00+00:00"):
         # sufixo por chamada: o diff precisa de dois dumps no mesmo tmp_path
         n = next(contador)
@@ -52,6 +53,10 @@ def make_dump(tmp_path):
             _write(root / "message_templates.json", {"raw": {"templates": message_templates}})
         if whatsapp_templates is not None:
             _write(root / "whatsapp_templates.json", {"raw": whatsapp_templates})
+        if forms is not None:
+            _write(root / "forms.json", {"raw": {"forms": forms, "total": len(forms)}})
+        if surveys is not None:
+            _write(root / "surveys.json", {"raw": {"surveys": surveys, "total": len(surveys)}})
         _write(
             root / "manifest.json",
             {
