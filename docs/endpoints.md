@@ -162,9 +162,33 @@ do campo padrão `contact.phone`. Limpa com string vazia.
 tipos aceitos: `TEXT, LARGE_TEXT, NUMERICAL, PHONE, MONETORY, CHECKBOX, SINGLE_OPTIONS,
 MULTIPLE_OPTIONS, FLOAT, TIME, DATE, TEXTBOX_LIST, FILE_UPLOAD, SIGNATURE, RADIO, URL,
 DATE_TIME, USER, RICH_TEXT, FORMULA`. O `EMAIL` visto em campos `model: business` vem de outro
-enum. Faltam exercitar, dessa lista: `MULTIPLE_OPTIONS`, `FLOAT`, `TIME`, `FILE_UPLOAD`,
-`SIGNATURE`, `URL`, `DATE_TIME`, `USER`, `RICH_TEXT`, `FORMULA` — nenhum existe hoje com
-`model: contact` na Instaltech.
+enum. **Os 9 tipos restantes foram exercitados em 2026-09-18**, cada um com um campo criado e
+apagado na Instaltech (nenhum existia com `model: contact`). Todos aceitam string no `value`
+e todos limpam com string vazia. O que a API faz com o valor:
+
+| tipo | enviei | voltou |
+|---|---|---|
+| `FLOAT` | `"3.14"` | `3.14` (número) |
+| `TIME` | `"14:30"` | `"14:30:00"` (segundos completados) |
+| `DATE_TIME` | `"2026-05-17T14:30:00.000Z"` | igual |
+| `URL` | `"https://exemplo.com"` | igual |
+| `MULTIPLE_OPTIONS` | `"um"` | `["um"]` (array, como `CHECKBOX`) |
+| `USER` | id do usuário, ou array com ele | string com o id |
+| `RICH_TEXT` | `"<p>oi <b>rico</b></p>"` | **string com um doc ProseMirror JSON** (`{"type":"doc","content":[...]}`) — o HTML é parseado |
+| `SIGNATURE` | URL | igual, sem validação |
+| `FILE_UPLOAD` | URL | objeto `{<uuid>: {meta:{fieldname,mimetype,originalname,size,uuid}, url}}` — a API **inventa o `meta`** a partir da URL (`size: 1`, mimetype pelo sufixo) sem baixar o arquivo |
+
+`URL` é o único tipo que **valida** o valor: `"nao-e-url"` responde HTTP 400 (`Please enter a
+valid URL`) em vez de gravar lixo.
+
+`FORMULA` aparece no enum mas o POST de criação o rejeita; não há como exercitá-lo por essa
+rota.
+
+**Config obrigatória no POST, por tipo** (400/422 explícito quando falta):
+`MULTIPLE_OPTIONS`/`SINGLE_OPTIONS` levam `options: [...]` (não `picklistOptions`, que a
+resposta usa); `TIME` e `DATE_TIME` levam `dateTimeValidation: { timezone }`; `URL` leva
+`urlValidation: { mode: "allow_all" | "allow_only" | "block" }`; `USER` leva
+`userFieldConfig: { multiSelect: boolean }`.
 
 ### Criar e apagar custom field — validado ao vivo (2026-09-18)
 ```

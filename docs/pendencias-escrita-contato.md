@@ -24,11 +24,13 @@ do aviso em telefone.
 
 ## Não validado — cada um é uma escrita que pode falhar em silêncio
 
-- **`MULTIPLE_OPTIONS`, `FLOAT`, `TIME`, `FILE_UPLOAD`, `SIGNATURE`, `URL`,
-  `DATE_TIME`, `USER`, `RICH_TEXT`, `FORMULA`.** O resto da lista fechada de
-  tipos que a API aceita (ver `docs/endpoints.md`); nenhum existe hoje com
-  `model: contact` na Instaltech. `PHONE` foi validado criando e apagando um
-  campo de teste; `EMAIL` não é um tipo válido de custom field.
+- **`FORMULA`.** Está no enum de `dataType` mas o POST de criação o rejeita;
+  sem campo, não há o que escrever. Único tipo da lista sem prova ao vivo.
+  (`EMAIL` não é um tipo válido de custom field — a pendência antiga partia de
+  premissa errada.)
+- **`FILE_UPLOAD` aceita qualquer URL e forja o `meta`** (`size: 1`, mimetype
+  pelo sufixo) sem baixar nada. Escrita por essa via grava um anexo que não
+  existe; ninguém deveria usar `--set` nesse tipo. Não há guarda na CLI.
 
 ## Limites conhecidos do desenho
 
