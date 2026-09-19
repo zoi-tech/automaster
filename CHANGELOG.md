@@ -4,6 +4,40 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.7.0 — 2026-09-19
+
+Agenda: calendários, compromissos e notas, lidos e escritos ao vivo.
+
+- **`agenda`**: calendários, calendário por id, horários livres, lista de eventos (mistura
+  compromisso e bloqueio — filtre por `_tipo`), um compromisso por id, notas de um
+  compromisso. Só leitura, sempre ao vivo — o dump só guarda nome e id de calendário, para
+  resolver referência de workflow; compromisso não está lá.
+- **`agenda_acao`**: marca, remarca, muda a situação (`new`/`confirmed`/`cancelled`/
+  `showed`/`noshow`/`invalid`/`completed`/`active` — não existe "remarcado"), cancela, e
+  cria/edita/apaga nota. Exige `confirmo=true`; registro em `<dumps>/_agenda/`. Compromisso
+  que se repete exige `alvo` (`instancia` ou `serie`) — sem ele a tool recusa em vez de
+  escolher.
+
+**A escrita fala com o cliente.** Marcar ou remarcar dispara o e-mail ou SMS que o
+calendário tem configurado e acorda as automações do compromisso. `--silenciar`/
+`silenciar=true` desliga as automações junto, mas **não está provado** que também impede a
+mensagem — o calendário de teste não tinha notificação configurada.
+
+Validado ao vivo na Instaltech, num calendário descartável criado e apagado na hora
+(`fuqBFE5vmoRDGK6u6Vpj`), com o contato de teste. Cobriu marcar, remarcar (série completa e
+uma só ocorrência), mudar situação, cancelar e as três operações de nota. **Não** exercitado
+ao vivo: bloqueio de horário (`block-slots`), `--forcar` isolado, e a forma real de um
+bloqueio (a Instaltech não tinha nenhum — o discriminante `_tipo` vem da referência, não de
+um bloqueio observado). Rotas e armadilhas em `docs/endpoints.md` seção `## Agenda`.
+
+Bug achado e corrigido pela própria validação: a checagem de série lia o envelope errado
+(`{event:...}` em vez de `{appointment:...}`), o que fazia a guarda de `--alvo` nunca
+disparar. Corrigido; os três casos (`--alvo instancia`, `--alvo serie`, sem `--alvo`)
+exercitados ao vivo depois da correção. Essa guarda e o desembrulho do envelope não têm
+teste em CI (o extractor não tem runner) — só a prova manual registrada acima.
+
+CLI: agenda, agenda-acao.
+
 ## 0.6.0 — 2026-09-19
 
 Oportunidades: os funis e os cards da subconta, lidos e escritos ao vivo.
