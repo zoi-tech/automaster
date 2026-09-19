@@ -24,9 +24,11 @@ do aviso em telefone.
 
 ## Não validado — cada um é uma escrita que pode falhar em silêncio
 
-- **Custom field `EMAIL` e `PHONE`.** A Instaltech não tem nenhum com
-  `model: contact` (os dois existem só em `business`), então validar exige criar
-  um campo na subconta. Ficam como o único tipo sem prova ao vivo.
+- **`MULTIPLE_OPTIONS`, `FLOAT`, `TIME`, `FILE_UPLOAD`, `SIGNATURE`, `URL`,
+  `DATE_TIME`, `USER`, `RICH_TEXT`, `FORMULA`.** O resto da lista fechada de
+  tipos que a API aceita (ver `docs/endpoints.md`); nenhum existe hoje com
+  `model: contact` na Instaltech. `PHONE` foi validado criando e apagando um
+  campo de teste; `EMAIL` não é um tipo válido de custom field.
 
 ## Limites conhecidos do desenho
 

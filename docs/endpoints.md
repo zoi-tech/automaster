@@ -154,8 +154,28 @@ ISO como enviada, `contact.phone` volta em E.164 com o DDI do `country` do conta
 e ignora. Para campo padrão o corpo tem que levar `null`, e é isso que a CLI manda quando o
 valor de `--set` é vazio.
 
-**O que NÃO foi exercitado:** `EMAIL` e `PHONE` como custom field — a Instaltech não tem nenhum
-com `model: contact` (só em `business`), então não há onde exercitar sem criar campo na subconta.
+**Custom field `PHONE`** (validado ao vivo em 2026-09-18 com um campo criado e apagado para o
+teste): aceita string crua e **não** coage para E.164 — `11999998888` volta igual, ao contrário
+do campo padrão `contact.phone`. Limpa com string vazia.
+
+**Custom field `EMAIL` não existe.** O POST de criação responde 422 com a lista fechada de
+tipos aceitos: `TEXT, LARGE_TEXT, NUMERICAL, PHONE, MONETORY, CHECKBOX, SINGLE_OPTIONS,
+MULTIPLE_OPTIONS, FLOAT, TIME, DATE, TEXTBOX_LIST, FILE_UPLOAD, SIGNATURE, RADIO, URL,
+DATE_TIME, USER, RICH_TEXT, FORMULA`. O `EMAIL` visto em campos `model: business` vem de outro
+enum. Faltam exercitar, dessa lista: `MULTIPLE_OPTIONS`, `FLOAT`, `TIME`, `FILE_UPLOAD`,
+`SIGNATURE`, `URL`, `DATE_TIME`, `USER`, `RICH_TEXT`, `FORMULA` — nenhum existe hoje com
+`model: contact` na Instaltech.
+
+### Criar e apagar custom field — validado ao vivo (2026-09-18)
+```
+POST   backend.leadconnectorhq.com/locations/<locationId>/customFields
+DELETE backend.leadconnectorhq.com/locations/<locationId>/customFields/<fieldId>
+```
+- Corpo do POST: `{ name, dataType, model: "contact", placeholder, position, showInForms }`.
+  Resposta 200 `{ customField: { id, fieldKey, parentId, ... } }`; o `fieldKey` é derivado do
+  nome (`zz probe PHONE` → `contact.zz_probe_phone`).
+- DELETE responde 200 e some do `customFields/search`. Nenhum comando do extractor expõe essas
+  duas rotas — foram exercitadas por script descartável.
 
 ### Contato inteiro (snapshot) — GET validado ao vivo
 ```
