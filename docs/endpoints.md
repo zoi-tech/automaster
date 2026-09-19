@@ -112,18 +112,29 @@ GET services.leadconnectorhq.com/associations/relations/record/<contactId>
   testado e RECUSADO com tokens internos — endpoint correto pendente de discover
   (aba Appointments do contato).
 
-## Escrita — rotas do bundle, GET validado 2026-09-18
+## Escrita — PUT de custom field, POST/DELETE de tag validados ao vivo (2026-09-18)
 
-Rotas obtidas lendo os chunks JS do app (`contacts-highrise`, `appcdn.leadconnectorhq.com`),
-sem escrita nenhuma em produção. Só o GET abaixo foi confirmado ao vivo; PUT/POST/DELETE
-vêm do código do app e ainda não foram executados (confirmação prevista para depois, ao
-vivo). Headers comuns de escrita, provados pelos scripts soltos do extractor
-(`extractor/restore.ts`, `extractor/patch.ts`, `extractor/cv.ts`, não versionados) em
-`PUT /workflow/...` e `POST /locations/<loc>/customValues`, ambos no host `backend`: os
-mesmos de leitura (`authorization: Bearer`, `token-id`, `channel: APP`,
-`source: WEB_USER`, `version: 2021-07-28`, UA de browser) mais `content-type: application/json`.
+Rotas obtidas lendo os chunks JS do app (`contacts-highrise`, `appcdn.leadconnectorhq.com`).
+Exercitadas ao vivo em 2026-09-18 contra a Instaltech (`Xb9gDxwxYhdqtprGcb5E`), contato de
+teste `uWqujqll20tRuglV3mLt`: PUT de custom field TEXT, POST de tag e DELETE de tag, incluindo
+uma execução combinando `set` + `tagsDel` na mesma chamada. Todas responderam 200. Headers de
+escrita, provados pelos scripts soltos do extractor (`extractor/restore.ts`, `extractor/patch.ts`,
+`extractor/cv.ts`, não versionados) e confirmados na execução ao vivo: os mesmos de leitura
+(`authorization: Bearer`, `token-id`, `channel: APP`, `source: WEB_USER`, `version: 2021-07-28`,
+UA de browser) mais `content-type: application/json`. **Nenhum header de escopo de subconta foi
+necessário** — os headers que o `GhlClient` já manda bastaram.
 O PUT de workflow exige também `version` e `dataVersion` vindos do GET anterior
-(concorrência otimista) — ainda não se sabe se o PUT de contato tem exigência equivalente.
+(concorrência otimista) — o PUT de contato não tem exigência equivalente (não pediu esses campos
+nas 3 execuções ao vivo).
+
+**Achado mais importante: o PUT é MERGE, não replace.** Alterar 1 custom field preservou os
+outros 4 custom fields, as 2 tags e todos os 4 campos padrão do contato de teste, em 3 execuções
+sem nenhum aviso de destruição.
+
+**O que foi exercitado:** PUT de custom field tipo TEXT, POST de tag, DELETE de tag.
+**O que NÃO foi exercitado:** nenhum campo padrão (`firstName`, `phone` etc.) foi escrito; nenhum
+custom field de tipo diferente de TEXT (SINGLE_OPTIONS, RADIO, NUMERICAL, DATE) foi escrito;
+`contact.source` segue fora do mapa por falta de confirmação ao vivo (ver nota abaixo).
 
 ### Contato inteiro (snapshot) — GET validado ao vivo
 ```
@@ -140,32 +151,37 @@ GET services.leadconnectorhq.com/contacts/<contactId>
   API pública v2 usa `field_value` para o mesmo conceito; a interna usa `value`. Quem for
   montar o corpo do PUT (Task 6, `buildFieldsBody`) tem que usar `value`, não `field_value`.
 
-### Campos do contato — do bundle, não executado
+### Campos do contato — PUT de custom field TEXT validado ao vivo
 ```
 PUT backend.leadconnectorhq.com/contacts/<contactId>?version=14-05-22
 ```
 - O `?version=14-05-22` é parte da rota (query string fixa do app), não um header.
-- Corpo, pelo código do app: campo padrão (`phone`, `companyName`, `email`, ...) vai cru
-  no topo do corpo, como no GET; custom field vai em `customFields: [{ id, value }]`.
-- Resposta: não observada ainda.
+- Corpo, pelo código do app e confirmado ao vivo para custom field TEXT: campo padrão
+  (`phone`, `companyName`, `email`, ...) vai cru no topo do corpo, como no GET; custom field
+  vai em `customFields: [{ id, value }]`.
+- Resposta: **200**, confirmada ao vivo (PUT de custom field TEXT). Campo padrão e custom
+  field de outro tipo (SINGLE_OPTIONS, RADIO, NUMERICAL, DATE) ainda não foram escritos.
+- **PUT é MERGE, não replace** (achado desta validação): campos não incluídos no corpo
+  permanecem intocados.
 - ⚠️ `contact.source` foi removido do `STANDARD_FIELD_BODY_KEY` (`extractor/src/cli.ts`):
   `source` era a única chave do mapa que não aparece nas chaves de topo do GET acima, então
   escrever nela seria escrever no vazio. `--set` nesse campo agora falha explícito; reponha
-  a entrada só depois de confirmar `source` ao vivo num contato real.
-- ⚠️ Não se sabe se o PUT parcial é merge ou replace. Por isso o `contato-editar` compara
-  o GET de antes com o de depois e emite `avisos` (stderr + campo do JSON) para chave que
-  sumiu (replace destrutivo) e para valor pedido que não mudou (escrita ignorada — o GHL
-  responde 200 para chave desconhecida).
+  a entrada só depois de confirmar `source` ao vivo num contato real — isso ainda não
+  aconteceu.
 - ⚠️ **Perigo não confirmado nem negado na interna:** na API pública v2 do GHL, mandar
   `tags` dentro do PUT de campos do contato **sobrescreve a lista inteira de tags**. Por
-  isso, aqui, tag nunca vai por esse PUT — sempre pelos endpoints granulares abaixo.
+  isso, aqui, tag nunca vai por esse PUT — sempre pelos endpoints granulares abaixo. A
+  validação ao vivo não testou mandar `tags` nesse PUT (não havia motivo, já que tag usa
+  os endpoints granulares).
 
-### Tags — do bundle, não executado
+### Tags — POST e DELETE validados ao vivo
 ```
 POST   backend.leadconnectorhq.com/contacts/<contactId>/tags     corpo: { tags: [...] }
 DELETE backend.leadconnectorhq.com/contacts/<contactId>/tags     corpo: { tags: [...] }
 ```
-- Adicionar e remover, respectivamente. Resposta: não observada ainda.
+- Adicionar e remover, respectivamente. Resposta: **200**, confirmada ao vivo em ambos.
+- Tag de teste criada nessa validação: `teste-automaster` (id `b6exN50lRXSodrTXKDE0`), na
+  Instaltech; permanece na subconta.
 
 ### Bônus (do bundle, não usado no projeto ainda)
 ```
