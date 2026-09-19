@@ -923,7 +923,8 @@ TOOLS = {
                ["loc"]),
     "agenda_acao": (agenda_acao, "ESCREVE EM PRODUÇÃO E FALA COM O CLIENTE: marca, remarca, "
                     "muda a situação ou cancela um compromisso, bloqueia um horário (`bloquear`, "
-                    "`bloqueio-editar` — bloqueio não tem contato nem situação e exige `dono`), e cria, "
+                    "`bloqueio-editar` — bloqueio não tem contato nem situação e exige `dono`, "
+                    "`inicio` e `fim`), e cria, "
                     "edita ou apaga notas. "
                     "Marcar, remarcar e cancelar disparam e-mail ou SMS para o contato e "
                     "acordam as automações do compromisso; não há desfazer. Exige "

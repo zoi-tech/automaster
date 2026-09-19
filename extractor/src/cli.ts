@@ -579,6 +579,9 @@ async function runAgenda(opts: {
   if ((opts.o === "calendario" || opts.o === "ver" || opts.o === "notas") && !opts.id) {
     throw new Error(`${opts.o} exige --id`);
   }
+  if (opts.o === "bloqueios" && opts.contato) {
+    throw new Error("bloqueios não filtra por contato: bloqueio não tem contato");
+  }
   await withClient(opts.location, log, async (client) => {
     let out: unknown;
     switch (opts.o) {
