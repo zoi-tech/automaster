@@ -9,6 +9,7 @@ from . import rules
 from .contract import ContractError, format_results, run_contracts
 from .dashboard import build_dashboard
 from .dashboard_html import write_dashboard_html
+from .diff import build_diff, write_diff
 from .finding import ERROR, INFO, WARN
 from .flow import enumerate_paths
 from .graph import build_graph
@@ -152,6 +153,27 @@ def run_journey(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_diff(args: argparse.Namespace) -> int:
+    try:
+        antes = load_dump(args.antes)
+        depois = load_dump(args.depois)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    diff = build_diff(antes, depois)
+    out = args.output or (Path(args.depois) / "diff.md")
+    write_diff(diff, out)
+    w = diff["workflows"]
+    if not diff["mesma_subconta"]:
+        print("atenção: os dois dumps são de subcontas diferentes", file=sys.stderr)
+    print(f"workflows: +{len(w['adicionados'])} -{len(w['removidos'])} "
+          f"~{len(w['alterados'])} alterados")
+    for tipo, e in diff["entidades"].items():
+        print(f"{tipo}: +{len(e['adicionados'])} -{len(e['removidos'])}")
+    print(f"relatório: {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -195,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_journey.add_argument("-o", "--output", type=Path,
                            help="arquivo HTML de saída (default: <dump>/journey.html)")
     p_journey.set_defaults(func=run_journey)
+
+    p_diff = sub.add_parser("diff", help="compara dois dumps da mesma subconta (Markdown)")
+    p_diff.add_argument("antes", type=Path, help="pasta do dump mais antigo")
+    p_diff.add_argument("depois", type=Path, help="pasta do dump mais recente")
+    p_diff.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <depois>/diff.md)")
+    p_diff.set_defaults(func=run_diff)
     return parser
 
 
@@ -202,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "diff", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

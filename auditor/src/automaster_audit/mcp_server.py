@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import rules
 from .dashboard import build_dashboard
+from .diff import build_diff
 from .journey import TriggerIndex, build_journey
 from .loader import DumpContext, DumpError, load_dump
 from .path_report import workflow_paths_lines
@@ -740,7 +741,25 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
+def comparar(loc: str, antes: str | None = None, depois: str | None = None) -> dict:
+    path_ultimo, _ = _snapshot(loc)  # valida a subconta e a raiz
+    snaps = _snapshots(path_ultimo.parent)
+    if len(snaps) < 2 and not (antes and depois):
+        raise ToolError(f"subconta {loc!r} só tem {len(snaps)} snapshot; o diff precisa de dois")
+    # _snapshots vem do mais recente para o mais antigo
+    ctx_depois, meta_depois = _load(loc, depois or snaps[0])
+    ctx_antes, meta_antes = _load(loc, antes or snaps[1])
+    diff = build_diff(ctx_antes, ctx_depois)
+    diff["_snapshot"] = {"antes": meta_antes, "depois": meta_depois}
+    return diff
+
+
 TOOLS = {
+    "comparar": (comparar, "Diff entre dois snapshots da mesma subconta: workflows adicionados/removidos/"
+                 "alterados (nome, status, steps, triggers) e entidades que entraram ou sumiram. Sem antes/depois, "
+                 "compara os dois mais recentes. Só lê o disco.",
+                 {"loc": _LOC, "antes": {"type": "string", "description": "snapshot mais antigo (default: o penúltimo)"},
+                  "depois": {"type": "string", "description": "snapshot mais recente (default: o último)"}}, ["loc"]),
     "dumps": (dumps, "Lista subcontas com dump, snapshots e data. ~200 tokens.", {}, []),
     "inventario": (inventario, "summary (~80 tokens) ou uma fatia: workflows, tags, fields, pipelines, "
                    "users, calendars, custom_values (até ~20k tokens).",

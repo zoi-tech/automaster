@@ -43,3 +43,18 @@ export function fetchCalendars(client: GhlClient, locationId: string): Promise<u
 export function fetchCustomValues(client: GhlClient, locationId: string): Promise<unknown> {
   return client.getJson(`${BACKEND}/locations/${locationId}/customValues/`);
 }
+
+/**
+ * Templates de mensagem da subconta (SMS e os canais que compartilham a mesma
+ * coleção — o template citado por um step `instagram-dm` sai aqui com
+ * `type: "sms"`). Sem `type` devolve todos; `limit` default do servidor é 25 e
+ * `offset` não existe (o servidor responde 422 `property offset should not exist`).
+ */
+export function fetchMessageTemplates(client: GhlClient, locationId: string): Promise<unknown> {
+  return client.getJson(`${BACKEND}/locations/${locationId}/templates?limit=10000`);
+}
+
+// Templates do email builder NÃO entram no dump: o `email.template_id` dos steps
+// não casa com nenhum id de `/emails/builder` (nem descendo nas pastas via
+// `parentId`, nem com `deleted=true`) — o step guarda uma cópia própria. Cruzar
+// os dois só produziria falso positivo. Detalhes em docs/endpoints.md.
