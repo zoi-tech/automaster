@@ -23,7 +23,10 @@
     "whatsapp": "tsx src/cli.ts whatsapp",
     "whatsapp-enviar": "tsx src/cli.ts whatsapp-enviar",
     "config": "tsx src/cli.ts config",
-    "grupo": "tsx src/cli.ts grupo"
+    "grupo": "tsx src/cli.ts grupo",
+    "oportunidades": "tsx src/cli.ts oportunidades",
+    "oportunidade-acao": "tsx src/cli.ts oportunidade-acao",
+    "pipeline": "tsx src/cli.ts pipeline"
   },
   "dependencies": {
     "commander": "^12.1.0",
