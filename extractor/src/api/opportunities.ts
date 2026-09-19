@@ -20,6 +20,7 @@ export interface OppFiltro {
   page?: number;
 }
 
+
 export interface OppCorpo {
   name?: string;
   status?: string;

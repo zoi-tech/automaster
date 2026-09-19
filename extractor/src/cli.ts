@@ -514,7 +514,8 @@ const PIPE_ACOES = ["criar", "editar", "apagar"];
 
 async function runOportunidades(opts: {
   location: string; o: string; id?: string; pipeline?: string; estagio?: string;
-  status?: string; contato?: string; termo?: string; limite?: string; json?: boolean;
+  status?: string; contato?: string; termo?: string; limite?: string; pagina?: string;
+  json?: boolean;
 }): Promise<void> {
   const log = opts.json ? console.error : console.log;
   await withClient(opts.location, log, async (client) => {
@@ -524,6 +525,7 @@ async function runOportunidades(opts: {
       status: opts.status,
       contact_id: opts.contato,
       limit: opts.limite ? Number(opts.limite) : undefined,
+      page: opts.pagina ? Number(opts.pagina) : undefined,
     };
     let out: unknown;
     switch (opts.o) {
@@ -538,7 +540,9 @@ async function runOportunidades(opts: {
         out = await getOpportunity(client, opts.id);
         break;
       default:
-        throw new Error(`-o inválido: ${opts.o}. Aceitos: pipelines, listar, buscar, ver`);
+        throw new Error(
+          `-o inválido: ${opts.o}. Aceitos: pipelines, listar, buscar, ver`,
+        );
     }
     if (opts.json) console.log(JSON.stringify(out));
     else console.log(JSON.stringify(out, null, 2));
@@ -548,6 +552,7 @@ async function runOportunidades(opts: {
 async function runOportunidadeAcao(opts: {
   location: string; acao: string; id?: string; pipeline?: string; estagio?: string;
   nome?: string; valor?: string; status?: string; contato?: string; dono?: string;
+  fechamento?: string; probabilidade?: string; campos?: string;
   confirmo?: boolean; json?: boolean;
 }): Promise<void> {
   const log = opts.json ? console.error : console.log;
@@ -571,6 +576,16 @@ async function runOportunidadeAcao(opts: {
     );
   }
 
+  let campos: { id: string; fieldValue: unknown }[] | undefined;
+  if (opts.campos) {
+    try {
+      campos = JSON.parse(opts.campos);
+    } catch {
+      throw new Error('--campos precisa ser JSON: [{"id":"...","fieldValue":"..."}]');
+    }
+    if (!Array.isArray(campos)) throw new Error("--campos precisa ser uma lista JSON");
+  }
+
   await withClient(opts.location, log, async (client) => {
     const corpo = {
       ...(opts.nome ? { name: opts.nome } : {}),
@@ -581,6 +596,9 @@ async function runOportunidadeAcao(opts: {
       ...(opts.contato ? { contactId: opts.contato } : {}),
       ...(opts.valor ? { monetaryValue: Number(opts.valor) } : {}),
       ...(opts.dono ? { assignedTo: opts.dono } : {}),
+      ...(opts.fechamento ? { forecastExpectedCloseDate: opts.fechamento } : {}),
+      ...(opts.probabilidade ? { forecastProbability: Number(opts.probabilidade) } : {}),
+      ...(campos ? { customFields: campos } : {}),
     };
     const antes = opts.id ? await getOpportunity(client, opts.id).catch(() => null) : null;
     const registro = registroEscrita(opts.location, "_oportunidades", opts.id ?? "novo", {
@@ -658,7 +676,9 @@ async function runPipeline(opts: {
         const linhas = somem.map((s) => `  ${s.name} (${s.cards} card${s.cards > 1 ? "s" : ""})`).join("\n");
         throw new Error(
           `esta edição remove estágio que tem card dentro:\n${linhas}\n` +
-          "Os cards somem junto e não voltam. Esvazie os estágios antes, ou repita com --apagar-com-cards.",
+          "Os cards não somem: o servidor joga todos para um estágio que sobrou, de uma vez. " +
+          "Isso muda o estágio de cada um sem aviso e acorda toda automação que reage a " +
+          "transição. Esvazie os estágios antes, ou repita com --apagar-com-cards.",
         );
       }
     }
@@ -1170,6 +1190,7 @@ program
   .option("--contato <id>", "filtra pelas oportunidades de um contato")
   .option("--termo <texto>", "termo de busca (com -o buscar)")
   .option("--limite <n>", "quantos cards trazer")
+  .option("--pagina <n>", "página da listagem, a partir de 1")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runOportunidades(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
@@ -1186,6 +1207,9 @@ program
   .option("--status <s>", "open | won | lost | abandoned")
   .option("--contato <id>", "só na criação; o vínculo não se troca depois")
   .option("--dono <id>", "usuário responsável")
+  .option("--fechamento <data>", "previsão de fechamento, AAAA-MM-DD")
+  .option("--probabilidade <n>", "probabilidade de ganhar, 0 a 100")
+  .option("--campos <json>", 'campos personalizados: [{"id":"...","fieldValue":"..."}]')
   .option("--confirmo", "obrigatório: muda dado real e não tem desfazer")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runOportunidadeAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
@@ -1198,7 +1222,7 @@ program
   .option("-i, --id <id>", "id do pipeline (editar e apagar)")
   .option("--nome <texto>", "nome do pipeline")
   .option("--estagios <json>", 'lista COMPLETA dos estágios: [{"id":"...","name":"..."}]')
-  .option("--apagar-com-cards", "libera remover estágio que tem card dentro; os cards somem junto")
+  .option("--apagar-com-cards", "libera remover estágio com card dentro; os cards migram para outro estágio")
   .option("--confirmo", "obrigatório: muda a estrutura do funil e não tem desfazer")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runPipeline(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));

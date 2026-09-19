@@ -549,7 +549,7 @@ def oportunidades(loc: str, o: str = "pipelines", id: str | None = None,
                   pipeline: str | None = None, estagio: str | None = None,
                   status: str | None = None, contato: str | None = None,
                   termo: str | None = None, limite: int | None = None,
-                  snapshot: str | None = None) -> dict:
+                  pagina: int | None = None, snapshot: str | None = None) -> dict:
     """Leitura ao vivo de pipelines e oportunidades da subconta."""
     if o not in OPP_LEITURA:
         raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(OPP_LEITURA)}")
@@ -561,7 +561,8 @@ def oportunidades(loc: str, o: str = "pipelines", id: str | None = None,
     args = ["oportunidades", "-l", loc, "-o", o]
     for flag, val in (("-i", id), ("--pipeline", pipeline), ("--estagio", estagio),
                       ("--status", status), ("--contato", contato), ("--termo", termo),
-                      ("--limite", str(limite) if limite else None)):
+                      ("--limite", str(limite) if limite else None),
+                      ("--pagina", str(pagina) if pagina else None)):
         if val:
             args += [flag, val]
     return {"resultado": _run_extractor(*args, "--json"), "_snapshot": meta}
@@ -571,6 +572,8 @@ def oportunidade_acao(loc: str, acao: str, id: str | None = None, pipeline: str 
                       estagio: str | None = None, nome: str | None = None,
                       valor: float | None = None, status: str | None = None,
                       contato: str | None = None, dono: str | None = None,
+                      fechamento: str | None = None, probabilidade: float | None = None,
+                      campos: list | None = None,
                       confirmo: bool = False, snapshot: str | None = None) -> dict:
     """ESCREVE: cria, edita, move, apaga ou restaura uma oportunidade."""
     if acao not in OPP_ACOES:
@@ -589,9 +592,13 @@ def oportunidade_acao(loc: str, acao: str, id: str | None = None, pipeline: str 
     args = ["oportunidade-acao", "-l", loc, "--acao", acao, "--confirmo"]
     for flag, val in (("-i", id), ("--pipeline", pipeline), ("--estagio", estagio),
                       ("--nome", nome), ("--valor", str(valor) if valor is not None else None),
-                      ("--status", status), ("--contato", contato), ("--dono", dono)):
+                      ("--status", status), ("--contato", contato), ("--dono", dono),
+                      ("--fechamento", fechamento),
+                      ("--probabilidade", str(probabilidade) if probabilidade is not None else None)):
         if val:
             args += [flag, val]
+    if campos:
+        args += ["--campos", json.dumps(campos)]
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
@@ -748,7 +755,9 @@ TOOLS = {
                        "status": {"type": "string", "enum": ["open", "won", "lost", "abandoned", "all"]},
                        "contato": {"type": "string", "description": "só as oportunidades deste contato"},
                        "termo": {"type": "string", "description": "com o=buscar"},
-                       "limite": {"type": "integer"}, "snapshot": _SNAP},
+                       "limite": {"type": "integer"},
+                       "pagina": {"type": "integer", "description": "página da listagem, a partir de 1"},
+                       "snapshot": _SNAP},
                       ["loc"]),
     "oportunidade_acao": (oportunidade_acao, "ESCREVE EM PRODUÇÃO: cria, edita, move de estágio, muda o "
                           "status, apaga ou restaura uma oportunidade. Exige confirmo=true; registro em "
@@ -761,12 +770,17 @@ TOOLS = {
                            "status": {"type": "string", "enum": ["open", "won", "lost", "abandoned"]},
                            "contato": {"type": "string", "description": "só na criação"},
                            "dono": {"type": "string", "description": "usuário responsável"},
+                           "fechamento": {"type": "string", "description": "previsão de fechamento, AAAA-MM-DD"},
+                           "probabilidade": {"type": "number", "description": "0 a 100"},
+                           "campos": {"type": "array", "items": {"type": "object"},
+                                      "description": "campos personalizados: [{id, fieldValue}]"},
                            "confirmo": {"type": "boolean", "default": False},
                            "snapshot": _SNAP},
                           ["loc", "acao"]),
     "pipeline": (pipeline, "ESCREVE EM PRODUÇÃO: cria, edita ou apaga um pipeline. `estagios` é "
-                 "SUBSTITUTIVO — estágio ausente da lista é removido, e some junto com os cards dele. "
-                 "A tool recusa remover estágio que tem card dentro, a menos que apagar_com_cards=true. "
+                 "SUBSTITUTIVO — estágio ausente da lista é removido, e os cards dele migram para um "
+                 "estágio que sobrou, o que acorda toda automação que reage a transição. A tool recusa "
+                 "remover estágio que tem card dentro, a menos que apagar_com_cards=true. "
                  "Apagar pipeline NÃO tem restore; o estado anterior fica em <dumps>/_oportunidades/.",
                  {"loc": _LOC, "acao": {"type": "string", "enum": list(PIPE_ACOES)},
                   "id": {"type": "string", "description": "id do pipeline (editar e apagar)"},
@@ -775,7 +789,7 @@ TOOLS = {
                                "description": "lista COMPLETA: [{id?, name, position?}]"},
                   "confirmo": {"type": "boolean", "default": False},
                   "apagar_com_cards": {"type": "boolean", "default": False,
-                                       "description": "libera remover estágio com card dentro"},
+                                       "description": "libera remover estágio com card dentro; eles migram, não somem"},
                   "snapshot": _SNAP},
                  ["loc", "acao"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "

@@ -425,7 +425,12 @@ descartável criado e apagado na hora. Os 4 pipelines reais não foram tocados.
 | Pipelines e estágios | `GET backend.leadconnectorhq.com/opportunities/pipelines?locationId=<loc>` | ✓ |
 | Cards, com filtro | `GET services.../opportunities/search?location_id=&pipeline_id=&pipeline_stage_id=&status=&contact_id=&limit=` | ✓ |
 | Busca por termo | mesma rota, com `q=<termo>` | ✓ |
+| Paginação | mesma rota, com `page=<n>` a partir de 1 | ✓ |
 | Um card | `GET services.../opportunities/<id>` | ✓ (404 `OPPORTUNITY_NOT_FOUND` se apagado) |
+
+`pipelines/search` **não** é busca de pipeline por nome: ela exige `pipelineId` e
+`pipelineStageId` e devolve os cards daquele estágio. Não há rota de buscar pipeline por
+nome — a lista completa já vem em uma chamada e é curta.
 
 **Os filtros da busca são snake_case.** `pipelineId` no query string devolve
 422 `property pipelineId should not exist`. O corpo das respostas, ao contrário, é
@@ -440,7 +445,9 @@ e as atribuições de campanha.
 | Apagar | `DELETE services.../opportunities/<id>` | — | ✓ |
 | Restaurar | `PUT services.../opportunities/<id>/restore` | `{}` | ✓ |
 
-`status` é **obrigatório na criação** (422 sem ele); a CLI manda `open` por padrão. Mover
+`status` é **obrigatório na criação** (422 sem ele); a CLI manda `open` por padrão.
+`assignedTo`, `forecastExpectedCloseDate` (AAAA-MM-DD), `forecastProbability` e
+`customFields` (`[{id, fieldValue}]`) gravam e voltam na leitura — validados ao vivo. Mover
 de estágio não tem rota própria: é o `PUT` da edição com `pipelineStageId` trocado. O
 contato só se vincula na criação. Apagar devolve 404 na leitura seguinte, e `restaurar`
 traz o card de volta.
@@ -463,9 +470,13 @@ No `PUT`, o `locationId` vai **na query, não no corpo** — no corpo devolve 42
 `property locationId should not exist`. No `POST` é o contrário: vai no corpo.
 
 **Editar estágios manda a lista inteira**, e estágio ausente dela é removido. Por isso a
-CLI conta os cards de cada estágio que sumiria e recusa sem `--apagar-com-cards`. Essa
-guarda foi exercitada ao vivo: com um card no estágio Dois, a edição que o omitia foi
-recusada antes de qualquer gravação.
+CLI conta os cards de cada estágio que sumiria e recusa sem `--apagar-com-cards`. A guarda
+foi exercitada ao vivo nos dois sentidos: com um card no estágio, a edição que o omitia foi
+recusada antes de gravar; com `--apagar-com-cards`, passou.
+
+**O card não some quando o estágio é removido** — o servidor o joga para um estágio que
+sobrou. Confirmado ao vivo. O risco não é perda de dado, é o estágio de cada card mudar de
+uma vez, acordando toda automação que reage a transição.
 
 Apagar o pipeline leva os cards dentro junto, e **não tem restore** — o estado anterior
 fica em `<dumps>/_oportunidades/`.

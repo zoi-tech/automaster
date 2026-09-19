@@ -63,3 +63,22 @@ restaurar é você regravando à mão.
 **O corpo de `grupo` com `o="criar"` não foi confirmado ao vivo.** A rota existe e responde,
 o formato do payload veio de leitura parcial do app. Trate um erro ali como contrato
 errado, não como bug do CRM.
+
+**As tools de oportunidade não leem o dump — elas abrem o Chrome.** `oportunidades`,
+`oportunidade_acao` e `pipeline` falam sempre com a subconta ao vivo. O funil muda a toda
+hora, então um número de card vindo do snapshot enganaria. Custo: cada chamada precisa da
+sessão logada, e é mais lenta que as tools de dump.
+
+**O contato de uma oportunidade é de nascença.** Ele só se define na criação; o servidor
+não aceita trocá-lo depois, e a tool recusa a tentativa. Quem pediu "mudar o card para
+outra pessoa" precisa de um card novo — e o antigo perde o histórico se for apagado.
+
+**`pipeline` com `acao="editar"` substitui a lista de estágios inteira.** Estágio que não
+estiver em `estagios` é removido. Os cards dele não somem: o servidor joga todos para um
+estágio que sobrou, de uma vez. Isso muda o estágio de cada card sem aviso e acorda toda
+automação que reage a transição — por isso a tool conta os cards antes e recusa, e só passa
+com `apagar_com_cards=true`. Ao montar a lista, sempre parta da leitura atual do pipeline.
+
+**Apagar pipeline não tem restore.** Apagar card tem (`acao="restaurar"`), e o card
+apagado devolve 404 na leitura até ser restaurado. Pipeline apagado leva os cards junto e
+só volta reconstruído à mão, a partir do estado gravado em `<dumps>/_oportunidades/`.

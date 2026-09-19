@@ -561,3 +561,21 @@ def test_pipeline_passa_apagar_com_cards(root, monkeypatch):
     srv.pipeline(LOC, acao="editar", id="p1", estagios=[{"id": "s1", "name": "A"}],
                  confirmo=True, apagar_com_cards=True)
     assert "--apagar-com-cards" in visto["args"]
+
+
+def test_oportunidades_passa_pagina(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
+    srv.oportunidades(LOC, o="listar", pagina=3)
+    assert "--pagina" in visto["args"] and "3" in visto["args"]
+
+
+def test_oportunidade_acao_serializa_campos_e_previsao(root, monkeypatch):
+    root(workflows=[wf()])
+    visto = {}
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    srv.oportunidade_acao(LOC, acao="editar", id="o1", fechamento="2026-12-01", probabilidade=40,
+                          campos=[{"id": "f1", "fieldValue": "x"}], confirmo=True)
+    assert "2026-12-01" in visto["args"]
+    assert '[{"id": "f1", "fieldValue": "x"}]' in visto["args"]

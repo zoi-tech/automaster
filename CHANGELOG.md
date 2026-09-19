@@ -21,6 +21,9 @@ Oportunidades: os funis e os cards da subconta, lidos e escritos ao vivo.
 As três foram exercitadas ao vivo na Instaltech, num pipeline descartável criado e apagado
 na hora, sem tocar os 4 pipelines reais. Rotas e armadilhas em `docs/endpoints.md`.
 
+Não entrou: apagar cards em lote, e busca de pipeline por nome — a rota que parecia fazer
+isso (`pipelines/search`) é listagem de cards de um estágio, não busca de funil.
+
 CLI: oportunidades, oportunidade-acao, pipeline.
 
 ## 0.5.0 — 2026-09-19
