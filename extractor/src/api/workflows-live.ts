@@ -270,3 +270,49 @@ export function avisoDespublicar(n: number): string {
   return `${n} contato(s) estão dentro agora. Eles não são removidos: congelam no passo em ` +
     "que estão e voltam a andar, todos de uma vez, quando o workflow for republicado.";
 }
+
+/** Origem das escritas. Valores do próprio app: enum desconhecido costuma dar 422. */
+const CANAL = "web_app";
+const FONTE_CONTATO = "add_to_campaign_modal";
+const FONTE_INSCRICAO = "workflow_status_page";
+
+/** ESCREVE: liga ou desliga o workflow. É um campo de status, não duas rotas. */
+export function mudarStatus(
+  client: GhlClient, loc: string, wid: string, status: StatusWorkflow, userId: string,
+): Promise<unknown> {
+  return client.putJson(`${WF}/${loc}/change-status/${wid}`, { status, updatedBy: userId });
+}
+
+/**
+ * ESCREVE: coloca um contato no workflow. A entrada é ENFILEIRADA — ler o estado logo
+ * depois pode não mostrar ninguém sem que nada tenha falhado.
+ */
+export function inscreverContato(
+  client: GhlClient, loc: string, wid: string, contactId: string, userId: string,
+  eventStartTime?: string,
+): Promise<unknown> {
+  return client.postJson(`${WF}/${loc}/${wid}/start-workflow`, {
+    contactId,
+    actionFrom: { userId, source: FONTE_CONTATO, channel: CANAL },
+    ...(eventStartTime ? { eventStartTime } : {}),
+  });
+}
+
+/** ESCREVE: tira o contato do workflow, pela rota por contato (não pela por inscrição). */
+export function removerContato(
+  client: GhlClient, loc: string, contactId: string, wid: string, userId: string,
+): Promise<unknown> {
+  return client.postJson(`${WF}/${loc}/contact/${contactId}/stop-execution`, {
+    workflowId: wid,
+    removedFrom: { userId, channel: CANAL, source: FONTE_CONTATO },
+  });
+}
+
+/** ESCREVE: religa uma inscrição parada. O alvo é o id da INSCRIÇÃO, não o do contato. */
+export function retomarInscricao(
+  client: GhlClient, loc: string, inscricaoId: string, userId: string,
+): Promise<unknown> {
+  return client.postJson(`${WF}/${loc}/${inscricaoId}/force-resume`, {
+    actionFrom: { userId, channel: CANAL, source: FONTE_INSCRICAO },
+  });
+}
