@@ -155,3 +155,16 @@ test("a prévia nomeia ordem dos slides alterada", () => {
   const depois = aplicar(antes, [{ op: "reordenar-slides", ordem: ["s2", "s1"] }], { permitirVazio: true });
   assert.ok(diferenca(antes, depois).some((l) => l.includes("ordem dos slides")));
 });
+
+test("a prévia nomeia lógica condicional definida", () => {
+  const antes = baseSurvey();
+  const depois = aplicar(antes, [{
+    op: "definir-logica",
+    regras: [{
+      conditionalOperation: "then",
+      conditions: [{ selectedField: "full_name", selectedOperation: "isEqualTo", inputValue: "x" }],
+      outcome: { jumpTarget: "s2", jumpTargetType: "slide", type: "jumpTo", value: "" },
+    }],
+  }], { permitirVazio: true });
+  assert.ok(diferenca(antes, depois).some((l) => l.includes("conditionalLogic")));
+});

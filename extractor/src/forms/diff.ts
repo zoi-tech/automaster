@@ -41,10 +41,9 @@ export function diferenca(antes: Doc, depois: Doc): string[] {
 
   const sa = idsSlide(antes);
   const sb = idsSlide(depois);
-  const antesDeEntrarSair = linhas.length;
   for (const id of sb) if (!sa.includes(id)) linhas.push(`+ slide ${id}`);
   for (const id of sa) if (!sb.includes(id)) linhas.push(`- slide ${id}`);
-  if (sa.length === sb.length && sa.join() !== sb.join() && linhas.length === antesDeEntrarSair) {
+  if (sa.length === sb.length && sa.join() !== sb.join() && linhas.length === 0) {
     linhas.push(`~ ordem dos slides: ${sa.join(", ")} → ${sb.join(", ")}`);
   }
 

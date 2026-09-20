@@ -1034,6 +1034,7 @@ async function runFormularioAcao(opts: {
     let novoId: string | undefined;
     let criado: unknown;
     let r: unknown;
+    let falhouNoRetry = false;
     try {
       switch (opts.acao) {
         case "criar": {
@@ -1070,15 +1071,22 @@ async function runFormularioAcao(opts: {
                 if (tentativa < TENTATIVAS) await sleep(ATRASO_MS);
               }
             }
-            if (ultimoErro || !doc) throw ultimoErro ?? new Error("carregarDoc não devolveu documento");
+            if (ultimoErro || !doc) {
+              falhouNoRetry = true;
+              throw ultimoErro ?? new Error("carregarDoc não devolveu documento");
+            }
             const corpo = ops.length
               ? aplicar(doc, ops, { permitirSemBotao: true, permitirVazio: true })
               : doc;
+            // se falhar daqui pra baixo (aplicar/publicar), não passou pelo laço de
+            // retry acima — `falhouNoRetry` continua false, e a mensagem abaixo não
+            // diz "mesmo após 3 tentativas" para um erro que não tentou 3 vezes.
             r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
           } catch (e2) {
+            const contagem = falhouNoRetry ? " mesmo após 3 tentativas" : "";
             throw new Error(
-              `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou ` +
-              `mesmo após 3 tentativas: ele ficou órfão, sem nome e sem campos, na ` +
+              `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou` +
+              `${contagem}: ele ficou órfão, sem nome e sem campos, na ` +
               `subconta. Rode "formulario-acao --acao apagar -i ${novoId} --confirmo" ` +
               `para removê-lo. Erro original: ${e2 instanceof Error ? e2.message : String(e2)}`,
             );
