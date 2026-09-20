@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -120,3 +120,16 @@ calendário apontando para formulário apagado nunca dispara.
 
 `unused_form` é revisão, não conserto. Formulário embutido num site externo, num funil ou
 numa landing page não aparece no dump, então aparecer aí não prova que está morto.
+
+**`formulario_acao` e `formulario_estilo` escrevem ao vivo, como `editar`.** Nem toda ação
+devolve `aplicado` — cada uma tem sua própria forma de resposta:
+
+- `formulario_acao`: toda ação exceto `versoes` traz `aplicado` (`false` é prévia — mostrou
+  campo que entra, campo que sai e estilo alterado, mas não tocou no servidor, então "a
+  prévia disse X" nunca significa "o servidor já tem X"; `true`, depois de `confirmo`, grava
+  de fato). `criar`, `apagar`, `duplicar`, `restaurar` não têm prévia por construção — são
+  ações diretas, sem "antes" e "depois" para comparar, mas ainda trazem `aplicado:true`.
+  `versoes` é leitura pura e devolve `{versoes}`, sem `aplicado`.
+- `formulario_estilo`: `aplicar`, `previa` e `paleta-gravar` trazem `aplicado`. `temas` e
+  `paleta-ver` devolvem `{resultado}`; `previa-visual` devolve `{url, arquivo}` — nenhuma
+  das três tem `aplicado`.

@@ -675,9 +675,16 @@ está no fim desta seção.
 
 ## Formulários e surveys
 
-Host `https://backend.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
+Host `https://services.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
 extractor). As mesmas rotas existem na API pública v3, mas devolvendo só id e nome.
 Módulo: `extractor/src/api/forms.ts`; CLI `npm run formularios`; tool MCP `formularios`.
+
+Migrado de `backend.` para `services.` em 2026-09-19 (Tarefa 1 da escrita de
+formulários/surveys): as seis rotas de leitura (lista de formulário, lista de
+survey, um formulário, um survey, submissões de formulário, submissões de
+survey) foram comparadas ao vivo nos dois hosts na Instaltech
+(`Xb9gDxwxYhdqtprGcb5E`) e devolveram o mesmo conteúdo, byte a byte (só o
+`traceId` de cada request muda).
 
 | operação | rota |
 | --- | --- |
@@ -709,3 +716,348 @@ Facebook: ele nunca está na lista de formulários e **não** é referência que
 regras `broken_form_ref` e `unused_form` o ignoram explicitamente.
 
 Não há busca por nome no servidor: `-o buscar` do CLI varre a lista inteira, que é curta.
+
+### Lógica condicional entre slides (`form.conditionalLogic`) — medida, não exercitada por escrita ao vivo
+
+Formato medido nos 29 documentos de survey da Instaltech (baixados direto das URLs
+públicas de `versionHistory[].surveyDataDownloadUrl`, sem precisar da interface do GHL).
+A validação ao vivo do POST/PUT com esse campo fica para a Tarefa 9.
+
+Caminho: **`form.conditionalLogic`**, uma lista, do **documento inteiro** — não por
+slide. Cada entrada:
+
+```json
+{
+  "conditionalOperation": "then",
+  "conditions": [
+    { "selectedField": "<fieldKey do campo>", "selectedOperation": "isEqualTo", "inputValue": "<valor>" }
+  ],
+  "outcome": { "jumpTarget": "<id do slide>", "jumpTargetType": "slide", "type": "jumpTo", "value": "" }
+}
+```
+
+- `conditionalOperation`: `"then"` (20/29 docs), `"and"` (16), `"or"` (10), `null` (23,
+  entrada vazia que o builder cria — `conditions`/`outcome` também `null` nesse caso).
+- `selectedOperation`: só `isEqualTo` apareceu (72 ocorrências), mas o builder oferece
+  outros — não é enum fechado, e a operação `definir-logica` do motor não valida esse campo.
+- `selectedField` é o `fieldKey`/`tag` do campo, não o `id`.
+- `outcome.jumpTarget` é o `id` de um slide; `jumpTargetType` sempre `"slide"`.
+- `surveyLogicLinkById: true` é um booleano no topo do documento (29/29) que diz que
+  `jumpTarget` guarda id de slide, não número — não faz parte da regra em si.
+- `form.conditionalLogic` também existe em documento de **formulário** (não só survey),
+  conferido ao vivo num formulário real da Instaltech.
+
+Operação do motor (`extractor/src/forms/doc.ts`): `{ op: "definir-logica", regras }`
+grava `regras` em `form.conditionalLogic`. Em survey, valida que todo `outcome.jumpTarget`
+citado é id de slide existente — erro em português caso contrário. Em formulário não há
+slides para validar contra, então grava sem checagem.
+
+
+### Escrita — validada ao vivo na Instaltech (Tarefa 9, 5 rodadas, 2026-09-19)
+
+Host `https://services.leadconnectorhq.com`, mesmos dois tokens de sessão da leitura.
+Widget público (onde a página do formulário/survey é renderizada e enviada):
+`https://link.msgsndr.com/widget/<form|survey>/<id>?notrack=true[&versionId=<v>&nocache=true]`.
+
+| operação | método + rota | corpo | exercitada ao vivo |
+| --- | --- | --- | --- |
+| criar | `POST /forms/` (com `productType`) ou `POST /surveys/` (sem `productType`, ver achado abaixo) | `{locationId[, productType], source:"landing_page"[, parentId]}` | sim, formulário e survey |
+| publicar/editar | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, sempre POST, nunca PUT | sim, formulário e survey |
+| apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — | sim, formulário e survey |
+| duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` | sim, formulário — survey: a rota foi chamada e devolveu `200`, mas nada ficou gravado, ver achado abaixo |
+| restaurar versão | igual a publicar, com `formData` baixado de `versionHistory[].formDataDownloadUrl` | `{name, formData}` | sim, formulário e survey (rodada 5) |
+| paleta padrão da subconta | `GET /forms/default-colors?locationId=<loc>` / `POST /forms/default-colors` | `{locationId, colors:[{name,value}]}` | sim — é da subconta, não por tipo |
+| temas prontos | `GET /forms/themes?locationId=<loc>` / `GET /surveys/themes?locationId=<loc>` | — | sim, formulário e survey (21 temas cada) |
+
+**A frase "todas as operações foram exercitadas ao vivo" era generalização falsa e saiu do
+documento** (achado da revisão da rodada 4): nem toda operação tem prévia por construção,
+e a tabela acima marca linha a linha o que tem prova e o que não tem. Das operações que
+passam por `runFormularioAcao --acao editar --ops` (`adicionar-campo`, `remover-campo`,
+`renomear-campo`, `reordenar-campos`, `criar-slide`, `remover-slide`, `renomear-slide`,
+`reordenar-slides`, `mover-campo`, `definir-logica`) e por `formulario-estilo --acao
+aplicar`, a prévia (`--ops`/`--tokens` sem `--confirmo`) bateu, sempre, exatamente com o
+que o servidor gravou depois do `--confirmo` — essa comparação prévia-vs-servidor é o que
+está provado, operação por operação, nas tabelas abaixo. `criar`, `apagar`, `duplicar`,
+`restaurar` (marcado abaixo como write-only) e `temas`/`paleta-ver` (leitura) **não têm
+prévia por construção** — são ações diretas, sem documento "antes" e "depois" para
+comparar — e a prova delas é só a conferência direta no servidor depois do `--confirmo`.
+
+**Corrigido — `criar()` mandava `productType` também para survey (2ª rodada de prova,
+2026-09-19).** `POST /surveys/` devolvia `422` com o corpo literal
+`{"status":422,"options":{},"message":["property productType should not exist"],"name":"UnprocessableEntityException","error":"Unprocessable Entity","statusCode":422}`
+quando o corpo levava `productType` — campo que `criar()` em
+`extractor/src/api/forms-write.ts` mandava sempre, também para survey, copiando o padrão
+de `/forms/`. O servidor não pediu nenhum campo substituto no 422 — só rejeitou a chave. A
+rota de survey não aceita `productType`: o tipo já é implícito no segmento `/surveys/` da
+URL. Corrigido: `criar()` só inclui `productType` no corpo quando `tipo !== "survey"`.
+Depois da correção, `POST /surveys/` com `{locationId, source:"landing_page"}` (sem
+`productType`) devolveu `200` e criou o survey normalmente.
+
+**Corrigido — a prévia era cega para operação de slide (3ª rodada, 2026-09-19).** Até a 2ª
+rodada, a prévia (`--ops` sem `--confirmo`) devolvia `{"aplicado":false,"previa":[]}` —
+vazia — para toda operação de slide (`criar-slide`/`renomear-slide`/`reordenar-slides`/
+`remover-slide`); `diferenca()` (`extractor/src/forms/diff.ts`) tinha `slides` na lista de
+caminhos ignorados do achatamento genérico e não tinha nenhuma lógica dedicada para
+slide, ao contrário de campo (que já tinha entra/sai/rótulo/ordem). Isso é pior do que
+não ter prévia: o operador via "nada mudaria" e, ao confirmar, o survey mudava de
+verdade. Corrigido: `diferenca()` agora compara a lista de `id`s de slide (entra/sai/
+ordem) e o mapa `id → slideName` (renomeado), no mesmo estilo das linhas de campo —
+`+ slide <id>`, `- slide <id>`, `~ nome do slide <id>: <antes> → <depois>`,
+`~ ordem dos slides: <ids antes> → <ids depois>`. O conteúdo interno de `slideData`
+continua fora do achatamento genérico (seria duplicar a listagem de tags de campo, que já
+cobre os slides via o prefixo `<slideId>/<tag>` — inclusive `mover-campo` entre slides
+aparece assim: `+ campo <slideDestino>/<tag>` e `- campo <slideOrigem>/<tag>`), e as
+demais propriedades de estilo de cada slide (`button`, `border`, `active`, ...) continuam
+ignoradas por não fazerem parte do conteúdo que uma operação de slide muda. 5 testes novos
+em `extractor/test/style.test.ts`: um por operação de slide, um para `definir-logica`,
+mais um confirmando que dois surveys idênticos continuam dando prévia vazia (sem falso
+positivo).
+
+#### Lado formulário — prova serial completa (rodada 4, 2026-09-19)
+
+**As rodadas 1-3 provaram o lado formulário numa passagem contaminada por concorrência: o
+`DELETE` do formulário original (`g7xmOrgWXe8TEMaL5ewr`) aconteceu sem que ninguém o
+tivesse pedido, porque dois agentes escreviam no mesmo documento ao mesmo tempo (ver
+achado do perfil único de Chrome abaixo). Nesse cenário nada distingue a gravação de um
+comando conferido da gravação do outro agente — "o servidor gravou o que a prévia
+anunciou" não era leitura confiável. A prova do lado formulário foi refeita do zero, em
+série, sem nenhum subagente, num formulário descartável novo:**
+
+Formulário `ZZ TESTE AUTOMASTER`, id `ietufnnUaIn4rdWQjs5w`. Sequência completa, cada
+operação com prévia conferida antes do `--confirmo` (quando a operação tem prévia) e
+leitura do servidor (`formularios -o detalhe`) depois:
+
+| operação | prévia anunciou | servidor gravou | bateu? |
+| --- | --- | --- | --- |
+| `criar` (sem prévia) | — | criado de primeira, sem lag de propagação nesta rodada | sim |
+| `adicionar-campo` ×3 (full_name, email, button) | `+ campo full_name`, `+ campo email`, `+ campo button` | `[full_name, email, button]` | sim |
+| `renomear-campo` (email → "Seu melhor e-mail") | `~ rótulo de email: E-mail → Seu melhor e-mail` | rótulo atualizado | sim |
+| `reordenar-campos` ([email, full_name]) | `~ ordem: full_name, email, button → email, full_name, button` | `[email, full_name, button]` | sim |
+| `remover-campo` (email) | `- campo email` | `[full_name, button]` | sim |
+| `adicionar-campo` custom field real (`consentimento`, id `N6cznmfKOH6YjVyyCSKg`) | `+ campo N6cznmfKOH6YjVyyCSKg` | campo completo gravado, tag = id | sim |
+| `aplicar` estilo (tokens Carbon) | 17 linhas (`fieldStyle.*`, `style.*`, `submitMessageStyle.fontColor`, `customStyle`) | idêntico, campo a campo | sim |
+| `previa-visual` (sem prévia, é a própria foto) | — | screenshot mostrou o formulário com o custom field renderizado e as cores dos tokens | sim |
+| `versoes` (sem prévia, é leitura) | — | 7 versões listadas | sim |
+| `previa-visual --versao <antiga>` (sem prévia) | — | screenshot da versão renderizou | sim |
+| `restaurar --versao <antiga>` (write-only, sem prévia — guarda de `--confirmo` é erro seco) | — | campos voltaram para `[full_name, email, button]`, o estado daquela versão | sim |
+| `duplicar` (sem prévia) | — | cópia criada com o estado atual (pós-restauração) | sim |
+| `apagar` da cópia (sem prévia) | — | `deleted:true`, cópia removida | sim |
+| `apagar` do formulário original (sem prévia) | — | `deleted:true`, formulário removido — **esta é a exclusão intencional do formulário desta rodada**, diferente do episódio da 1ª rodada (ver abaixo) | sim |
+
+Todas as gravações desta rodada foram feitas por este agente, sozinho, um comando por
+vez, sem nenhuma invocação concorrente — a leitura "prévia bateu com o servidor" nesta
+tabela é confiável porque não houve segundo escritor no meio.
+
+**O que aconteceu com o formulário da 1ª rodada (`g7xmOrgWXe8TEMaL5ewr`), registrado como
+episódio, não como prova**: ele foi criado, editado, estilizado e teve uma submissão
+pública real recebida durante a 1ª rodada desta tarefa — mas, no meio da passagem, dois
+agentes (a sessão principal e um subagente despachado para a automação de browser da
+submissão) escreveram nele ao mesmo tempo. Uma cópia extra apareceu sem que `duplicar`
+tivesse sido chamado duas vezes, e o formulário original foi apagado do servidor num
+ponto em que a sessão principal não tinha pedido esse `apagar`. Como consequência, as
+operações de campo/estilo/versão/restauração/duplicação feitas *nele* não servem como
+prova de confiabilidade — só a submissão pública em si (que não pode ser refeita sem criar
+outro contato real no CRM do cliente) continua valendo, isolada, na seção abaixo.
+
+**Custom field num formulário usa o `id` do custom field como `tag`.** Testado ao vivo com
+o campo `consentimento` (`TEXT`, `contact.consentimento`, id `N6cznmfKOH6YjVyyCSKg`) da
+Instaltech: `{"op":"adicionar-campo","campo":{"tag":"<id>","fieldKey":"contact.consentimento",
+"dataType":"TEXT","model":"contact","name":"consentimento","id":"<id>","type":"text","label":"..."}}`.
+Renderizou na página pública, aceitou valor e a submissão de teste (na passagem
+contaminada da 1ª rodada) guardou o valor sob a chave `N6cznmfKOH6YjVyyCSKg` (não sob
+`fieldKey`).
+
+**Criação tem lag de propagação — corrigido com retry (2ª rodada, 2026-09-19).** A
+primeira `criar` de um formulário, na 1ª rodada desta tarefa, retornou `POST /forms/` OK,
+mas o `GET /forms/<id>` imediatamente seguinte (dentro da própria etapa de publicar)
+devolveu `400 Form does not exist`, deixando um formulário órfão (sem nome, sem campos)
+que precisou de `apagar` manual. O servidor aceita o `POST` antes de o objeto ficar
+visível para `GET` — janela de eventual consistency, não determinística. Corrigido em
+`runFormularioAcao` (`extractor/src/cli.ts`): o `carregarDoc` logo depois do `criar` agora
+tenta até 3 vezes, com 1,5s de atraso entre tentativas, antes de desistir. O rastro grava
+`criadoId` **antes** da primeira tentativa (já fazia isso), então mesmo esgotando as
+tentativas o id órfão fica registrado no arquivo de rastro; a mensagem de erro final
+nomeia o id, diz que ele existe no servidor sem nome nem campos, e dá o comando exato
+(`formulario-acao --acao apagar -i <id> --confirmo`) para removê-lo — e essa frase só
+aparece quando a falha foi de fato no laço de retry, não quando `aplicar()`/`publicar()`
+falha depois dele (a mensagem não pode contar 3 tentativas para um erro que tentou uma
+vez). Na 4ª rodada, o `criar` do formulário serial funcionou de primeira, sem acionar o
+retry.
+
+#### Lado survey — prova serial (rodadas 2 e 3)
+
+Survey descartável `ZZ TESTE AUTOMASTER SURVEY`, num id novo a cada rodada, sempre criado
+e apagado em série, sem subagente. `criar-slide` ×3, `renomear-slide`, `reordenar-slides`,
+`adicionar-campo` com `slide`, `mover-campo` entre slides, `remover-slide` e
+`definir-logica`, todos confirmados por leitura direta do servidor (`-o detalhe --tipo
+survey`) depois do `--confirmo` — os valores gravados bateram exatamente com o que cada
+operação pedia (nomes, ordem dos slides, `id` do campo no slide de destino, e a regra de
+`conditionalLogic` no formato documentado na seção acima, com `jumpTarget` apontando para
+um `id` de slide real). Refeito depois do conserto da prévia de slide (rodada 3): as
+quatro operações (`criar-slide`, `remover-slide`, `renomear-slide`, `reordenar-slides`)
+tiveram a prévia conferida **antes** de cada `--confirmo`, e em todas as quatro a linha que
+a prévia anunciou bateu, campo a campo, com o que o servidor gravou: `+ slide <id>` → o
+slide novo apareceu com aquele id; `- slide <id>` → o slide saiu da lista; `~ nome do
+slide <id>: <antes> → <depois>` → o `slideName` mudou exatamente assim; `~ ordem dos
+slides: <antes> → <depois>` → a nova ordem bateu com a lista do lado direito da seta.
+`previa-visual` no survey mostrou o campo do slide ativo renderizado com a barra de
+progresso e o botão "Submit" — navegar entre telas via clique não foi exercitado (a
+ferramenta só fotografa o estado atual, não simula clique de avançar).
+
+**`restaurar` versão exercitado ao vivo em survey (rodada 5, 2026-09-19).** Survey
+descartável `ZZ TESTE AUTOMASTER SURVEY` (id `FuKXZth8OYvPJuzwr7u9`): `criar-slide`
+("Segunda tela") e depois `renomear-slide` (para "Segunda tela renomeada") geraram duas
+versões distintas em `versionHistory`. `--acao restaurar --tipo survey --versao <a versão
+gravada logo depois do criar-slide, antes do renomear-slide>` devolveu `aplicado:true`, e
+o `-o detalhe --tipo survey` seguinte mostrou o slide de volta ao nome "Segunda tela" —
+exatamente o estado da versão restaurada, não o nome renomeado. Mesma rota de `publicar`
+usada no formulário (`POST /surveys/<id>` com o `formData` baixado da URL da versão), sem
+diferença de comportamento entre os dois tipos. Nota à margem: o `--acao apagar` seguinte
+devolveu `404 Survey does not exist or is deleted` já na primeira tentativa, e um `GET`
+imediato depois confirmou o mesmo — apesar do `-o detalhe` ter lido esse mesmo survey com
+sucesso poucos segundos antes (mostrando o estado restaurado). O survey não aparece mais em
+`-o lista --tipo survey` (total voltou a 29), então não há resíduo, mas o motivo exato de
+ter desaparecido entre a leitura e o `apagar` — sem um `DELETE` bem-sucedido no meio — não
+foi identificado. Essa anomalia e a de `duplicar` abaixo (`200` sem gravar nada) têm o
+mesmo formato — um survey que uma leitura recente confirmou e que some antes da escrita
+seguinte alcançá-lo — e podem compartilhar causa no lado do servidor. Ninguém investigou
+se é a mesma causa; fica registrado como suspeita, não como conclusão.
+
+**Achado — `duplicar` de survey pode devolver `200` com documento completo sem gravar
+nada (investigado a fundo na rodada 5, 2026-09-19; conclusão: é o servidor, não lag).**
+`POST /surveys/duplicate/<id>` devolveu `200` com um documento completo e coerente para o
+id `u0WIsApG4MDPfCDqcFRf` (`_id` novo, distinto do original; `name: "ZZ TESTE AUTOMASTER
+SURVEY COPIA"`, exatamente o pedido, não o nome do original; `locationId` correto;
+`deleted:false`; `source:"duplicate"`; `dateAdded`/`dateUpdated` frescos, do momento da
+chamada) — não é eco estático do documento original, é uma resposta específica daquela
+chamada. Mesmo assim, `GET /surveys/<id>` devolveu `404 Survey not Found!` na hora, de
+novo depois de ~8s, e **de novo minutos depois, numa sessão de investigação própria**; o
+`DELETE` nesse id devolveu `404 Survey does not exist or is deleted`; `-o lista --tipo
+survey` nunca mostrou esse nome, e o `total` da lista bateu exatamente com a contagem de
+produção de antes de qualquer escrita desta tarefa (29), nas três vezes em que foi
+conferido. **Conclusão: o servidor aceita o `POST` de duplicar survey, monta e devolve um
+documento coerente com `200`, mas não grava o registro em lugar nenhum que `GET` ou a
+listagem alcancem — não é lag de propagação (que se resolve em segundos, como no `criar()`
+de formulário) e não sobrou survey invisível na subconta.** A base para essa conclusão:
+o id devolvido nunca apareceu em nenhuma leitura, em três checagens espaçadas no tempo, e
+a contagem da lista nunca subiu de 29. Ainda assim, como a única fonte é a API pública —
+sem acesso direto ao banco do servidor — **fica registrado aqui, para quem quiser conferir
+pela interface do GHL: o id em questão é `u0WIsApG4MDPfCDqcFRf`, na Instaltech
+(`Xb9gDxwxYhdqtprGcb5E`)**. Sem resíduo a limpar por este agente (nada para apagar num id
+que nenhuma leitura confirma existir), mas é um achado real de API, e a recomendação vale
+para qualquer escrita de survey, não só `duplicate`: **depois de qualquer escrita de
+survey, confirme com um `GET` antes de assumir que o objeto está lá** — a mesma
+desconfiança que cobre `duplicar` cobre o desaparecimento pré-`apagar` acima. O
+`criar()`/`duplicar()` de formulário não mostraram esse comportamento nas rodadas em que
+foram testados.
+
+**`temas` — exercitado ao vivo para os dois tipos (rodada 4).** `GET /forms/themes` e
+`GET /surveys/themes` devolveram, cada um, 21 temas prontos (`Default Theme`, `Dark
+Theme`, `Neon Theme`, ...), cada tema com seu próprio `formId`/`surveyId` de onde vem o
+preview. Rota de leitura, sem `--confirmo`.
+
+#### Submissão pública, resposta histórica, `cssLivre`, perguntas abertas
+
+**Envio público de submissão — exercitado ao vivo na passagem contaminada da 1ª rodada
+(Playwright, widget público); não refeito nas rodadas seguintes de propósito, para não
+criar outro contato real no CRM do cliente.** O portão do passo 1 (ver Regra 2 do brief)
+confirmou que os 6 triggers de "formulário/survey enviado" na Instaltech são todos
+filtrados por `form.id`/`survey.id` explícito — nenhum dispara para um formulário não
+citado — então a submissão de teste no formulário descartável era segura. Preencheu
+`full_name` e o custom field `consentimento`, clicou Enviar; a submissão apareceu em `GET
+/forms/submissions?formId=<id>&limit=<n≤100>`, com o valor do custom field sob a chave do
+id (`N6cznmfKOH6YjVyyCSKg`). **`-o submissoes` sem `--formulario` e sem `--limite` (ou com
+`--limite` fora de 1..100) devolve `422 limit must not be greater than 100 / limit must be
+a number` mesmo sem nenhum parâmetro inválido explícito** — o filtro por formulário é
+obrigatório na prática, mesmo não sendo formalmente exigido pelo `-o inválido`; passar
+`--formulario <id> --limite <n≤100>` resolve. Efeito colateral fora do escopo desta tarefa:
+o envio real criou um contato novo de verdade na Instaltech (`ZlkU3kiMDr0xiIGLiMC5`, nome
+"ZZ TESTE AUTOMASTER", `internalSource.type: "form_builder"`, `medium: "form"`,
+`mediumId: g7xmOrgWXe8TEMaL5ewr` — o formulário da 1ª rodada, já apagado no episódio
+descrito acima). Desfazer contato está fora de escopo do projeto (ver CLAUDE.md, seção
+"Fora de escopo"), então ele não foi removido — mas, na 2ª rodada, recebeu a tag
+`teste-automaster` (a mesma já usada em testes anteriores na Instaltech) via `npm run
+contato-editar -- -l Xb9gDxwxYhdqtprGcb5E -i ZlkU3kiMDr0xiIGLiMC5 --tag +teste-automaster
+--json`, para não ficar anônimo no CRM do cliente. Esse contato é o único residual fora do
+escopo de formulário/survey desta tarefa, e continua nomeado aqui para quem for achá-lo
+depois. **Nenhum workflow disparou com essa submissão**: o portão do passo 1 já tinha
+mapeado os 6 triggers de "formulário/survey enviado" da subconta, todos filtrados por
+`form.id`/`survey.id` explícito, e nenhum desses filtros cita `g7xmOrgWXe8TEMaL5ewr` (o
+formulário de teste) — então nenhum dos 6 workflows entra em condição de disparar por essa
+submissão.
+
+**Resposta histórica sobrevive à remoção do campo — confirmado ao vivo na mesma passagem
+contaminada, não refeito pelo mesmo motivo (evitar outro contato real).** Depois de
+remover o campo `N6cznmfKOH6YjVyyCSKg` do formulário (`remover-campo`) e reconferir
+`-o submissoes`, o valor respondido continuou visível na submissão antiga, sob a mesma
+chave. O documento do formulário e as submissões já enviadas são independentes.
+
+**`cssLivre` grande — sem limite encontrado até 102 KB.** Um `customStyle` de 91.026
+bytes (na passagem contaminada) e, numa rodada serial separada, outro de 102.000 bytes
+foram aceitos pelo `POST /forms/<id>` e voltaram intactos, byte a byte, na leitura
+seguinte. Não foi testado acima de 102 KB; se existe um limite, é maior que isso.
+
+**Pergunta 7.1 (builder do GHL preserva `customStyle`/`fieldStyle` ao salvar pela
+interface) continua sem resposta.** Exige abrir o formulário no builder pela interface,
+mexer e salvar manualmente — passo que pede um humano (ver Regra 3 do brief) e não foi
+feito. Quem for confirmar isso precisa: aplicar um estilo customizado por
+`formulario-estilo --acao aplicar`, abrir o formulário no builder do GHL na UI, salvar
+sem tocar no estilo, e depois baixar o documento de novo (`-o detalhe`) para comparar
+`customStyle`/`fieldStyle` antes/depois.
+
+#### Paleta padrão da subconta e perfil único de Chrome
+
+**Paleta padrão da subconta — mescla provada ao vivo (pendência da Tarefa 5).** Antes de
+qualquer escrita desta tarefa, `paleta-ver` já trazia **10** entradas, salvas em
+`/Users/luccassilveira/.claude/jobs/9ca1d468/tmp/paleta-antes.json`: 5 alheias da
+Instaltech (`Secondary`, `White`, `Black`, `#00000024`, `#212121ff`) e **5 com os nomes de
+papel do motor** (`Primary #0f62feFF`, `Text #161616FF`, `Background #ffffffFF`,
+`Border #8d8d8dFF`, `Error #da1e28FF`) — resíduo de uma validação ao vivo anterior a esta
+tarefa (Tarefa 5/8, não desta rodada; ver comentário datado em
+`extractor/src/forms/style.ts`). Gravar os tokens de teste desta tarefa usando **os
+mesmos 5 valores de papel que já estavam lá** e reler a paleta depois: as 10 entradas
+saíram idênticas, byte a byte, às 10 de antes — nenhuma cor, alheia ou de papel,
+apareceu, desapareceu ou mudou de valor. Isto prova que a operação de gravar do motor
+(`mesclarPaleta`, client-side, em `extractor/src/forms/style.ts`) preserva as cores
+alheias; não isola se `POST /forms/default-colors` faria merge por si mesmo com uma
+lista parcial, porque o motor nunca manda uma lista parcial. As 5 entradas de papel **não
+são resíduo desta tarefa** — pré-existiam antes do primeiro comando desta rodada, e a
+Tarefa 9 não as criou nem as removeu (Regra 1 do brief: só se toca no que se cria nesta
+sessão). Não há operação de remoção individual exposta pelo motor (só gravar a lista
+inteira mesclada); são apenas swatches adicionais no seletor de cores do builder — nada
+na subconta usa esses nomes de papel hoje, então nenhuma página ou automação muda de
+aparência por causa disso.
+
+**Chrome persistente com perfil compartilhado — a escrita ao vivo é serial por
+construção.** Abrir uma segunda sessão do Chrome apontando para o mesmo
+`~/.automaster/chrome-profile` (por exemplo, uma segunda invocação do CLI, ou uma
+ferramenta de automação de navegador separada) enquanto o extractor tenta abrir a sua
+própria sessão trava o lock (`SingletonLock`) e faz o `npm run formulario-*` falhar com
+`Target page, context or browser has been closed` — ou, pior, deixa duas requisições
+disputando a mesma aba e produz efeitos cruzados (visto na 1ª rodada desta tarefa: uma
+cópia extra e uma exclusão inesperada do formulário original, quando a sessão principal e
+um subagente escreveram perto no tempo — ver episódio registrado acima). Matar os
+processos Chrome do perfil e apagar
+`SingletonLock`/`SingletonCookie`/`SingletonSocket` resolve o lock em si, mas não evita o
+segundo efeito. Não é um bug do extractor: é a arquitetura de "perfil persistente único"
+descrita no CLAUDE.md — **a consequência prática é que nenhuma escrita ao vivo de
+formulário/survey (nem a captura de token que a antecede) pode rodar em paralelo com
+outra**, nem em dois terminais, nem em dois agentes/processos, nem numa mistura dos dois.
+Quem for operar este comando deve sempre rodá-lo em série, um de cada vez, até o fim — é a
+regra que as rodadas 2, 3 e 4 desta tarefa seguiram, e a 1ª rodada não seguiu.
+
+**Residual de teste (conferido nas cinco rodadas)**: nenhum, em formulário ou survey. A
+conferência de cada rodada foi: rodar `formulario-acao -o lista` (formulário) e `-o lista
+--tipo survey` (survey) depois da limpeza e procurar por `"name":"ZZ TESTE` no JSON
+completo da resposta — nenhuma ocorrência, nas cinco vezes. Na 1ª rodada, isso incluiu
+achar e apagar manualmente uma cópia extra que tinha aparecido por causa da concorrência.
+Na 4ª rodada, a conferência final mostrou `"total":10` em formulários e `"total":29` em
+surveys, os mesmos totais de produção de antes de qualquer escrita desta tarefa. A 5ª
+rodada escreveu depois dessa conferência (o `restaurar` de survey e a investigação do
+`duplicar` fantasma, ambos acima) e teve a sua própria: o total de surveys foi checado de
+novo depois do episódio `restaurar`/`apagar` anômalo (voltou a `29`) e outras três vezes
+ao longo da investigação do duplicado fantasma (sempre `29`, sem os ids `u0WIsApG4MDPfCDqcFRf`
+nem `FuKXZth8OYvPJuzwr7u9` aparecendo na listagem) — é a mesma checagem de total, repetida, não uma
+conferência nova inventada aqui. Fora do escopo de formulário/survey, o contato de teste
+`ZlkU3kiMDr0xiIGLiMC5` (ver seção de submissão pública acima) continua na subconta, por
+decisão — não é resíduo esquecido.
