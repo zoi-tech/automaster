@@ -47,6 +47,7 @@ def _entities(ctx: DumpContext) -> dict[str, dict[str, str] | None]:
         # contra ele diria "81 templates novos" quando nada mudou.
         "templates de mensagem": _tpl(ctx, "message"),
         "templates de WhatsApp": _tpl(ctx, "whatsapp"),
+        "templates de e-mail": _tpl(ctx, "email"),
     }
 
 

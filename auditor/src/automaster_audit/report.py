@@ -37,6 +37,8 @@ _CEGAS = [
      "message_templates.json / whatsapp_templates.json", "broken_template_ref"),
     (lambda ctx: not ctx.form_ids,
      "forms.json / surveys.json", "broken_form_ref, unused_form"),
+    (lambda ctx: "email" not in ctx.template_ids,
+     "email_templates.json", "stale_email_template, unused_email_template"),
 ]
 
 
