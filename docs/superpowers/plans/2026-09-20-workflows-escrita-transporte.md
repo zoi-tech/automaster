@@ -923,7 +923,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
   if (precisaId && !o.id) throw new Error(`--acao ${o.acao} exige -i/--id (id do workflow)`);
 
   await withClient(o.location, log, async (client, _page, tokens) => {
-    const usuarioId = o.usuario ?? decodeUserId(tokens.tokenId);
+    const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
     const saida: Record<string, unknown> = { aplicado: false, acao: o.acao, id: o.id };
 
     if (o.acao === "historico") {
@@ -1067,7 +1067,7 @@ async function escritaSemCorpo(client: Parameters<typeof salvarWorkflow>[0], o: 
 
 /** Conta quem está dentro AGORA: a busca devolve linhas `finished` junto das vivas. */
 async function contarDentro(client: Parameters<typeof salvarWorkflow>[0], loc: string, wid: string): Promise<number> {
-  const pagina = await paginaDeInscritos(client as never, loc, wid, { limite: 100 });
+  const pagina = await paginaDeInscritos(client as never, loc, wid, 100);
   return pagina.linhas.filter((l) => l.status !== "finished").length;
 }
 
