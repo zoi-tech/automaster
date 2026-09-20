@@ -4,6 +4,32 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.13.0 — 2026-09-20
+
+Workflows ao vivo. Duas tools novas (`workflows_ao_vivo`, `workflow_acao`), 29 no total,
+módulo `extractor/src/api/workflows-live.ts` e dois comandos de CLI.
+
+- Leitura ao vivo pelos dois lados: quem está dentro de um workflow (com o passo em que
+  cada um parou, desde quando e por que entrou) e em que workflows um contato está.
+- Escrita: publicar/despublicar, inscrever, remover e retomar. Tudo atrás de `confirmo`,
+  com registro em `<dumps>/_workflows/<locationId>/<workflowId>/`.
+- **Despublicar não remove ninguém**: quem está dentro congela no passo em que está e volta
+  a andar, todo mundo de uma vez, na republicação.
+- **Inscrever é enfileirado pelo servidor**: ler o estado logo depois pode não mostrar o
+  contato ainda.
+- **Toda escrita é carimbada com o usuário logado**, lido do token; sem conseguir ler, a
+  escrita recusa e pede `usuario`.
+- A tool `workflow` passa a declarar na descrição que lê o dump — o estado corrente é da
+  tool nova. Comportamento inalterado.
+- Teto de 500 inscritos por leitura, ajustável, com declaração de corte.
+- Despublicar e inscrever foram exercitados ao vivo na Instaltech; quatro comportamentos
+  (retomar inscrição pausada, despublicar com gente congelando de verdade, remover contato
+  parado no meio, e efeito sobre inscrição dupla) ficaram sem prova — nenhum workflow
+  descartável tinha passo de espera. Detalhe em
+  `docs/superpowers/handoffs/2026-09-20-workflows-ao-vivo-prova.md`.
+
+Rotas em `docs/endpoints.md`, seção `## Workflows ao vivo`.
+
 ## 0.12.0 — 2026-09-19
 
 Escrita de formulários e surveys. Duas tools novas (`formulario_acao`,

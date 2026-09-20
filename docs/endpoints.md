@@ -58,6 +58,114 @@ GET backend.leadconnectorhq.com/workflow/<locationId>/trigger?workflowId=<workfl
 ```
 - Resposta: **array** de triggers. Cada um: `id`, `name`, `belongs_to`, `masterType`, filtros.
 
+## Workflows ao vivo
+
+Host `backend.leadconnectorhq.com`, os dois tokens. Exercitado ao vivo em 2026-09-20 contra
+a Instaltech (`Xb9gDxwxYhdqtprGcb5E`), workflow descartável `test.cmd [review]`
+(`457e3101-9aa4-4733-acaa-9f7a90bf6f90`) e contato de teste `uWqujqll20tRuglV3mLt`. Detalhe
+completo em `docs/superpowers/handoffs/2026-09-20-workflows-ao-vivo-prova.md`.
+
+**Atenção ao prefixo: a busca de inscritos usa `/workflows` (plural); lista, meta, inscrição
+por contato e todas as escritas usam `/workflow` (singular).** Não é engano de digitação —
+são serviços diferentes no backend.
+
+### Leitura
+| O que | Rota | Ao vivo |
+|---|---|---|
+| Lista de workflows | `GET .../workflow/<loc>/list?type=workflow&limit=&offset=&sortBy=name&sortOrder=asc` | ✓ |
+| Meta de um workflow | `GET .../workflow/<loc>/<wid>?includeScheduledPauseInfo=true` | ✓ |
+| Inscritos de um workflow (paginado) | `GET .../workflows/status/search/workflow-with-filter?workflowId=&locationId=&limit=&action=first\|next&referenceId=&referenceCreatedAt=&referenceSid=` | ✓ |
+| Workflows de um contato | `GET .../workflow/<loc>/contact/<cid>/statuses_v2` | ✓ |
+| Contagem de inscritos (`enroll-stats`) | `GET .../workflows/status/enroll-stats?workflowId=&locationId=` e as 3 variantes abaixo | ✓ (todas 404/401) |
+
+`enroll-stats` é **404 em todas as variantes tentadas**:
+
+    GET /workflows/status/enroll-stats?workflowId=..&locationId=..  → 404 Cannot GET
+    GET /workflow/status/enroll-stats?...                           → 401
+    GET /workflows/<loc>/status/enroll-stats?workflowId=..          → 404
+    GET /workflows/status/stats?...                                 → 404
+
+Não existe rota de contagem. O `count` que `workflow-with-filter` devolve é **tamanho da
+página**, não total de inscritos — confirmado ao vivo. Não há como saber quantas pessoas já
+passaram por um workflow sem paginar a lista inteira.
+
+A meta do workflow vem na **raiz** da resposta, não sob `meta.workflow`: `{"_id":"...",
+"name":"...","status":"draft","updatedBy":"...","fileUrl":"...","version":10,...}`. O id fica
+em `_id`, não em `id`.
+
+O campo da próxima execução na linha de inscrição é `executeOn`. `nextExecutionOn` — o nome
+que apareceu ao ler o bundle público — não existe na resposta real do servidor.
+
+`GET .../contact/<cid>` (usado para exibir nome) **não devolve `contact.name`** nem
+`contact.contactName`. Vêm apenas `firstName`, `lastName`, `fullNameLowerCase`, `email`.
+
+`statuses_v2` (workflows de um contato) devolve linhas mínimas: só `{workflowId, status}`. Sem
+`_id`, sem `contactId`, sem passo, sem `createdAt`, sem `meta.addedSource`. Por isso o id de
+inscrição para `force-resume` **tem que sair da busca de inscritos do workflow**
+(`workflow-with-filter`, filtrando por `workflowId` e `contactId`), nunca de `statuses_v2`.
+
+`workflow-with-filter` devolve as linhas `finished` **junto** das vivas. Contar o tamanho da
+lista de inscritos superestima quem está dentro agora — confirmado ao vivo: uma única
+inscrição `finished` aparecia como "1 contato dentro". O mesmo vale para `statuses_v2` do
+lado do contato: 9 de 10 linhas do contato de teste eram `finished`, e a contagem ingênua do
+tamanho da lista mentia que ele estava em dez workflows.
+
+### Escrita
+| O que | Rota | Corpo | Ao vivo |
+|---|---|---|---|
+| Publicar/despublicar | `PUT .../workflow/<loc>/change-status/<wid>` | `{status, updatedBy}` | ✓ |
+| Inscrever contato | `POST .../workflow/<loc>/<wid>/start-workflow` | `{contactId, actionFrom:{userId, source, channel}, eventStartTime?}` | ✓ |
+| Remover contato | `POST .../workflow/<loc>/contact/<cid>/stop-execution` | `{workflowId, removedFrom:{userId, channel, source}}` | ✓ |
+| Retomar inscrição | `POST .../workflow/<loc>/<inscricaoId>/force-resume` | `{actionFrom:{userId, channel, source}}` | ✓ (sobre inscrição `finished`, ver abaixo) |
+
+`change-status` devolve o workflow inteiro com o `status` novo; `updatedBy` muda para o id do
+usuário do token — a autoria funciona de ponta a ponta (confirmado ao vivo: mudou de
+`OvPQsxKKffcLSOGL90wN` para `GYFy8jJyy0KRNliM8ejy`).
+
+**Inscrever num workflow em `draft` devolve 200 e não cria inscrição nenhuma.** A resposta é
+idêntica à de uma inscrição que funciona (`200 {"msg":"ADD To WF:... PubSub
+StartWorker:...","error":false}`), em duas tentativas, sem nenhuma linha nova depois. Só
+publicar o workflow fez a inscrição aparecer. O comando não tem como distinguir os dois casos
+pela resposta.
+
+**Despublicar não remove ninguém: congela.** Quem está dentro para no passo em que está e
+volta a andar, todo mundo de uma vez, quando o workflow for republicado.
+
+**Inscrever é enfileirado pelo servidor** (`"PubSub StartWorker"` na mensagem) — ler o estado
+logo depois de inscrever pode não mostrar o contato ainda, sem que nada tenha falhado.
+
+**Remover é enfileirado e, sobre inscrição já terminada, não faz nada.**
+`stop-execution` devolveu `200 {"msg":"successfully queued contact to end workflow
+execution"}` sobre uma inscrição já `finished`, e ela continuou `finished` — não havia o que
+encerrar.
+
+**`force-resume` age sobre o id da INSCRIÇÃO, não do contato**, e recusa inscrição terminada:
+`404 {"msg":"Invalid workflow status id"}` sobre uma inscrição `finished`. O resolvedor local
+(que busca a inscrição certa por `workflowId` + `contactId` na lista de inscritos do
+workflow, já que `statuses_v2` não serve para isso) achou o id certo — quem recusou foi o
+servidor, não o código.
+
+**`source` de uma inscrição criada pelo app é `add_to_campaign_modal`**, e o campo é
+persistido (confirmado com o workflow publicado). O servidor **aceitou** `source:
+"automaster"` com `200`, sem `422` — o enum não é fechado —, mas o teste rodou com o workflow
+em `draft`, onde nenhuma inscrição é criada, então a persistência desse valor não foi vista.
+O código segue mandando o valor do app.
+
+**Nenhum dos quatro comportamentos abaixo foi exercitado**, porque nenhum workflow
+descartável da Instaltech tem passo de espera — o contato entra e termina na hora, sem ficar
+parado onde daria para provar sem disparar automação real de cliente: `retomar` sobre uma
+inscrição genuinamente pausada, despublicar com gente de verdade congelando, remover um
+contato parado no meio de um workflow, e o efeito da remoção por contato sobre inscrição
+dupla (`allowMultiple`). Ver o handoff citado acima.
+
+### Correção: descoberta de bundle
+
+A nota antiga (seção "Como o bundle foi lido") está desatualizada para o editor de workflow:
+o app hoje carrega de `production.app-manifest.leadconnectorhq.com/latest/manifest.json`, e o
+editor de workflow é uma aplicação à parte, em
+`client-app-automation-workflows.leadconnectorhq.com`. As rotas mapeadas acima vieram de lá,
+não do bundle `crm/*` usado nas seções anteriores.
+
 ## Entidades referenciadas (para auditoria de refs)
 
 ### Pipelines (+ stages)

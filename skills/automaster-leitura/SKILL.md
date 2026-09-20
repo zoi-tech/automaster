@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -133,3 +133,28 @@ devolve `aplicado` — cada uma tem sua própria forma de resposta:
 - `formulario_estilo`: `aplicar`, `previa` e `paleta-gravar` trazem `aplicado`. `temas` e
   `paleta-ver` devolvem `{resultado}`; `previa-visual` devolve `{url, arquivo}` — nenhuma
   das três tem `aplicado`.
+
+## Workflows ao vivo (`workflows_ao_vivo`, `workflow_acao`)
+
+`workflow` lê o dump — o estado pode estar velho, com a idade que `_snapshot.idade_dias`
+declara. `workflows_ao_vivo` abre o Chrome e pergunta ao servidor agora. Não é redundância:
+use `workflow` para entender o desenho do workflow (steps, triggers, caminhos) e
+`workflows_ao_vivo` para saber quem está dentro dele neste minuto. Este par não tem
+precedente na skill — é a primeira vez que duas tools tratam do mesmo assunto com frescores
+diferentes.
+
+Lista vazia vem com `vazio_porque` — leia antes de concluir "ninguém está dentro".
+`estrangulado: true` significa que o servidor cortou a busca (`isLocationRateLimited`), não
+que não há gente: a resposta pode estar incompleta, tente de novo depois. `cortou: true`
+significa que existe mais gente do que a resposta mostra (teto de 500 inscritos, ajustável).
+
+A lista do lado do contato (`o="contato"`) traz também os workflows que o contato **já
+terminou** — o `status` de cada linha (`finished` ou não) é quem distingue histórico de
+presença atual. `dentro_agora` já conta só quem não terminou; não some o tamanho da lista de
+`inscricoes` para saber em quantos workflows o contato está.
+
+`workflow_acao` escreve ao vivo. **Despublicar não remove quem está dentro: congela** no
+passo em que está e volta a andar, todo mundo de uma vez, quando o workflow for republicado.
+**Inscrever é enfileirado pelo servidor**: conferir logo em seguida pode não mostrar o
+contato ainda, sem que a escrita tenha falhado — reler depois de alguns segundos antes de
+concluir que não funcionou.
