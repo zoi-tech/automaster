@@ -199,13 +199,31 @@ export function aplicar(
         if (!ehSurvey(doc)) throw new Error("slide só existe em survey");
         const i = doc.slides.findIndex((s: any) => s.id === o.alvo);
         if (i < 0) throw new Error(`slide ${o.alvo} não existe neste survey`);
-        const regra = regraQueSaltaPara(doc, o.alvo);
-        if (regra) {
+        const regraSalto = regraQueSaltaPara(doc, o.alvo);
+        if (regraSalto) {
+          const campos = ((regraSalto.conditions ?? []) as any[])
+            .map((c: any) => c?.selectedField).filter(Boolean).join(", ") || "nenhum campo";
           throw new Error(
-            `slide ${o.alvo} é o destino de uma regra de lógica condicional (salto para este ` +
-            "slide) e removê-lo deixaria a regra órfã. Ajuste ou remova a regra primeiro " +
-            "(op definir-logica).",
+            `slide ${o.alvo} é o destino de uma regra de lógica condicional (salto para ` +
+            `este slide, condição em ${campos}) e removê-lo deixaria essa regra órfã. ` +
+            "Ajuste ou remova a regra primeiro (op definir-logica).",
           );
+        }
+        // remover o slide também remove os campos do `slideData` dele — uma
+        // regra que dependa de um desses campos (mas salte para OUTRO slide)
+        // ficaria órfã do mesmo jeito, e sem essa checagem passava batido.
+        // Reaproveita a mesma função de `remover-campo`, um campo por vez.
+        for (const campo of doc.slides[i].slideData ?? []) {
+          const tag = identifica(campo);
+          const regraCampo = regraQueDependeDe(doc, tag);
+          if (regraCampo) {
+            throw new Error(
+              `slide ${o.alvo} contém o campo ${tag}, usado numa condição de lógica ` +
+              `condicional (regra que salta para ${regraCampo.outcome?.jumpTarget}), e ` +
+              "removê-lo deixaria essa regra órfã. Ajuste ou remova a regra primeiro " +
+              "(op definir-logica).",
+            );
+          }
         }
         doc.slides.splice(i, 1);
         break;

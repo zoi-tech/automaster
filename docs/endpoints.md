@@ -1056,8 +1056,8 @@ surveys, os mesmos totais de produção de antes de qualquer escrita desta taref
 rodada escreveu depois dessa conferência (o `restaurar` de survey e a investigação do
 `duplicar` fantasma, ambos acima) e teve a sua própria: o total de surveys foi checado de
 novo depois do episódio `restaurar`/`apagar` anômalo (voltou a `29`) e outras três vezes
-ao longo da investigação do duplicado fantasma (sempre `29`, sem o nome `u0WIsApG4MDPfCDqcFRf`
-nem `FuKXZth8OYvPJuzwr7u9` na listagem) — é a mesma checagem de total, repetida, não uma
+ao longo da investigação do duplicado fantasma (sempre `29`, sem os ids `u0WIsApG4MDPfCDqcFRf`
+nem `FuKXZth8OYvPJuzwr7u9` aparecendo na listagem) — é a mesma checagem de total, repetida, não uma
 conferência nova inventada aqui. Fora do escopo de formulário/survey, o contato de teste
 `ZlkU3kiMDr0xiIGLiMC5` (ver seção de submissão pública acima) continua na subconta, por
 decisão — não é resíduo esquecido.

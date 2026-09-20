@@ -1040,8 +1040,9 @@ TOOLS = {
                           "para fieldStyle e customStyle; fieldCSS NUNCA é escrito, porque o "
                           "builder o regenera e apagaria o trabalho. Em 'paleta-gravar' a "
                           "resposta pode trazer um campo 'aviso': presente quando não deu para "
-                          "ler a paleta atual da subconta antes de gravar, e por isso a "
-                          "gravação SUBSTITUIU a paleta em vez de mesclar nela — leia esse "
+                          "ler a paleta atual da subconta antes de gravar, OU quando a leitura "
+                          "respondeu num formato inesperado, e por isso a gravação SUBSTITUIU "
+                          "a paleta em vez de mesclar nela — leia esse "
                           "campo antes de assumir que nada se perdeu. Exige confirmo=true para "
                           "gravar; registro em <dumps>/_formularios/.",
                           {"loc": _LOC, "acao": {"type": "string", "enum": list(ESTILO_ACOES)},

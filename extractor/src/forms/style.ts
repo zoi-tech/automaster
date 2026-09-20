@@ -147,3 +147,18 @@ export function resolverPaleta(
       "uma lista); as cores que já existiam na subconta podem ter sido substituídas.",
   };
 }
+
+/**
+ * Monta o objeto de saída de `paleta-gravar` — puro, para que um teste
+ * morda se alguém tirar o `aviso` do JSON de novo (achado Crítico da
+ * revisão: o campo já foi removido em silêncio uma vez, com a suíte toda
+ * passando, porque nada exercitava essa fiação).
+ */
+export function saidaPaletaGravar(
+  args: { resposta: unknown; registro: string; aviso?: string },
+): { aplicado: true; acao: "paleta-gravar"; resposta: unknown; registro: string; aviso?: string } {
+  return {
+    aplicado: true, acao: "paleta-gravar", resposta: args.resposta, registro: args.registro,
+    ...(args.aviso ? { aviso: args.aviso } : {}),
+  };
+}

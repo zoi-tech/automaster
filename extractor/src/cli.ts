@@ -32,7 +32,7 @@ import {
 import { aplicar, type Op } from "./forms/doc.js";
 import { diferenca } from "./forms/diff.js";
 import {
-  opsDeEstilo, resolverPaleta, type Tokens as TokensEstilo, type CorNomeada,
+  opsDeEstilo, resolverPaleta, saidaPaletaGravar, type Tokens as TokensEstilo, type CorNomeada,
 } from "./forms/style.js";
 import {
   fetchPipelines,
@@ -1282,7 +1282,7 @@ async function runFormularioEstilo(opts: {
     fs.writeFileSync(registro, JSON.stringify({
       em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aviso, aplicado: true, resposta: r,
     }, null, 2));
-    const out = { aplicado: true, acao: "paleta-gravar", resposta: r, registro, ...(aviso ? { aviso } : {}) };
+    const out = saidaPaletaGravar({ resposta: r, registro, aviso });
     if (opts.json) console.log(JSON.stringify(out));
     else log(`ok — paleta gravada; registro em ${registro}`);
   });

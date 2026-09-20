@@ -223,6 +223,22 @@ test("remover slide destino de salto condicional é recusado", () => {
   );
 });
 
+test("remover slide cujo campo é usado numa condição de outro salto é recusado (o slide leva o campo com ele)", () => {
+  const s = survey();
+  s.slides.push({ id: "s3", slideName: "Slide 3", button: {}, slideData: [] });
+  // s2, na fixture base, já tem o campo "email" — é o slide que vai ser removido.
+  const regras = [{
+    conditionalOperation: "then",
+    conditions: [{ selectedField: "email", selectedOperation: "isEqualTo", inputValue: "x" }],
+    outcome: { jumpTarget: "s3", jumpTargetType: "slide", type: "jumpTo", value: "" },
+  }];
+  const d = aplicar(s, [{ op: "definir-logica", regras }]);
+  assert.throws(
+    () => aplicar(d, [{ op: "remover-slide", alvo: "s2" }]),
+    /slide s2 contém o campo email, usado numa condição de lógica condicional \(regra que salta para s3\)/,
+  );
+});
+
 test("remover campo usado numa condição é recusado", () => {
   const regras = [{
     conditionalOperation: "then",

@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cor, opsDeEstilo, paletaDeTokens, mesclarPaleta, resolverPaleta, type Tokens } from "../src/forms/style.js";
+import {
+  cor, opsDeEstilo, paletaDeTokens, mesclarPaleta, resolverPaleta, saidaPaletaGravar, type Tokens,
+} from "../src/forms/style.js";
 import { diferenca } from "../src/forms/diff.js";
 import { aplicar, type Doc } from "../src/forms/doc.js";
 
@@ -106,6 +108,20 @@ test("resolverPaleta substitui e avisa com frase diferente quando colors não é
   assert.match(r.aviso ?? "", /não veio no formato esperado/);
   assert.doesNotMatch(r.aviso ?? "", /não pôde ser lida/);
   assert.deepEqual(r.colors, paletaDeTokens(tokens));
+});
+
+test("saidaPaletaGravar traz aviso quando presente (Dívida 2: morde se o campo for removido)", () => {
+  const out = saidaPaletaGravar({ resposta: { ok: true }, registro: "/tmp/x.json", aviso: "cuidado" });
+  assert.equal(out.aviso, "cuidado");
+  assert.deepEqual(out, {
+    aplicado: true, acao: "paleta-gravar", resposta: { ok: true }, registro: "/tmp/x.json", aviso: "cuidado",
+  });
+});
+
+test("saidaPaletaGravar não traz aviso quando ausente", () => {
+  const out = saidaPaletaGravar({ resposta: { ok: true }, registro: "/tmp/x.json" });
+  assert.ok(!("aviso" in out));
+  assert.deepEqual(out, { aplicado: true, acao: "paleta-gravar", resposta: { ok: true }, registro: "/tmp/x.json" });
 });
 
 const base = (): Doc => ({
