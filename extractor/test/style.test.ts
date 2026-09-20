@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cor, opsDeEstilo, paletaDeTokens, type Tokens } from "../src/forms/style.js";
+import { cor, opsDeEstilo, paletaDeTokens, mesclarPaleta, type Tokens } from "../src/forms/style.js";
 import { diferenca } from "../src/forms/diff.js";
 import { aplicar, type Doc } from "../src/forms/doc.js";
 
@@ -51,6 +51,40 @@ test("paleta da subconta sai dos mesmos tokens, em lista de {name, value}", () =
   const p = paletaDeTokens(tokens);
   assert.ok(Array.isArray(p));
   const primary = p.find((c) => c.name === "Primary");
+  assert.equal(primary?.value, "0f62feFF");
+});
+
+test("mesclar paleta troca o valor de um rótulo nosso já existente", () => {
+  const atual = [{ name: "Primary", value: "AAAAAAFF" }];
+  const r = mesclarPaleta(atual, tokens);
+  const primary = r.find((c) => c.name === "Primary");
+  assert.equal(primary?.value, "0f62feFF");
+});
+
+test("mesclar paleta acrescenta rótulo nosso ausente, sem remover o que já existe", () => {
+  const atual = [{ name: "Secondary", value: "188BF6FF" }];
+  const r = mesclarPaleta(atual, tokens);
+  assert.equal(r.length, 6); // Secondary + os 5 nossos
+  assert.ok(r.some((c) => c.name === "Primary" && c.value === "0f62feFF"));
+});
+
+test("mesclar paleta preserva intacto rótulo alheio", () => {
+  const atual = [
+    { name: "Secondary", value: "188BF6FF" },
+    { name: "White", value: "FFFFFFFF" },
+    { name: "Black", value: "000000" },
+  ];
+  const r = mesclarPaleta(atual, tokens);
+  assert.ok(r.some((c) => c.name === "Secondary" && c.value === "188BF6FF"));
+  assert.ok(r.some((c) => c.name === "White" && c.value === "FFFFFFFF"));
+  assert.ok(r.some((c) => c.name === "Black" && c.value === "000000"));
+});
+
+test("mesclar paleta casa rótulo sem diferenciar maiúscula de minúscula", () => {
+  const atual = [{ name: "primary", value: "AAAAAAFF" }];
+  const r = mesclarPaleta(atual, tokens);
+  assert.equal(r.length, 5); // "primary" e "Primary" são o mesmo rótulo
+  const primary = r.find((c) => c.name.toLowerCase() === "primary");
   assert.equal(primary?.value, "0f62feFF");
 });
 

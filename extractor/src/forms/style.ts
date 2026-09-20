@@ -96,3 +96,26 @@ export function paletaDeTokens(t: Tokens): CorNomeada[] {
     { name: "Error", value: cor(t.corErro) },
   ];
 }
+
+/**
+ * Mescla os cinco rótulos nossos na paleta ATUAL da subconta, em vez de
+ * substituir a lista inteira. Nada prova que `POST /forms/default-colors`
+ * mescla sozinho no servidor — só a prova ao vivo da Tarefa 9 vai dizer — e
+ * a amostra real da Instaltech tem entradas alheias (`Secondary`, `White`,
+ * `Black`, rótulos-hex) que não são nossas e não podem desaparecer. Se o
+ * servidor já mesclasse, esta função seria redundante e inofensiva; ela
+ * existe porque a hipótese de substituição total não foi descartada.
+ *
+ * Casamento de `name` é sem diferenciar maiúscula/minúscula, já que o
+ * rótulo é livre e a amostra real mistura caixa (`"#212121ff"` etc.).
+ */
+export function mesclarPaleta(atual: CorNomeada[], t: Tokens): CorNomeada[] {
+  const novos = paletaDeTokens(t);
+  const resultado = atual.map((c) => ({ ...c }));
+  for (const novo of novos) {
+    const i = resultado.findIndex((c) => c.name.toLowerCase() === novo.name.toLowerCase());
+    if (i >= 0) resultado[i] = { ...resultado[i], value: novo.value };
+    else resultado.push(novo);
+  }
+  return resultado;
+}

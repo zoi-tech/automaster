@@ -31,7 +31,9 @@ import {
 } from "./api/forms-write.js";
 import { aplicar, type Op } from "./forms/doc.js";
 import { diferenca } from "./forms/diff.js";
-import { opsDeEstilo, paletaDeTokens, type Tokens as TokensEstilo } from "./forms/style.js";
+import {
+  opsDeEstilo, paletaDeTokens, mesclarPaleta, type Tokens as TokensEstilo, type CorNomeada,
+} from "./forms/style.js";
 import {
   fetchPipelines,
   fetchCustomFields,
@@ -1171,25 +1173,41 @@ async function runFormularioEstilo(opts: {
     if (!opts.confirmo) {
       throw new Error(
         "gravar a paleta muda a cor padrão de todo formulário novo desta subconta, " +
-        "inclusive os que o cliente criar na interface. Repita com --confirmo.",
+        "inclusive os que o cliente criar na interface. As cores já existentes na subconta " +
+        "são preservadas: só os cinco papéis da identidade (Primary/Text/Background/" +
+        "Border/Error) são sobrescritos. Repita com --confirmo.",
       );
     }
     const antes = await paletaPadrao(client, opts.location).catch(() => null);
+    const atualColors = (antes as { colors?: CorNomeada[] } | null)?.colors;
+    let colors: CorNomeada[];
+    if (Array.isArray(atualColors)) {
+      colors = mesclarPaleta(atualColors, tokens!);
+    } else {
+      // leitura da paleta atual falhou: sem ela não há o que mesclar. Avisa
+      // em voz alta — as cores que já existiam na subconta podem ser
+      // substituídas por só as cinco nossas.
+      log(
+        "aviso: a paleta anterior não pôde ser lida; as cores que existiam na subconta " +
+        "podem ter sido substituídas.",
+      );
+      colors = paletaDeTokens(tokens!);
+    }
     const registro = registroEscrita(opts.location, "_formularios", "paleta", {
-      acao: "paleta-gravar", tokens, antes, aplicado: false,
+      acao: "paleta-gravar", tokens, antes, colors, aplicado: false,
     });
     log(`snapshot: ${registro}`);
     let r: unknown;
     try {
-      r = await gravarPaletaPadrao(client, opts.location, paletaDeTokens(tokens!));
+      r = await gravarPaletaPadrao(client, opts.location, colors);
     } catch (e) {
       fs.writeFileSync(registro, JSON.stringify({
-        em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, aplicado: false, erro: String(e),
+        em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aplicado: false, erro: String(e),
       }, null, 2));
       throw e;
     }
     fs.writeFileSync(registro, JSON.stringify({
-      em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, aplicado: true, resposta: r,
+      em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: "paleta-gravar", resposta: r, registro };
     if (opts.json) console.log(JSON.stringify(out));
