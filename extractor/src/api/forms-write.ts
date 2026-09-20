@@ -23,11 +23,18 @@ export interface CriarOpts {
   parentId?: string;
 }
 
-/** Cria o objeto vazio e devolve a resposta crua (traz `form._id`). */
+/**
+ * Cria o objeto vazio e devolve a resposta crua (traz `form._id`).
+ *
+ * `POST /surveys/` recusa `productType` com `422 property productType should
+ * not exist` — o tipo já é implícito no segmento da rota (`/forms/` vs.
+ * `/surveys/`). Só `/forms/` aceita esse campo. Medido ao vivo na Instaltech,
+ * Tarefa 9, 2026-09-19.
+ */
 export function criar(client: GhlClient, tipo: Tipo, o: CriarOpts): Promise<unknown> {
   return client.postJson(`${BASE}/${rota(tipo)}/`, {
     locationId: o.locationId,
-    productType: o.productType,
+    ...(tipo === "survey" ? {} : { productType: o.productType }),
     source: "landing_page",
     ...(o.parentId ? { parentId: o.parentId } : {}),
   });

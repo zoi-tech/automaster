@@ -69,6 +69,8 @@ import { execFile } from "node:child_process";
 
 const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
 
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 /** Snapshot mais recente da subconta: só pastas com manifest.json contam. */
 function latestDumpDir(locationId: string): string | undefined {
   try {
@@ -1049,18 +1051,36 @@ async function runFormularioAcao(opts: {
             aplicado: false, criadoId: novoId, criado,
           }, null, 2));
           try {
-            // o objeto nasce vazio e sem nome; publicar de novo grava nome e campos
-            const { doc } = await carregarDoc(client, tipo, opts.location, novoId);
+            // o objeto nasce vazio e sem nome; publicar de novo grava nome e campos.
+            // O servidor às vezes aceita o POST antes de o id ficar visível para
+            // leitura (janela de eventual consistency, medida ao vivo na Instaltech,
+            // Tarefa 9): um GET imediato pode devolver 400 "Form does not exist".
+            // Tenta de novo algumas vezes, com um pequeno atraso, antes de desistir.
+            const TENTATIVAS = 3;
+            const ATRASO_MS = 1500;
+            let doc: Record<string, unknown> | undefined;
+            let ultimoErro: unknown;
+            for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+              try {
+                doc = (await carregarDoc(client, tipo, opts.location, novoId)).doc;
+                ultimoErro = undefined;
+                break;
+              } catch (e) {
+                ultimoErro = e;
+                if (tentativa < TENTATIVAS) await sleep(ATRASO_MS);
+              }
+            }
+            if (ultimoErro || !doc) throw ultimoErro ?? new Error("carregarDoc não devolveu documento");
             const corpo = ops.length
               ? aplicar(doc, ops, { permitirSemBotao: true, permitirVazio: true })
               : doc;
             r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
           } catch (e2) {
             throw new Error(
-              `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou: ` +
-              `ele ficou órfão, sem nome e sem campos, na subconta. Rode ` +
-              `"formulario-acao --acao apagar -i ${novoId} --confirmo" para removê-lo. ` +
-              `Erro original: ${e2 instanceof Error ? e2.message : String(e2)}`,
+              `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou ` +
+              `mesmo após 3 tentativas: ele ficou órfão, sem nome e sem campos, na ` +
+              `subconta. Rode "formulario-acao --acao apagar -i ${novoId} --confirmo" ` +
+              `para removê-lo. Erro original: ${e2 instanceof Error ? e2.message : String(e2)}`,
             );
           }
           break;

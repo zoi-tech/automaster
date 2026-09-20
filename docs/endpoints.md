@@ -760,7 +760,7 @@ Widget público (onde a página do formulário/survey é renderizada e enviada):
 
 | operação | método + rota | corpo |
 | --- | --- | --- |
-| criar | `POST /forms/` ou `POST /surveys/` | `{locationId, productType, source:"landing_page"[, parentId]}` |
+| criar | `POST /forms/` (com `productType`) ou `POST /surveys/` (sem `productType`, ver achado abaixo) | `{locationId[, productType], source:"landing_page"[, parentId]}` |
 | publicar/editar | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, sempre POST, nunca PUT |
 | apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — |
 | duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` |
@@ -776,16 +776,35 @@ remover campo, adicionar um custom field real da subconta (`consentimento`,
 restaurar versão, duplicar, apagar. Em cada operação a prévia do motor (`--ops` sem
 `--confirmo`) bateu exatamente com o que o servidor gravou depois do `--confirmo`.
 
-**Survey NÃO foi exercitado ao vivo — achado bloqueante.** `POST /surveys/` devolve
-`422 property productType should not exist` quando o corpo leva `productType` (o campo
-que `criar()` em `extractor/src/api/forms-write.ts` sempre envia, também para survey,
-copiando o padrão de `/forms/`). A rota de survey não aceita essa chave — o tipo já é
-implícito no segmento `/surveys/` da URL. Isso bloqueou toda a Tarefa 9 no lado survey:
-`criar-slide`, `renomear-slide`, `reordenar-slides`, `adicionar-campo` com `slide`,
-`mover-campo`, `remover-slide` e `definir-logica` (lógica condicional) **não foram
-exercitados ao vivo** — só têm a prova de formato estático da seção anterior e os 45
-testes do motor puro. O conserto (omitir `productType` no corpo para `tipo === "survey"`)
-é decisão de quem revisar este relatório, não foi feito aqui.
+**Corrigido — `criar()` mandava `productType` também para survey (2ª rodada de prova,
+2026-09-19).** `POST /surveys/` devolvia `422` com o corpo literal
+`{"status":422,"options":{},"message":["property productType should not exist"],"name":"UnprocessableEntityException","error":"Unprocessable Entity","statusCode":422}`
+quando o corpo levava `productType` — campo que `criar()` em
+`extractor/src/api/forms-write.ts` mandava sempre, também para survey, copiando o padrão
+de `/forms/`. O servidor não pediu nenhum campo substituto no 422 — só rejeitou a chave. A
+rota de survey não aceita `productType`: o tipo já é implícito no segmento `/surveys/` da
+URL. Corrigido: `criar()` só inclui `productType` no corpo quando `tipo !== "survey"`.
+Depois da correção, `POST /surveys/` com `{locationId, source:"landing_page"}` (sem
+`productType`) devolveu `200` e criou o survey normalmente — ver achado seguinte, agora
+exercitado ao vivo por completo.
+
+**Survey exercitado ao vivo por completo (2ª rodada, depois da correção acima).** Survey
+descartável `ZZ TESTE AUTOMASTER SURVEY` (criado com um slide padrão "Slide 1" já vazio):
+`criar-slide` ×3, `renomear-slide`, `reordenar-slides`, `adicionar-campo` com `slide`,
+`mover-campo` entre slides, `remover-slide` e `definir-logica`, todos confirmados por
+leitura direta do servidor (`-o detalhe --tipo survey`) depois do `--confirmo` — os
+valores gravados bateram exatamente com o que cada operação pedia (nomes, ordem dos
+slides, `id` do campo no slide de destino, e a regra de `conditionalLogic` no formato
+documentado na seção acima, com `jumpTarget` apontando para um `id` de slide real).
+**Achado à margem, sem correção aplicada**: a prévia (`--ops` sem `--confirmo`) devolveu
+`{"aplicado":false,"previa":[]}` — vazia — para toda operação de slide
+(`criar-slide`/`renomear-slide`/`reordenar-slides`/`remover-slide`/`mover-campo`); a
+função `diferenca()` só nomeia mudanças de campo dentro de uma lista plana, não mudanças
+de slide. A prévia de formulário (sem slide) continua correta; a de survey com slides
+está sem cobertura de prévia, embora a gravação em si funcione. `previa-visual` no
+formulário resultante mostrou o campo do slide ativo renderizado e o botão "Submit" —
+navegar entre telas via clique não foi exercitado (a ferramenta só fotografa o estado
+atual, não simula clique de avançar).
 
 **Custom field num formulário usa o `id` do custom field como `tag`.** Testado ao vivo com
 o campo `consentimento` (`TEXT`, `contact.consentimento`, id `N6cznmfKOH6YjVyyCSKg`) da
@@ -794,12 +813,18 @@ Instaltech: `{"op":"adicionar-campo","campo":{"tag":"<id>","fieldKey":"contact.c
 Renderizou na página pública, aceitou valor e a submissão de teste guardou o valor sob a
 chave `N6cznmfKOH6YjVyyCSKg` (não sob `fieldKey`).
 
-**Criação tem lag de propagação — achado, não bug de comando.** A primeira `criar` de um
-formulário retornou `POST /forms/` OK, mas o `GET /forms/<id>` imediatamente seguinte
-(dentro da própria etapa de publicar) devolveu `400 Form does not exist`, deixando um
-formulário órfão (sem nome, sem campos) que precisou de `apagar` manual. Repetir o comando
-funcionou de primeira. O servidor aceita o `POST` antes de o objeto ficar visível para
-`GET` — janela de eventual consistency, não determinístico.
+**Criação tem lag de propagação — corrigido com retry (2ª rodada, 2026-09-19).** A
+primeira `criar` de um formulário, na 1ª rodada desta tarefa, retornou `POST /forms/` OK,
+mas o `GET /forms/<id>` imediatamente seguinte (dentro da própria etapa de publicar)
+devolveu `400 Form does not exist`, deixando um formulário órfão (sem nome, sem campos)
+que precisou de `apagar` manual. O servidor aceita o `POST` antes de o objeto ficar
+visível para `GET` — janela de eventual consistency, não determinística. Corrigido em
+`runFormularioAcao` (`extractor/src/cli.ts`): o `carregarDoc` logo depois do `criar` agora
+tenta até 3 vezes, com 1,5s de atraso entre tentativas, antes de desistir. O rastro grava
+`criadoId` **antes** da primeira tentativa (já fazia isso), então mesmo esgotando as
+tentativas o id órfão fica registrado no arquivo de rastro; a mensagem de erro final
+nomeia o id, diz que ele existe no servidor sem nome nem campos, e dá o comando exato
+(`formulario-acao --acao apagar -i <id> --confirmo`) para removê-lo.
 
 **Envio público de submissão — exercitado ao vivo (Playwright, widget público).** O portão
 do passo 1 (ver Regra 2 do brief) confirmou que os 6 triggers de "formulário/survey
@@ -813,9 +838,17 @@ valor do custom field sob a chave do id (`N6cznmfKOH6YjVyyCSKg`). **`-o submisso
 parâmetro inválido explícito** — o filtro por formulário é obrigatório na prática, mesmo
 não sendo formalmente exigido pelo `-o inválido`; passar `--formulario <id> --limite <n≤100>`
 resolve. Efeito colateral fora do escopo desta tarefa: o envio real criou um contato novo
-de verdade na Instaltech (`ZlkU3kiMDr0xiIGLiMC5`, nome "ZZ TESTE AUTOMASTER"); desfazer
-contato está fora de escopo do projeto (ver CLAUDE.md, seção "Fora de escopo"), então ele
-não foi removido.
+de verdade na Instaltech (`ZlkU3kiMDr0xiIGLiMC5`, nome "ZZ TESTE AUTOMASTER",
+`internalSource.type: "form_builder"`, `medium: "form"`, `mediumId: g7xmOrgWXe8TEMaL5ewr`).
+Desfazer contato está fora de escopo do projeto (ver CLAUDE.md, seção "Fora de escopo"),
+então ele não foi removido — mas, na 2ª rodada, recebeu a tag `teste-automaster` (a mesma
+já usada em testes anteriores na Instaltech) via `npm run contato-editar -- -l
+Xb9gDxwxYhdqtprGcb5E -i ZlkU3kiMDr0xiIGLiMC5 --tag +teste-automaster --json`, para não
+ficar anônimo no CRM do cliente. **Nenhum workflow disparou com essa submissão**: o
+portão do passo 1 já tinha mapeado os 6 triggers de "formulário/survey enviado" da
+subconta, todos filtrados por `form.id`/`survey.id` explícito, e nenhum desses filtros
+cita `g7xmOrgWXe8TEMaL5ewr` (o formulário de teste) — então nenhum dos 6 workflows entra
+em condição de disparar por essa submissão.
 
 **Resposta histórica sobrevive à remoção do campo — confirmado ao vivo.** Depois de
 remover o campo `N6cznmfKOH6YjVyyCSKg` do formulário (`remover-campo`) e reconferir
@@ -856,17 +889,26 @@ inteira mesclada); são apenas swatches adicionais no seletor de cores do builde
 na subconta usa esses nomes de papel hoje, então nenhuma página ou automação muda de
 aparência por causa disso.
 
-**Chrome persistente com perfil compartilhado — achado operacional.** Abrir uma segunda
-sessão do Chrome apontando para o mesmo `~/.automaster/chrome-profile` (por exemplo, via
-uma ferramenta de automação de navegador separada) enquanto o extractor tenta abrir a
-sua própria sessão trava o lock (`SingletonLock`) e faz o `npm run formulario-*` falhar
-com `Target page, context or browser has been closed`. Matar os processos Chrome do
-perfil e apagar `SingletonLock`/`SingletonCookie`/`SingletonSocket` resolve. Não é um bug
-do extractor: é a arquitetura de "perfil persistente único" descrita no CLAUDE.md
-encontrando concorrência de duas fontes diferentes tentando abri-la ao mesmo tempo.
+**Chrome persistente com perfil compartilhado — a escrita ao vivo é serial por
+construção.** Abrir uma segunda sessão do Chrome apontando para o mesmo
+`~/.automaster/chrome-profile` (por exemplo, uma segunda invocação do CLI, ou uma
+ferramenta de automação de navegador separada) enquanto o extractor tenta abrir a sua
+própria sessão trava o lock (`SingletonLock`) e faz o `npm run formulario-*` falhar com
+`Target page, context or browser has been closed` — ou, pior, deixa duas requisições
+disputando a mesma aba e produz efeitos cruzados (visto na 1ª rodada desta tarefa: uma
+cópia extra e uma exclusão inesperada, quando duas invocações de escrita rodaram perto no
+tempo). Matar os processos Chrome do perfil e apagar
+`SingletonLock`/`SingletonCookie`/`SingletonSocket` resolve o lock em si, mas não evita o
+segundo efeito. Não é um bug do extractor: é a arquitetura de "perfil persistente único"
+descrita no CLAUDE.md — **a consequência prática é que nenhuma escrita ao vivo de
+formulário/survey (nem a captura de token que a antecede) pode rodar em paralelo com
+outra**, nem em dois terminais, nem em dois agentes/processos, nem numa mistura dos dois.
+Quem for operar este comando deve sempre rodá-lo em série, um de cada vez, até o fim.
 
-**Residual de teste**: nenhum. `-o lista` de formulários (10, todos de produção) e de
-surveys (29, todos de produção) não mostra nenhum nome começando com `ZZ TESTE` depois
-da limpeza — inclusive um segundo `ZZ TESTE COPIA` criado por engano (retry de comando
-cuja primeira execução na verdade tinha funcionado, só a confirmação no terminal que se
-perdeu) foi encontrado pela varredura de resíduo e apagado.
+**Residual de teste (conferido nas duas rodadas)**: nenhum. Na 1ª rodada, `-o lista` de
+formulários (10, todos de produção) e de surveys (29, todos de produção) não mostrou
+nenhum nome começando com `ZZ TESTE` depois da limpeza — inclusive um segundo formulário
+extra que apareceu por causa da concorrência (ver achado acima) foi encontrado pela
+varredura de resíduo e apagado. Na 2ª rodada, depois de exercitar e apagar o survey
+descartável, `-o lista` (10 formulários) e `-o lista --tipo survey` (29 surveys) foram
+conferidos de novo e continuaram sem nenhum `ZZ TESTE`, em nenhum dos dois.
