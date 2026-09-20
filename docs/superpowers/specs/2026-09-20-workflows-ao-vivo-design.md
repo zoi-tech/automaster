@@ -1,8 +1,14 @@
 # Workflows ao vivo no MCP — spec
 
 Data: 2026-09-20
-Estado: revisada pelo grill (fase 3 do spec-flow); pesquisa em
-`docs/superpowers/research/2026-09-20-workflows-ao-vivo-research.md`
+Estado: implementada. A prova ao vivo derrubou oito premissas desta spec e do plano —
+entre elas a rota de contagem de inscritos, o nome do campo de próxima execução e o caminho
+que resolvia a inscrição a retomar. **O que vale hoje é `docs/endpoints.md`, seção
+`## Workflows ao vivo`, e o handoff
+`docs/superpowers/handoffs/2026-09-20-workflows-ao-vivo-prova.md`.** Esta spec fica como
+registro da decisão, não como descrição do que existe.
+
+Pesquisa em `docs/superpowers/research/2026-09-20-workflows-ao-vivo-research.md`.
 
 ## Problema
 
@@ -80,12 +86,12 @@ um parâmetro produz surpresa na hora errada.
 
 ## Escrita
 
-Quatro ações em `workflow-acao`, todas atrás de `--confirmo` e todas com rastro em
-`<dumps>/_workflows/<locationId>/<ts>.json`, como mensagem e oportunidade já fazem.
+Quatro ações em `workflow-acao`, todas atrás de `--confirmo` e todas com rastro em disco,
+como mensagem e oportunidade já fazem.
 
 O rastro é agrupado por automação: `<dumps>/_workflows/<locationId>/<workflowId>/<ts>.json`
 (A12). Abrir a pasta de um workflow mostra tudo que foi feito nele — publicações, quem
-entrou, quem saiu. As três ações sempre têm workflow; nem todas têm contato.
+entrou, quem saiu. As quatro ações sempre têm workflow; nem todas têm contato.
 
 `publicar` liga e desliga — é um campo de status, não duas rotas. Antes de despublicar,
 conta quantos contatos estão dentro naquele momento e informa: eles **congelam no passo em
@@ -106,7 +112,7 @@ prova ao vivo.
 
 ## Autoria da escrita (A4)
 
-As três ações mandam ao servidor o id do usuário que as fez — é esse nome que aparece no
+As quatro ações mandam ao servidor o id do usuário que as fez — é esse nome que aparece no
 histórico do GHL para o cliente. O extractor hoje só captura os dois tokens.
 
 O id sai do próprio token, pelo mesmo caminho que `decodeCompanyId` já usa
