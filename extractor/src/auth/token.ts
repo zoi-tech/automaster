@@ -5,14 +5,36 @@ export interface Tokens {
   tokenId: string;
 }
 
+/** Payload de um JWT, sem verificar assinatura. `{}` quando o texto não é um JWT. */
+function payloadDeJwt(token: string): Record<string, unknown> {
+  try {
+    const parte = token.split(".")[1];
+    if (!parte) return {};
+    return JSON.parse(Buffer.from(parte, "base64url").toString("utf-8")) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 /** Extrai o company_id do JWT `token-id` (necessário para o endpoint de usuários). */
 export function decodeCompanyId(tokenId: string): string {
-  try {
-    const payload = JSON.parse(Buffer.from(tokenId.split(".")[1], "base64url").toString("utf-8"));
-    return typeof payload.company_id === "string" ? payload.company_id : "";
-  } catch {
-    return "";
+  const v = payloadDeJwt(tokenId).company_id;
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * Id do usuário logado, para carimbar autoria nas escritas de workflow. Procura nos dois
+ * tokens porque o app manda o mesmo usuário em claims de nomes diferentes conforme o
+ * emissor. Vazio = não deu para saber; quem chama exige `--usuario` nesse caso.
+ */
+export function decodeUserId(bearer: string, tokenId: string): string {
+  for (const p of [payloadDeJwt(bearer), payloadDeJwt(tokenId)]) {
+    for (const chave of ["user_id", "userId", "sub"]) {
+      const v = p[chave];
+      if (typeof v === "string" && v) return v;
+    }
   }
+  return "";
 }
 
 const WORKFLOWS_URL = (loc: string) =>
