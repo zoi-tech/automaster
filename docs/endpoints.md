@@ -791,6 +791,75 @@ está no fim desta seção.
   `instagram-dm.template_id`, `ig_interactive_messenger.templateId` e
   `proposals_estimates_send_document.templateId` (esse último sem lista para cruzar).
 
+## Templates de e-mail — sondagem ao vivo 2026-09-20
+
+O que destravou as regras `stale_email_template` e `unused_email_template`. A lista entra no
+dump como `email_templates.json` (opcional). Módulo: `extractor/src/api/emails.ts`; tool MCP
+`modelos_email`.
+
+| Lista | Rota | Resposta |
+|---|---|---|
+| email builder | `GET backend/emails/builder?locationId=&limit=&offset=&parentId=` | `{builders:[{id,name,templateType,parentId,previewUrl,isPlainText,version,dateAdded,lastUpdated,updatedBy}], total:[{total:N}]}` |
+
+- Lista **uma pasta por vez**: item com `templateType: "folder"` esconde os seus, e só aparecem
+  passando `parentId=<id da pasta>`. A varredura é recursiva a partir da raiz. Instaltech: 43
+  itens, 37 não-pasta. Cliente B: 44 itens, 39 não-pasta.
+- Não existe `updatedAt`: as datas são `lastUpdated` e `dateAdded`.
+
+### O id do step de e-mail sai do `previewUrl`, nunca do `template_id`
+
+A nota antiga desta doc dizia que e-mail não dava para auditar porque o `template_id` do step
+não casava com o builder. Estava olhando o campo errado. O step guarda dois ids:
+
+| `templateCreationMode` | `template_id` | id dentro do `previewUrl` |
+|---|---|---|
+| `existing` | cópia interna do step, nunca está no builder | o id real do template |
+| ausente / `template-gallery` | igual ao id do `previewUrl` | o id real do template |
+
+O `previewUrl` aponta para `location/<loc>/emails/<id>/index.html` no Storage. Nos 12 dumps em
+disco, **99 de 99 steps de e-mail têm `previewUrl`** — o campo nunca falta. 70 com id igual ao
+`template_id`, 29 diferentes.
+
+### Template fora da lista é template apagado, não cópia oculta
+
+A HighLevel documenta que o template escolhido dentro de um workflow vira uma cópia que "não
+aparece na lista de templates"
+([artigo 155000005856](https://help.gohighlevel.com/support/solutions/articles/155000005856-snapshot-workflow-email-action-enhanced-flow)),
+o que permitiria ler todo achado como falso positivo. A prova comparativa de 2026-09-20 mostra
+que não:
+
+- Instaltech: 8 dos 13 steps casam (todos `existing`); os 5 que não casam têm nome e assunto
+  iguais a templates do builder criados dois dias depois — templates refeitos, com os workflows
+  presos na versão velha.
+- Cliente B: **6 de 6 casam**, e todos os 6 são do mesmo formato dos 5 que falham na
+  Instaltech (`previewUrl` igual ao `template_id`). O formato não implica ocultação.
+
+Por isso `stale_email_template` é **WARN e não ERROR**: o conteúdo renderizado continua no
+Storage e o e-mail continua sendo enviado. O que se perdeu é poder editá-lo pelo app.
+
+### O que não funciona
+
+- `?templateId=<id>` e `deleted=true` em `emails/builder` são **ignorados**: devolvem a lista
+  inteira, byte a byte igual à chamada sem eles.
+- `GET /emails/builder/<id>` responde `404 Cannot GET`, inclusive para template que está na lista.
+- `GET /locations/<loc>/templates?originId=<workflowId|locationId>[&type=email]` responde 200 com
+  `{templates:[], totalCount:0}` em toda combinação, nos dois hosts. Não serve de junção.
+- As rotas v3 `GET /emails/locations/<loc>/templates[/<id>]` respondem `404 Cannot GET` em
+  `services.` e em `backend.` com os tokens da sessão: são de app do marketplace (OAuth/PIT).
+  A doc pública marca `emails/builder` como removida na v3, mas ela segue respondendo ao app web.
+
+### O HTML do e-mail baixa sem token
+
+`https://firebasestorage.googleapis.com/v0/b/highlevel-backend.appspot.com/o/location%2F<loc>%2Femails%2F<id>%2Findex.html?alt=media`
+responde **200 sem o parâmetro `token`**, medido em duas subcontas; id inexistente dá 404 limpo.
+O `previewUrl` do step traz um `token=` e ainda um `?cb=<ms>` colado depois (dois `?` na query),
+e responde 200 assim mesmo.
+
+Não guarde o `previewUrl` de um dump antigo esperando que funcione: o token do Storage é
+metadado do arquivo e **troca a cada sobrescrita**, então editar o e-mail invalida a URL
+guardada. A tool `modelos_email` remonta a URL a partir do id do snapshot corrente e omite o
+token.
+
 ## Formulários e surveys
 
 Host `https://services.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
