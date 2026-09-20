@@ -546,6 +546,9 @@ def enviar(loc: str, id: str, tipo: str, texto: str, assunto: str | None = None,
 
 _LOC = {"type": "string", "description": "locationId da subconta"}
 _SNAP = {"type": "string", "description": "snapshot YYYY-MM-DD_HHmm (default: mais recente)"}
+WF_LEITURA = ("lista", "dentro", "contato")
+WF_ACOES = ("publicar", "inscrever", "remover", "retomar")
+WF_STATUS = ("published", "draft", "locked", "paused")
 OPP_LEITURA = ("pipelines", "listar", "buscar", "ver")
 OPP_ACOES = ("criar", "editar", "mover", "status", "apagar", "restaurar")
 PIPE_ACOES = ("criar", "editar", "apagar")
@@ -851,6 +854,52 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
+def workflows_ao_vivo(loc: str, o: str = "lista", id: str | None = None,
+                      contato: str | None = None, limite: int | None = None,
+                      nomes: bool = False) -> dict:
+    """Leitura ao vivo de workflows e inscrições. Não usa o dump."""
+    if o not in WF_LEITURA:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(WF_LEITURA)}")
+    if o == "dentro" and not id:
+        raise ToolError("o=dentro exige o id do workflow")
+    if o == "contato" and not contato:
+        raise ToolError("o=contato exige o contato")
+    args = ["workflows-ao-vivo", "-l", loc, "-o", o]
+    for flag, val in (("-i", id), ("--contato", contato),
+                      ("--limite", str(limite) if limite else None)):
+        if val:
+            args += [flag, val]
+    if nomes:
+        args += ["--nomes"]
+    return _run_extractor(*args, "--json")
+
+
+def workflow_acao(loc: str, acao: str, id: str, contato: str | None = None,
+                  inscricao: str | None = None, status: str | None = None,
+                  usuario: str | None = None, inicio: str | None = None,
+                  confirmo: bool = False) -> dict:
+    """ESCREVE: publica/despublica um workflow, inscreve, remove ou retoma um contato."""
+    if acao not in WF_ACOES:
+        raise ToolError(f"acao inválida: {acao}. Aceitas: {', '.join(WF_ACOES)}")
+    if not confirmo:
+        raise ToolError("Isto muda dado real da subconta e não tem desfazer. Repita com confirmo=true.")
+    if acao == "publicar":
+        if not status:
+            raise ToolError(f"publicar exige status: {', '.join(WF_STATUS)}")
+        if status not in WF_STATUS:
+            raise ToolError(f"status inválido: {status}. Aceitos: {', '.join(WF_STATUS)}")
+    elif acao in ("inscrever", "remover") and not contato:
+        raise ToolError(f"{acao} exige o contato")
+    elif acao == "retomar" and not (contato or inscricao):
+        raise ToolError("retomar exige inscricao ou contato")
+    args = ["workflow-acao", "-l", loc, "--acao", acao, "--confirmo", "-i", id]
+    for flag, val in (("--contato", contato), ("--inscricao", inscricao),
+                      ("--status", status), ("--usuario", usuario), ("--inicio", inicio)):
+        if val:
+            args += [flag, val]
+    return _run_extractor(*args, "--json")
+
+
 def comparar(loc: str, antes: str | None = None, depois: str | None = None) -> dict:
     path_ultimo, _ = _snapshot(loc)  # valida a subconta e a raiz
     snaps = _snapshots(path_ultimo.parent)
@@ -874,7 +923,8 @@ TOOLS = {
     "inventario": (inventario, "summary (~80 tokens) ou uma fatia: workflows, tags, fields, pipelines, "
                    "users, calendars, custom_values (até ~20k tokens).",
                    {"loc": _LOC, "fatia": {"type": "string", "enum": list(FATIAS)}, "snapshot": _SNAP}, ["loc"]),
-    "workflow": (workflow, "Meta, árvore de caminhos (teto ~1.5k tokens, flag caminhos_truncado) e achados de um workflow.",
+    "workflow": (workflow, "DO DUMP (pode estar velho; para o estado corrente use `workflows_ao_vivo`): "
+                 "meta, árvore de caminhos (teto ~1.5k tokens, flag caminhos_truncado) e achados de um workflow.",
                  {"loc": _LOC, "id": {"type": "string"}, "snapshot": _SNAP}, ["loc", "id"]),
     "achados": (achados, "Achados agrupados por (rule, workflow, detail) com n; counts por severidade sempre.",
                 {"loc": _LOC, "severidade": {"type": "string", "enum": ["ERROR", "WARN", "INFO"]}, "snapshot": _SNAP}, ["loc"]),
@@ -1153,6 +1203,37 @@ TOOLS = {
                      "confirmo": {"type": "boolean", "default": False},
                      "snapshot": _SNAP},
                     ["loc", "acao"]),
+    "workflows_ao_vivo": (workflows_ao_vivo, "Leitura AO VIVO de workflows (abre Chrome, não usa o "
+                          "dump e não exige extração prévia): `lista` (todos os workflows com o status "
+                          "corrente), `dentro` (quem está dentro de um workflow agora, com o passo em "
+                          "que cada um parou, desde quando e por que entrou), `contato` (em que "
+                          "workflows um contato está agora). Teto de 500 inscritos, ajustável por "
+                          "`limite`; a resposta declara se cortou. `nomes=true` resolve o nome de cada "
+                          "contato, uma chamada por contato — lento em lista grande.",
+                          {"loc": _LOC, "o": {"type": "string", "enum": list(WF_LEITURA), "default": "lista"},
+                           "id": {"type": "string", "description": "id do workflow (com o=dentro)"},
+                           "contato": {"type": "string", "description": "id do contato (com o=contato)"},
+                           "limite": {"type": "integer", "description": "teto de inscritos (padrão 500)"},
+                           "nomes": {"type": "boolean", "default": False}},
+                          ["loc"]),
+    "workflow_acao": (workflow_acao, "ESCREVE EM PRODUÇÃO: publica ou despublica um workflow "
+                      "(`publicar` com o status desejado), inscreve um contato, remove um contato ou "
+                      "retoma uma inscrição parada. Exige confirmo=true; registro em "
+                      "<dumps>/_workflows/<locationId>/<workflowId>/. Despublicar NÃO remove ninguém: quem está "
+                      "dentro congela no passo em que está e volta a andar, todo mundo de uma vez, "
+                      "quando o workflow for republicado. Inscrever é enfileirado pelo servidor — ler "
+                      "logo depois pode não mostrar o contato ainda. A ação é carimbada com o usuário "
+                      "logado no histórico do GHL; `usuario` sobrescreve.",
+                      {"loc": _LOC, "acao": {"type": "string", "enum": list(WF_ACOES)},
+                       "id": {"type": "string", "description": "id do workflow"},
+                       "contato": {"type": "string", "description": "inscrever, remover, retomar"},
+                       "inscricao": {"type": "string", "description": "id da inscrição (retomar)"},
+                       "status": {"type": "string", "enum": list(WF_STATUS),
+                                  "description": "com acao=publicar"},
+                       "usuario": {"type": "string", "description": "autor; sem ele, sai do token"},
+                       "inicio": {"type": "string", "description": "início programado (inscrever), ISO com fuso"},
+                       "confirmo": {"type": "boolean", "default": False}},
+                      ["loc", "acao", "id"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",
