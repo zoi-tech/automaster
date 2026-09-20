@@ -35,6 +35,8 @@ export interface InscricaoCrua {
   createdAt?: string;
   currentStepName?: string;
   currentStepType?: string;
+  /** Nome real na resposta. `nextExecutionOn` é o nome que veio do bundle público — pode voltar. */
+  executeOn?: string;
   nextExecutionOn?: string;
   meta?: { addedSource?: { source?: string; sourceName?: string } };
 }
@@ -111,13 +113,6 @@ export async function paginaDeInscritos(
   };
 }
 
-/** Quantos passaram pelo workflow e quantos já terminaram. Uma chamada, resposta curta. */
-export function contarInscritos(
-  client: GhlClient, loc: string, wid: string,
-): Promise<{ total?: number; finished?: number }> {
-  return client.getJson(`${WFS}/status/enroll-stats?workflowId=${wid}&locationId=${loc}`);
-}
-
 /** O lado inverso: em que workflows este contato está agora. */
 export function inscricoesDoContato(
   client: GhlClient, loc: string, cid: string,
@@ -148,7 +143,7 @@ export function normalizarInscricao(c: InscricaoCrua): Inscricao {
     entrouEm: String(c.createdAt ?? ""),
     passo: String(c.currentStepName ?? ""),
     passoTipo: String(c.currentStepType ?? ""),
-    proximaExecucao: String(c.nextExecutionOn ?? ""),
+    proximaExecucao: String(c.executeOn ?? c.nextExecutionOn ?? ""),
     origem: String(c.meta?.addedSource?.source ?? ""),
     origemNome: String(c.meta?.addedSource?.sourceName ?? ""),
   };
@@ -173,8 +168,6 @@ export function porqueVazio(estrangulado: boolean): string {
 
 export interface SaidaPorWorkflow {
   workflow: { id: string; name?: string; status?: string };
-  total_historico?: number;
-  terminados?: number;
   dentro_agora: number;
   cortou: boolean;
   estrangulado: boolean;
@@ -182,12 +175,14 @@ export interface SaidaPorWorkflow {
   vazio_porque?: string;
 }
 
-/** O lado "quem está dentro deste workflow". */
+/**
+ * O lado "quem está dentro deste workflow". `total_historico`/`terminados` saíram:
+ * `enroll-stats` é 404 em todas as variantes testadas ao vivo, e não há substituto —
+ * `count` da busca paginada é o tamanho da página, não o total (confirmado ao vivo).
+ */
 export function resumoPorWorkflow(a: {
   workflow: WorkflowLinha;
   cruas: InscricaoCrua[];
-  total?: number;
-  finished?: number;
   cortou: boolean;
   estrangulado: boolean;
   nomes: Record<string, string>;
@@ -199,8 +194,6 @@ export function resumoPorWorkflow(a: {
   });
   return {
     workflow: { id: a.workflow.id, name: a.workflow.name, status: a.workflow.status },
-    total_historico: a.total,
-    terminados: a.finished,
     dentro_agora: inscricoes.length,
     cortou: a.cortou,
     estrangulado: a.estrangulado,
@@ -216,7 +209,13 @@ export interface SaidaPorContato {
   vazio_porque?: string;
 }
 
-/** O lado "em que workflows este contato está". Mesma linha normalizada do outro lado. */
+/**
+ * O lado "em que workflows este contato está". Mesma linha normalizada do outro lado.
+ * `dentro_agora` conta só quem NÃO terminou (`status !== "finished"`) — o lado do contato
+ * costuma trazer um histórico cheio de `finished` (visto ao vivo: 9 de 10 linhas), e contar
+ * a lista inteira mentia que o contato estava dentro de workflows que já acabou de percorrer.
+ * As linhas `finished` continuam na lista, com o status delas, para quem quiser o histórico.
+ */
 export function resumoPorContato(a: {
   contactId: string;
   cruas: InscricaoCrua[];
@@ -227,13 +226,15 @@ export function resumoPorContato(a: {
     const nome = a.nomesWorkflow[wid];
     return { ...normalizarInscricao(c), workflowId: wid, ...(nome ? { workflow: nome } : {}) };
   });
+  const dentroAgora = inscricoes.filter((i) => i.status !== "finished").length;
+  const vazioPorque = inscricoes.length
+    ? "este contato já terminou todos os workflows por onde passou; nenhum está com ele dentro agora."
+    : "nenhum workflow tem este contato dentro agora.";
   return {
     contactId: a.contactId,
-    dentro_agora: inscricoes.length,
+    dentro_agora: dentroAgora,
     inscricoes,
-    ...(inscricoes.length
-      ? {}
-      : { vazio_porque: "nenhum workflow tem este contato dentro agora." }),
+    ...(dentroAgora ? {} : { vazio_porque: vazioPorque }),
   };
 }
 
@@ -327,12 +328,16 @@ export function retomarInscricao(
 /**
  * Qual inscrição deste contato retomar num workflow. Duas inscrições no mesmo workflow é
  * possível (a flag `allowMultiple` do GHL), e aí escolher por conta própria seria adivinhar.
+ *
+ * `cruas` vem da busca de inscritos DO WORKFLOW (não da rota `statuses_v2` do contato: essa
+ * devolve só `{workflowId, status}`, sem `_id`, e nunca dá para resolver nada com ela —
+ * achado ao vivo). Por isso filtra pelos DOIS campos, workflowId e contactId.
  */
 export function resolverInscricao(
-  cruas: InscricaoCrua[], wid: string,
+  cruas: InscricaoCrua[], wid: string, contactId: string,
 ): { id: string } | { erro: string } {
   const minhas = cruas
-    .filter((c) => String(c.workflowId ?? "") === wid)
+    .filter((c) => String(c.workflowId ?? "") === wid && String(c.contactId ?? "") === contactId)
     .map((c) => String(c._id ?? c.id ?? ""))
     .filter(Boolean);
   if (!minhas.length) return { erro: `este contato não está no workflow ${wid} agora.` };
@@ -343,4 +348,20 @@ export function resolverInscricao(
     };
   }
   return { id: minhas[0] };
+}
+
+/**
+ * Nome do contato para exibição, na ordem: `contactName`, `name`, `firstName`+`lastName`
+ * aparados, `email`. `getContact` NÃO devolve `contact.name` nem `contactName` (achado ao
+ * vivo) — só `firstName`/`lastName`/`fullNameLowerCase`/`email` — mas a rota é interna e
+ * pode voltar a mandar qualquer um desses campos, daí a ordem inteira.
+ */
+export function nomeContato(c: {
+  contactName?: string; name?: string; firstName?: string; lastName?: string; email?: string;
+}): string {
+  if (c.contactName) return c.contactName;
+  if (c.name) return c.name;
+  const junto = [c.firstName, c.lastName].filter(Boolean).map((s) => s!.trim()).join(" ").trim();
+  if (junto) return junto;
+  return c.email ?? "";
 }

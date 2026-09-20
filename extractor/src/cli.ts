@@ -58,9 +58,9 @@ import {
   createPipeline, updatePipeline, deletePipeline,
 } from "./api/opportunities.js";
 import {
-  listarWorkflows, getWorkflowMeta, paginaDeInscritos, contarInscritos, inscricoesDoContato,
+  listarWorkflows, getWorkflowMeta, paginaDeInscritos, inscricoesDoContato,
   resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, cortar,
-  mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao,
+  mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao, nomeContato,
   STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
 } from "./api/workflows-live.js";
 import {
@@ -2138,8 +2138,11 @@ async function nomesDeContatos(
   const nomes: Record<string, string> = {};
   for (const id of [...new Set(ids)].filter(Boolean)) {
     try {
-      const c = await getContact(client, loc, id) as { contact?: { name?: string } };
-      if (c?.contact?.name) nomes[id] = c.contact.name;
+      const c = await getContact(client, loc, id) as {
+        contact?: { contactName?: string; name?: string; firstName?: string; lastName?: string; email?: string };
+      };
+      const nome = c?.contact ? nomeContato(c.contact) : "";
+      if (nome) nomes[id] = nome;
     } catch {
       // contato apagado depois de entrar no workflow: segue sem o nome
     }
@@ -2176,18 +2179,17 @@ async function runWorkflowsAoVivo(opts: {
       }
       case "dentro": {
         const wid = opts.id!;
-        const meta = await getWorkflowMeta(client, opts.location, wid) as
-          { workflow?: { id?: string; name?: string; status?: string } };
-        const w = meta?.workflow ?? {};
+        // `getWorkflowMeta` devolve o workflow na RAIZ da resposta, não sob `meta.workflow`
+        // (achado ao vivo: `{_id, name, status, ...}` direto).
+        const w = await getWorkflowMeta(client, opts.location, wid) as
+          { _id?: string; id?: string; name?: string; status?: string };
         const { cruas, cortou, estrangulado } = await todosOsInscritos(client, opts.location, wid, teto);
-        const stats = await contarInscritos(client, opts.location, wid)
-          .catch(() => ({}) as { total?: number; finished?: number });
         const nomes = opts.nomes
           ? await nomesDeContatos(client, opts.location, cruas.map((c) => String(c.contactId ?? "")))
           : {};
         out = resumoPorWorkflow({
-          workflow: { id: String(w.id ?? wid), name: w.name, status: w.status },
-          cruas, total: stats.total, finished: stats.finished, cortou, estrangulado, nomes,
+          workflow: { id: String(w?._id ?? w?.id ?? wid), name: w?.name, status: w?.status },
+          cruas, cortou, estrangulado, nomes,
         });
         break;
       }
@@ -2271,8 +2273,11 @@ async function runWorkflowAcao(opts: {
     }
 
     if (opts.acao === "retomar" && !alvoInscricao) {
-      const d = await inscricoesDoContato(client, opts.location, opts.contato!);
-      const r = resolverInscricao(d.workflowStatuses ?? [], wid);
+      // A rota do lado do contato (`statuses_v2`) devolve só `{workflowId, status}`, sem
+      // `_id` — nunca dá para resolver a inscrição por ela (achado ao vivo). Busca pelo
+      // lado do workflow, que traz `_id` e `contactId`, e filtra pelos dois.
+      const { cruas } = await todosOsInscritos(client, opts.location, wid, WF_TETO_PADRAO);
+      const r = resolverInscricao(cruas, wid, opts.contato!);
       if ("erro" in r) throw new Error(r.erro);
       alvoInscricao = r.id;
     }
