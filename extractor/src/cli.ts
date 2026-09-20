@@ -2120,15 +2120,18 @@ program
 async function todosOsInscritos(
   client: GhlClient, loc: string, wid: string, teto: number,
 ): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
+  // um número só: o tamanho pedido e a condição de "veio página cheia" têm que concordar,
+  // e separá-los em dois literais quebra o laço em silêncio quando alguém mexe num deles
+  const TAMANHO_PAGINA = 100;
   let cruas: InscricaoCrua[] = [];
   let cursor: Cursor | undefined;
   let estrangulado = false;
   // teto + 1 para saber que havia mais; `cortar` apara depois
   while (cruas.length <= teto) {
-    const p = await paginaDeInscritos(client, loc, wid, 100, cursor);
+    const p = await paginaDeInscritos(client, loc, wid, TAMANHO_PAGINA, cursor);
     estrangulado = estrangulado || p.estrangulado;
     cruas = juntarPaginas(cruas, p.linhas);
-    if (p.linhas.length < 100 || !p.cursor) break;
+    if (p.linhas.length < TAMANHO_PAGINA || !p.cursor) break;
     cursor = p.cursor;
   }
   const c = cortar(cruas, teto);
