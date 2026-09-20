@@ -1,8 +1,9 @@
 import type { GhlClient } from "./client.js";
 
 /**
- * Formulários e surveys da subconta. Host interno, dois tokens da sessão — as
- * mesmas rotas existem na API pública v3, mas devolvendo só id e nome.
+ * Formulários e surveys da subconta. Host `services.leadconnectorhq.com`,
+ * dois tokens da sessão — as mesmas rotas existem na API pública v3, mas
+ * devolvendo só id e nome.
  * Rotas em docs/endpoints.md, seção `## Formulários e surveys`.
  */
 const BASE = "https://services.leadconnectorhq.com";

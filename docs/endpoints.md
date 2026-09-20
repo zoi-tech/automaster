@@ -675,9 +675,16 @@ está no fim desta seção.
 
 ## Formulários e surveys
 
-Host `https://backend.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
+Host `https://services.leadconnectorhq.com`, os dois tokens da sessão (como o resto do
 extractor). As mesmas rotas existem na API pública v3, mas devolvendo só id e nome.
 Módulo: `extractor/src/api/forms.ts`; CLI `npm run formularios`; tool MCP `formularios`.
+
+Migrado de `backend.` para `services.` em 2026-09-19 (Tarefa 1 da escrita de
+formulários/surveys): as seis rotas de leitura (lista de formulário, lista de
+survey, um formulário, um survey, submissões de formulário, submissões de
+survey) foram comparadas ao vivo nos dois hosts na Instaltech
+(`Xb9gDxwxYhdqtprGcb5E`) e devolveram o mesmo conteúdo, byte a byte (só o
+`traceId` de cada request muda).
 
 | operação | rota |
 | --- | --- |
