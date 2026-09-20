@@ -47,9 +47,11 @@ test("formulário não recebe rodapé de navegação", () => {
   assert.ok(!ops.some((o: any) => o.caminho.startsWith("form.footerStyle")));
 });
 
-test("paleta da subconta sai dos mesmos tokens", () => {
+test("paleta da subconta sai dos mesmos tokens, em lista de {name, value}", () => {
   const p = paletaDeTokens(tokens);
-  assert.equal(p.primary, "0f62feFF");
+  assert.ok(Array.isArray(p));
+  const primary = p.find((c) => c.name === "Primary");
+  assert.equal(primary?.value, "0f62feFF");
 });
 
 const base = (): Doc => ({

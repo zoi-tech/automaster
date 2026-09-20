@@ -27,9 +27,11 @@ import {
 } from "./api/forms.js";
 import {
   criar, publicar, apagar, duplicar, restaurarVersao, baixarVersao,
+  paletaPadrao, gravarPaletaPadrao, temas,
 } from "./api/forms-write.js";
 import { aplicar, type Op } from "./forms/doc.js";
 import { diferenca } from "./forms/diff.js";
+import { opsDeEstilo, paletaDeTokens, type Tokens as TokensEstilo } from "./forms/style.js";
 import {
   fetchPipelines,
   fetchCustomFields,
@@ -1089,6 +1091,112 @@ async function runFormularioAcao(opts: {
   });
 }
 
+const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas"];
+
+/**
+ * Aplica tokens de identidade visual a um formulário/survey, ou lê/grava a
+ * paleta padrão da subconta (`GET`/`POST /forms/default-colors`).
+ * `paleta-gravar` não tem prévia: a guarda de `--confirmo` é um erro seco, não
+ * um "mostra e não grava", porque o alvo é a subconta inteira, não um documento.
+ */
+async function runFormularioEstilo(opts: {
+  location: string; acao: string; tipo?: string; id?: string; tokens?: string;
+  confirmo?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!ESTILO_ACOES.includes(opts.acao)) {
+    throw new Error(`--acao inválida: ${opts.acao}. Aceitas: ${ESTILO_ACOES.join(", ")}`);
+  }
+  const tipo = (opts.tipo ?? "formulario") as "formulario" | "survey";
+  if (tipo !== "formulario" && tipo !== "survey") {
+    throw new Error("--tipo aceita formulario ou survey");
+  }
+
+  let tokens: TokensEstilo | undefined;
+  if (opts.tokens) {
+    const texto = fs.existsSync(opts.tokens) ? fs.readFileSync(opts.tokens, "utf-8") : opts.tokens;
+    try {
+      tokens = JSON.parse(texto);
+    } catch {
+      throw new Error("--tokens precisa ser JSON, ou o caminho de um arquivo JSON");
+    }
+  }
+  if ((opts.acao === "aplicar" || opts.acao === "paleta-gravar") && !tokens) {
+    throw new Error(`${opts.acao} exige --tokens`);
+  }
+  if (opts.acao === "aplicar" && !opts.id) throw new Error("aplicar exige --id");
+
+  await withClient(opts.location, log, async (client) => {
+    if (opts.acao === "temas" || opts.acao === "paleta-ver") {
+      const r = opts.acao === "temas"
+        ? await temas(client, tipo, opts.location)
+        : await paletaPadrao(client, opts.location);
+      if (opts.json) console.log(JSON.stringify({ resultado: r }));
+      else log(JSON.stringify(r, null, 2));
+      return;
+    }
+
+    if (opts.acao === "aplicar") {
+      const { nome, doc } = await carregarDoc(client, tipo, opts.location, opts.id!);
+      const novo = aplicar(doc, opsDeEstilo(doc, tokens!));
+      if (!opts.confirmo) {
+        const previa = diferenca(doc, novo);
+        if (opts.json) console.log(JSON.stringify({ aplicado: false, previa }));
+        else { log(previa.length ? previa.join("\n") : "nada mudaria"); log("\nnada foi gravado. Repita com --confirmo."); }
+        return;
+      }
+      const registro = registroEscrita(opts.location, "_formularios", opts.id!, {
+        acao: "estilo", tipo, tokens, antes: doc, aplicado: false,
+      });
+      log(`snapshot: ${registro}`);
+      let r: unknown;
+      try {
+        r = await publicar(client, tipo, opts.id!, nome, novo);
+      } catch (e) {
+        fs.writeFileSync(registro, JSON.stringify({
+          em: new Date().toISOString(), acao: "estilo", tipo, tokens, antes: doc, aplicado: false, erro: String(e),
+        }, null, 2));
+        throw e;
+      }
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), acao: "estilo", tipo, tokens, antes: doc, aplicado: true, resposta: r,
+      }, null, 2));
+      const out = { aplicado: true, acao: "estilo", resposta: r, registro };
+      if (opts.json) console.log(JSON.stringify(out));
+      else log(`ok — estilo aplicado; registro em ${registro}`);
+      return;
+    }
+
+    // paleta-gravar: muda TODA a subconta, não um formulário — sem prévia
+    if (!opts.confirmo) {
+      throw new Error(
+        "gravar a paleta muda a cor padrão de todo formulário novo desta subconta, " +
+        "inclusive os que o cliente criar na interface. Repita com --confirmo.",
+      );
+    }
+    const antes = await paletaPadrao(client, opts.location).catch(() => null);
+    const registro = registroEscrita(opts.location, "_formularios", "paleta", {
+      acao: "paleta-gravar", tokens, antes, aplicado: false,
+    });
+    log(`snapshot: ${registro}`);
+    let r: unknown;
+    try {
+      r = await gravarPaletaPadrao(client, opts.location, paletaDeTokens(tokens!));
+    } catch (e) {
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, aplicado: false, erro: String(e),
+      }, null, 2));
+      throw e;
+    }
+    fs.writeFileSync(registro, JSON.stringify({
+      em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, aplicado: true, resposta: r,
+    }, null, 2));
+    const out = { aplicado: true, acao: "paleta-gravar", resposta: r, registro };
+    if (opts.json) console.log(JSON.stringify(out));
+    else log(`ok — paleta gravada; registro em ${registro}`);
+  });
+}
+
 async function runOportunidades(opts: {
   location: string; o: string; id?: string; pipeline?: string; estagio?: string;
   status?: string; contato?: string; termo?: string; limite?: string; pagina?: string;
@@ -1810,6 +1918,18 @@ program
   .option("--confirmo", "obrigatório: publica de verdade. Sem ele, só mostra a prévia")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runFormularioAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("formulario-estilo")
+  .description("ESCREVE: aplica tokens visuais a um formulário, ou grava a paleta padrão da subconta")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("--acao <a>", ESTILO_ACOES.join(" | "))
+  .option("--tipo <t>", "formulario | survey", "formulario")
+  .option("-i, --id <id>", "id do formulário ou survey")
+  .option("--tokens <json|arquivo>", "tokens de identidade visual")
+  .option("--confirmo", "obrigatório para gravar. Sem ele, só mostra a prévia (exceto paleta-gravar)")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runFormularioEstilo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("agenda")

@@ -66,20 +66,33 @@ export function opsDeEstilo(doc: Doc, t: Tokens): Op[] {
 }
 
 /**
- * Corpo de `POST /forms/default-colors`: a paleta padrão da subconta.
+ * Uma entrada da paleta padrão da subconta: rótulo livre + cor.
  *
- * Nota: estas chaves (`primary`, `text`, `background`, `border`, `error`) são
- * uma hipótese. Antes de gravar a paleta ao vivo (Tarefa 5), leia
- * `GET /forms/default-colors` de uma subconta que já tenha uma e ajuste as
- * chaves ao que o servidor devolve. Se as chaves divergirem, corrija aqui e
- * no teste.
+ * Medido ao vivo em 2026-09-19 contra `GET /forms/default-colors` na
+ * Instaltech (`Xb9gDxwxYhdqtprGcb5E`): o servidor devolve
+ * `{colors: [{name, value}, ...]}`, uma LISTA de rótulos livres
+ * (`"Secondary"`, `"White"`, `"Black"`, `"#00000024"`, `"#212121ff"` na
+ * amostra real), não um mapa fixo de chaves semânticas. A hipótese antiga
+ * (`{primary, text, background, ...}` como objeto) estava errada na forma
+ * (objeto em vez de lista) e no conteúdo (chaves fixas em vez de rótulo
+ * livre). `value` já vem em hex de 8 dígitos, como em `cor()`.
  */
-export function paletaDeTokens(t: Tokens): Record<string, string> {
-  return {
-    primary: cor(t.corPrimaria),
-    text: cor(t.corTexto),
-    background: cor(t.corFundo),
-    border: cor(t.corBorda),
-    error: cor(t.corErro),
-  };
+export interface CorNomeada {
+  name: string;
+  value: string;
+}
+
+/**
+ * Corpo de `colors` para `POST /forms/default-colors`: a paleta padrão da
+ * subconta, no formato medido acima. Os rótulos aqui são nossos — o servidor
+ * aceita rótulo livre — escolhidos para nomear o papel de cada token.
+ */
+export function paletaDeTokens(t: Tokens): CorNomeada[] {
+  return [
+    { name: "Primary", value: cor(t.corPrimaria) },
+    { name: "Text", value: cor(t.corTexto) },
+    { name: "Background", value: cor(t.corFundo) },
+    { name: "Border", value: cor(t.corBorda) },
+    { name: "Error", value: cor(t.corErro) },
+  ];
 }
