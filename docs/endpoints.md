@@ -765,7 +765,7 @@ Widget público (onde a página do formulário/survey é renderizada e enviada):
 | publicar/editar | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, sempre POST, nunca PUT | sim, formulário e survey |
 | apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — | sim, formulário e survey |
 | duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` | sim, formulário e survey — ver achado sobre a duplicata de survey abaixo |
-| restaurar versão | igual a publicar, com `formData` baixado de `versionHistory[].formDataDownloadUrl` | `{name, formData}` | **mapeada, não exercitada em survey** — só formulário; a rota é a mesma (`publicar`), então o comportamento no survey não tem prova própria |
+| restaurar versão | igual a publicar, com `formData` baixado de `versionHistory[].formDataDownloadUrl` | `{name, formData}` | sim, formulário e survey (rodada 5) |
 | paleta padrão da subconta | `GET /forms/default-colors?locationId=<loc>` / `POST /forms/default-colors` | `{locationId, colors:[{name,value}]}` | sim — é da subconta, não por tipo |
 | temas prontos | `GET /forms/themes?locationId=<loc>` / `GET /surveys/themes?locationId=<loc>` | — | sim, formulário e survey (21 temas cada) |
 
@@ -904,19 +904,47 @@ slides: <antes> → <depois>` → a nova ordem bateu com a lista do lado direito
 progresso e o botão "Submit" — navegar entre telas via clique não foi exercitado (a
 ferramenta só fotografa o estado atual, não simula clique de avançar).
 
-**Achado — duplicar survey pode devolver `200` com documento completo para um id que não
-persiste (rodada 4, 2026-09-19, sem correção aplicada).** `POST /surveys/duplicate/<id>`
-devolveu `200` com um documento completo e coerente (`_id`, `name`, `slides`, `deleted:
-false`), mas o `GET /surveys/<id>` imediatamente seguinte, e de novo depois de ~8s de
-espera, devolveu `404 Survey not Found!`; o `DELETE` nesse id devolveu `404 Survey does
-not exist or is deleted`; e `-o lista --tipo survey` nunca mostrou esse nome. Diferente do
-lag de propagação de `criar()` (que se resolve em segundos com retry), aqui a espera não
-resolveu — o objeto simplesmente nunca ficou visível para leitura, apesar da resposta de
-sucesso. Sem residual a limpar (o id nunca existiu para efeito de listagem/leitura), mas é
-um achado real: quem depender do `_id` devolvido por `duplicate` num survey deve confirmar
-com um `GET` antes de assumir que o objeto está lá — o `criar()` de formulário e o
-`duplicar()` de formulário não mostraram esse comportamento nas rodadas em que foram
-testados.
+**`restaurar` versão exercitado ao vivo em survey (rodada 5, 2026-09-19).** Survey
+descartável `ZZ TESTE AUTOMASTER SURVEY` (id `FuKXZth8OYvPJuzwr7u9`): `criar-slide`
+("Segunda tela") e depois `renomear-slide` (para "Segunda tela renomeada") geraram duas
+versões distintas em `versionHistory`. `--acao restaurar --tipo survey --versao <a versão
+gravada logo depois do criar-slide, antes do renomear-slide>` devolveu `aplicado:true`, e
+o `-o detalhe --tipo survey` seguinte mostrou o slide de volta ao nome "Segunda tela" —
+exatamente o estado da versão restaurada, não o nome renomeado. Mesma rota de `publicar`
+usada no formulário (`POST /surveys/<id>` com o `formData` baixado da URL da versão), sem
+diferença de comportamento entre os dois tipos. Nota à margem: o `--acao apagar` seguinte
+devolveu `404 Survey does not exist or is deleted` já na primeira tentativa, e um `GET`
+imediato depois confirmou o mesmo — apesar do `-o detalhe` ter lido esse mesmo survey com
+sucesso poucos segundos antes (mostrando o estado restaurado). O survey não aparece mais em
+`-o lista --tipo survey` (total voltou a 29), então não há resíduo, mas o motivo exato de
+ter desaparecido entre a leitura e o `apagar` — sem um `DELETE` bem-sucedido no meio — não
+foi identificado.
+
+**Achado — `duplicar` de survey pode devolver `200` com documento completo sem gravar
+nada (investigado a fundo na rodada 5, 2026-09-19; conclusão: é o servidor, não lag).**
+`POST /surveys/duplicate/<id>` devolveu `200` com um documento completo e coerente para o
+id `u0WIsApG4MDPfCDqcFRf` (`_id` novo, distinto do original; `name: "ZZ TESTE AUTOMASTER
+SURVEY COPIA"`, exatamente o pedido, não o nome do original; `locationId` correto;
+`deleted:false`; `source:"duplicate"`; `dateAdded`/`dateUpdated` frescos, do momento da
+chamada) — não é eco estático do documento original, é uma resposta específica daquela
+chamada. Mesmo assim, `GET /surveys/<id>` devolveu `404 Survey not Found!` na hora, de
+novo depois de ~8s, e **de novo minutos depois, numa sessão de investigação própria**; o
+`DELETE` nesse id devolveu `404 Survey does not exist or is deleted`; `-o lista --tipo
+survey` nunca mostrou esse nome, e o `total` da lista bateu exatamente com a contagem de
+produção de antes de qualquer escrita desta tarefa (29), nas três vezes em que foi
+conferido. **Conclusão: o servidor aceita o `POST` de duplicar survey, monta e devolve um
+documento coerente com `200`, mas não grava o registro em lugar nenhum que `GET` ou a
+listagem alcancem — não é lag de propagação (que se resolve em segundos, como no `criar()`
+de formulário) e não sobrou survey invisível na subconta.** A base para essa conclusão:
+o id devolvido nunca apareceu em nenhuma leitura, em três checagens espaçadas no tempo, e
+a contagem da lista nunca subiu de 29. Ainda assim, como a única fonte é a API pública —
+sem acesso direto ao banco do servidor — **fica registrado aqui, para quem quiser conferir
+pela interface do GHL: o id em questão é `u0WIsApG4MDPfCDqcFRf`, na Instaltech
+(`Xb9gDxwxYhdqtprGcb5E`)**. Sem resíduo a limpar por este agente (nada para apagar num id
+que nenhuma leitura confirma existir), mas é um achado real de API: quem depender do `_id`
+devolvido por `duplicate` num survey deve confirmar com um `GET` antes de assumir que o
+objeto está lá — o `criar()` de formulário e o `duplicar()` de formulário não mostraram
+esse comportamento nas rodadas em que foram testados.
 
 **`temas` — exercitado ao vivo para os dois tipos (rodada 4).** `GET /forms/themes` e
 `GET /surveys/themes` devolveram, cada um, 21 temas prontos (`Default Theme`, `Dark
