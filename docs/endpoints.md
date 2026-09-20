@@ -764,7 +764,7 @@ Widget público (onde a página do formulário/survey é renderizada e enviada):
 | criar | `POST /forms/` (com `productType`) ou `POST /surveys/` (sem `productType`, ver achado abaixo) | `{locationId[, productType], source:"landing_page"[, parentId]}` | sim, formulário e survey |
 | publicar/editar | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, sempre POST, nunca PUT | sim, formulário e survey |
 | apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — | sim, formulário e survey |
-| duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` | sim, formulário e survey — ver achado sobre a duplicata de survey abaixo |
+| duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` | sim, formulário — survey: a rota foi chamada e devolveu `200`, mas nada ficou gravado, ver achado abaixo |
 | restaurar versão | igual a publicar, com `formData` baixado de `versionHistory[].formDataDownloadUrl` | `{name, formData}` | sim, formulário e survey (rodada 5) |
 | paleta padrão da subconta | `GET /forms/default-colors?locationId=<loc>` / `POST /forms/default-colors` | `{locationId, colors:[{name,value}]}` | sim — é da subconta, não por tipo |
 | temas prontos | `GET /forms/themes?locationId=<loc>` / `GET /surveys/themes?locationId=<loc>` | — | sim, formulário e survey (21 temas cada) |
@@ -918,7 +918,10 @@ imediato depois confirmou o mesmo — apesar do `-o detalhe` ter lido esse mesmo
 sucesso poucos segundos antes (mostrando o estado restaurado). O survey não aparece mais em
 `-o lista --tipo survey` (total voltou a 29), então não há resíduo, mas o motivo exato de
 ter desaparecido entre a leitura e o `apagar` — sem um `DELETE` bem-sucedido no meio — não
-foi identificado.
+foi identificado. Essa anomalia e a de `duplicar` abaixo (`200` sem gravar nada) têm o
+mesmo formato — um survey que uma leitura recente confirmou e que some antes da escrita
+seguinte alcançá-lo — e podem compartilhar causa no lado do servidor. Ninguém investigou
+se é a mesma causa; fica registrado como suspeita, não como conclusão.
 
 **Achado — `duplicar` de survey pode devolver `200` com documento completo sem gravar
 nada (investigado a fundo na rodada 5, 2026-09-19; conclusão: é o servidor, não lag).**
@@ -941,10 +944,12 @@ a contagem da lista nunca subiu de 29. Ainda assim, como a única fonte é a API
 sem acesso direto ao banco do servidor — **fica registrado aqui, para quem quiser conferir
 pela interface do GHL: o id em questão é `u0WIsApG4MDPfCDqcFRf`, na Instaltech
 (`Xb9gDxwxYhdqtprGcb5E`)**. Sem resíduo a limpar por este agente (nada para apagar num id
-que nenhuma leitura confirma existir), mas é um achado real de API: quem depender do `_id`
-devolvido por `duplicate` num survey deve confirmar com um `GET` antes de assumir que o
-objeto está lá — o `criar()` de formulário e o `duplicar()` de formulário não mostraram
-esse comportamento nas rodadas em que foram testados.
+que nenhuma leitura confirma existir), mas é um achado real de API, e a recomendação vale
+para qualquer escrita de survey, não só `duplicate`: **depois de qualquer escrita de
+survey, confirme com um `GET` antes de assumir que o objeto está lá** — a mesma
+desconfiança que cobre `duplicar` cobre o desaparecimento pré-`apagar` acima. O
+`criar()`/`duplicar()` de formulário não mostraram esse comportamento nas rodadas em que
+foram testados.
 
 **`temas` — exercitado ao vivo para os dois tipos (rodada 4).** `GET /forms/themes` e
 `GET /surveys/themes` devolveram, cada um, 21 temas prontos (`Default Theme`, `Dark

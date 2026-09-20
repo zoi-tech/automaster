@@ -1035,6 +1035,7 @@ async function runFormularioAcao(opts: {
     let criado: unknown;
     let r: unknown;
     let falhouNoRetry = false;
+    const TENTATIVAS = 3;
     try {
       switch (opts.acao) {
         case "criar": {
@@ -1057,7 +1058,6 @@ async function runFormularioAcao(opts: {
             // leitura (janela de eventual consistency, medida ao vivo na Instaltech,
             // Tarefa 9): um GET imediato pode devolver 400 "Form does not exist".
             // Tenta de novo algumas vezes, com um pequeno atraso, antes de desistir.
-            const TENTATIVAS = 3;
             const ATRASO_MS = 1500;
             let doc: Record<string, unknown> | undefined;
             let ultimoErro: unknown;
@@ -1083,7 +1083,7 @@ async function runFormularioAcao(opts: {
             // diz "mesmo após 3 tentativas" para um erro que não tentou 3 vezes.
             r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
           } catch (e2) {
-            const contagem = falhouNoRetry ? " mesmo após 3 tentativas" : "";
+            const contagem = falhouNoRetry ? ` mesmo após ${TENTATIVAS} tentativas` : "";
             throw new Error(
               `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou` +
               `${contagem}: ele ficou órfão, sem nome e sem campos, na ` +

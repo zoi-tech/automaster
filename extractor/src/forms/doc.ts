@@ -35,7 +35,7 @@ const NAO_CAMPO = new Set(["button", "header", "terms_and_conditions"]);
 // fieldCSS/mobileFieldCSS aparecem tanto na raiz do documento quanto sob
 // `form.` no documento real — pegar só a segunda forma deixaria passar
 // exatamente o caminho que existe de verdade.
-const CAMINHO_PROIBIDO = /^(form\.)?(mobileF|f)ieldCSS$/;
+export const CAMINHO_PROIBIDO = /^(form\.)?(mobileF|f)ieldCSS$/;
 
 export function ehSurvey(doc: Doc): boolean {
   return Array.isArray(doc.slides);

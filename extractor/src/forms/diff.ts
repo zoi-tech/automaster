@@ -1,5 +1,5 @@
 import type { Doc } from "./doc.js";
-import { listasDeCampos } from "./doc.js";
+import { listasDeCampos, CAMINHO_PROIBIDO } from "./doc.js";
 
 /** Achata o documento em caminho → valor, ignorando as listas de campos. */
 function achatar(o: unknown, prefixo = "", fora: (caminho: string) => boolean = () => false): Record<string, string> {
@@ -16,12 +16,10 @@ function achatar(o: unknown, prefixo = "", fora: (caminho: string) => boolean = 
   return r;
 }
 
-// Mesmo critério de `doc.ts` (CAMINHO_PROIBIDO): fieldCSS/mobileFieldCSS
-// aparecem na raiz do documento (survey) ou sob `form.` (formulário) nos
-// documentos reais. São blocos de CSS gigantes gerados pelo builder — se
-// escaparem, a prévia vira uma parede ilegível.
-const CAMINHO_IGNORADO = /^(form\.)?(mobileF|f)ieldCSS$/;
-const ignorar = (caminho: string) => caminho === "form.fields" || caminho === "slides" || CAMINHO_IGNORADO.test(caminho);
+// Mesmo critério de `doc.ts` (CAMINHO_PROIBIDO): fieldCSS/mobileFieldCSS são
+// blocos de CSS gigantes gerados pelo builder — se escaparem, a prévia vira
+// uma parede ilegível.
+const ignorar = (caminho: string) => caminho === "form.fields" || caminho === "slides" || CAMINHO_PROIBIDO.test(caminho);
 
 /** Linhas legíveis do que muda entre dois documentos. Lista vazia = nada muda. */
 export function diferenca(antes: Doc, depois: Doc): string[] {

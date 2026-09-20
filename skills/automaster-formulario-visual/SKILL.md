@@ -59,7 +59,10 @@ estar no documento.
    Se decidir gravar esses tokens como a paleta padrão da subconta
    (`acao="paleta-gravar"`), saiba que a gravação **mescla**, não substitui: as cores que
    a subconta já tem em `default-colors` são preservadas, e só os cinco papéis da
-   identidade acima são sobrescritos. Nenhum rótulo livre que já existia lá se perde.
+   identidade acima são sobrescritos. Nenhum rótulo livre que já existia lá se perde. Essa
+   mescla depende de ler a paleta atual primeiro: se essa leitura falhar, o comando cai
+   para substituição e avisa — quem usar a tool tem que olhar esse aviso na resposta, não
+   confiar de cabeça que nada se perde.
 4. **Veja antes de gravar.** `formulario_estilo` com `acao="previa"`, depois
    `acao="aplicar"` com `confirmo=true` num formulário descartável, depois
    `acao="previa-visual"`, que fotografa a página pública real e devolve o caminho de um

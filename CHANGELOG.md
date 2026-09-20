@@ -4,6 +4,36 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.12.0 — 2026-09-19
+
+Escrita de formulários e surveys. Duas tools novas (`formulario_acao`,
+`formulario_estilo`), 27 no total, e a skill `automaster-formulario-visual`.
+
+- Criar, editar, duplicar, apagar e restaurar versão de formulário e survey. A edição
+  republica o documento inteiro a partir do que está no servidor, aplicando operações
+  declaradas — campo que o automaster não modela atravessa intacto.
+- Slide do survey é entidade de primeira classe: criar, remover, renomear, reordenar,
+  mover campo entre slides, navegação, barra de progresso e lógica condicional.
+- Prévia antes de publicar: sem `--confirmo`, o comando mostra campo que entra, campo que
+  sai e estilo alterado, sem tocar no servidor. É o primeiro comando do projeto com esse
+  comportamento; os outros continuam dando erro seco.
+- Identidade visual por cliente: os tokens vão para `fieldStyle` (o painel do builder, que
+  sobrevive a edição na interface) e `customStyle` (CSS livre). `fieldCSS` nunca é escrito.
+  Screenshot da página pública real para aprovar antes de aplicar em produção.
+- Paleta padrão da subconta: leitura sempre, gravação só por comando à parte, e mescla —
+  não substitui — as cores que a subconta já tinha.
+- Guardas: remover exige nomear o campo; deixar o documento sem botão de envio ou sem
+  nenhum campo é recusado sem flag explícita.
+- **A leitura de formulários migrou de `backend.` para `services.leadconnectorhq.com`**, o
+  host que o app usa — as seis rotas de leitura foram comparadas ao vivo entre os dois
+  hosts e devolveram o mesmo conteúdo.
+- **Achado de API, sem causa confirmada**: `duplicar` de survey pode devolver `200` com
+  documento completo sem gravar nada, e um survey lido com sucesso pode desaparecer antes
+  do `apagar` seguinte alcançá-lo. Depois de qualquer escrita de survey, confirme com um
+  `GET` antes de assumir que o objeto está lá. Detalhe em `docs/endpoints.md`.
+- **Escrita ao vivo é serial por construção**: o perfil persistente do Chrome é único, e
+  dois comandos de escrita ao vivo em paralelo travam no `SingletonLock`.
+
 ## 0.11.0 — 2026-09-19
 
 Formulários e surveys: leitura ao vivo, submissões, duas listas novas no dump e duas
