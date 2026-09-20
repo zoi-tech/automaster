@@ -120,3 +120,38 @@ test("fieldCSS de raiz nunca aparece na prévia, em nenhuma das duas formas", ()
   const depois: Doc = { form: { fields: [] }, fieldCSS: "body{color:blue}", mobileFieldCSS: "b{}" };
   assert.deepEqual(diferenca(antes, depois), []);
 });
+
+const baseSurvey = (): Doc => ({
+  slides: [
+    { id: "s1", slideName: "Slide 1", slideData: [{ tag: "full_name", label: "Nome" }] },
+    { id: "s2", slideName: "Slide 2", slideData: [] },
+  ],
+});
+
+test("survey igual não tem diferença", () => {
+  assert.deepEqual(diferenca(baseSurvey(), baseSurvey()), []);
+});
+
+test("a prévia nomeia slide que entra", () => {
+  const antes = baseSurvey();
+  const depois = aplicar(antes, [{ op: "criar-slide", nome: "Slide 3" }], { permitirVazio: true });
+  assert.ok(diferenca(antes, depois).some((l) => l.startsWith("+ slide ")));
+});
+
+test("a prévia nomeia slide que sai", () => {
+  const antes = baseSurvey();
+  const depois = aplicar(antes, [{ op: "remover-slide", alvo: "s2" }], { permitirVazio: true });
+  assert.ok(diferenca(antes, depois).includes("- slide s2"));
+});
+
+test("a prévia nomeia nome de slide trocado", () => {
+  const antes = baseSurvey();
+  const depois = aplicar(antes, [{ op: "renomear-slide", alvo: "s2", nome: "Slide 2 renomeado" }], { permitirVazio: true });
+  assert.ok(diferenca(antes, depois).some((l) => l.includes("nome do slide s2")));
+});
+
+test("a prévia nomeia ordem dos slides alterada", () => {
+  const antes = baseSurvey();
+  const depois = aplicar(antes, [{ op: "reordenar-slides", ordem: ["s2", "s1"] }], { permitirVazio: true });
+  assert.ok(diferenca(antes, depois).some((l) => l.includes("ordem dos slides")));
+});

@@ -796,15 +796,35 @@ leitura direta do servidor (`-o detalhe --tipo survey`) depois do `--confirmo` �
 valores gravados bateram exatamente com o que cada operação pedia (nomes, ordem dos
 slides, `id` do campo no slide de destino, e a regra de `conditionalLogic` no formato
 documentado na seção acima, com `jumpTarget` apontando para um `id` de slide real).
-**Achado à margem, sem correção aplicada**: a prévia (`--ops` sem `--confirmo`) devolveu
-`{"aplicado":false,"previa":[]}` — vazia — para toda operação de slide
-(`criar-slide`/`renomear-slide`/`reordenar-slides`/`remover-slide`/`mover-campo`); a
-função `diferenca()` só nomeia mudanças de campo dentro de uma lista plana, não mudanças
-de slide. A prévia de formulário (sem slide) continua correta; a de survey com slides
-está sem cobertura de prévia, embora a gravação em si funcione. `previa-visual` no
-formulário resultante mostrou o campo do slide ativo renderizado e o botão "Submit" —
-navegar entre telas via clique não foi exercitado (a ferramenta só fotografa o estado
-atual, não simula clique de avançar).
+**Corrigido — a prévia era cega para operação de slide (3ª rodada, 2026-09-19).** Na 2ª
+rodada, a prévia (`--ops` sem `--confirmo`) devolvia `{"aplicado":false,"previa":[]}` —
+vazia — para toda operação de slide (`criar-slide`/`renomear-slide`/`reordenar-slides`/
+`remover-slide`); `diferenca()` (`extractor/src/forms/diff.ts`) tinha `slides` na lista de
+caminhos ignorados do achatamento genérico e não tinha nenhuma lógica dedicada para
+slide, ao contrário de campo (que já tinha entra/sai/rótulo/ordem). Isso é pior do que
+não ter prévia: o operador via "nada mudaria" e, ao confirmar, o survey mudava de
+verdade. Corrigido: `diferenca()` agora compara a lista de `id`s de slide (entra/sai/
+ordem) e o mapa `id → slideName` (renomeado), no mesmo estilo das linhas de campo —
+`+ slide <id>`, `- slide <id>`, `~ nome do slide <id>: <antes> → <depois>`,
+`~ ordem dos slides: <ids antes> → <ids depois>`. O conteúdo interno de `slideData`
+continua fora do achatamento genérico (seria duplicar a listagem de tags de campo, que já
+cobre os slides via o prefixo `<slideId>/<tag>`), e as demais propriedades de estilo de
+cada slide (`button`, `border`, `active`, ...) continuam ignoradas por não fazerem parte
+do conteúdo que uma operação de slide muda. Testes novos em
+`extractor/test/style.test.ts`: um por operação de slide, mais um confirmando que dois
+surveys idênticos continuam dando prévia vazia (sem falso positivo).
+
+Refeito ao vivo depois do conserto, num survey descartável novo, em série: as quatro
+operações de slide (`criar-slide`, `remover-slide`, `renomear-slide`,
+`reordenar-slides`) tiveram a prévia conferida **antes** de cada `--confirmo` — e em
+todas as quatro a linha que a prévia anunciou bateu, campo a campo, com o que o `-o
+detalhe --tipo survey` leu do servidor depois da gravação: `+ slide <id>` → o slide novo
+apareceu com aquele id; `- slide <id>` → o slide saiu da lista; `~ nome do slide <id>:
+<antes> → <depois>` → o `slideName` mudou exatamente assim; `~ ordem dos slides: <antes>
+→ <depois>` → a nova ordem bateu com a lista do lado direito da seta. `previa-visual` no
+survey mostrou o campo do slide ativo renderizado com a barra de progresso e o botão
+"Submit" — navegar entre telas via clique não foi exercitado (a ferramenta só fotografa o
+estado atual, não simula clique de avançar).
 
 **Custom field num formulário usa o `id` do custom field como `tag`.** Testado ao vivo com
 o campo `consentimento` (`TEXT`, `contact.consentimento`, id `N6cznmfKOH6YjVyyCSKg`) da
