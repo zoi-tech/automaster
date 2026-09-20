@@ -443,10 +443,10 @@ function acharCampo(doc: Doc, alvo: string): { lista: any[]; indice: number } {
   throw new Error(`campo ${alvo} não existe neste documento`);
 }
 
-function validar(doc: Doc, permitirSemBotao: boolean): void {
+function validar(doc: Doc, permitirSemBotao: boolean, permitirVazio: boolean): void {
   const todos = listasDeCampos(doc).flatMap((l) => l.campos);
   const campos = todos.filter((c) => !NAO_CAMPO.has(identifica(c)));
-  if (campos.length === 0) {
+  if (campos.length === 0 && !permitirVazio) {
     throw new Error(
       "a operação deixaria o documento sem nenhum campo — um formulário assim recebe " +
       "visita e não coleta nada. Se é isso mesmo, repita com --permitir-vazio.",
@@ -563,12 +563,10 @@ export function aplicar(
     }
   }
 
-  validar(doc, opts.permitirSemBotao ?? false);
+  validar(doc, opts.permitirSemBotao ?? false, opts.permitirVazio ?? false);
   return doc;
 }
 ```
-
-Nota: o teste "esvaziar o documento é recusado" não usa `permitirVazio`; o campo existe em `opts` para o CLI passar `--permitir-vazio`, e nesse caso `validar` deve pular a primeira checagem. Ajuste `validar` para receber as duas permissões e o teste continua passando.
 
 - [ ] **Step 4: rodar os testes**
 
@@ -844,14 +842,23 @@ const IGNORAR = ["form.fields", "slides", "form.fieldCSS", "form.mobileFieldCSS"
 export function diferenca(antes: Doc, depois: Doc): string[] {
   const linhas: string[] = [];
 
-  const tags = (d: Doc) => listasDeCampos(d).flatMap((l, i) =>
+  const tags = (d: Doc) => listasDeCampos(d).flatMap((l) =>
     l.campos.map((c: any) => `${l.slideId ? `${l.slideId}/` : ""}${c.tag ?? c.id}`));
+
+  const rotulos = (d: Doc) => Object.fromEntries(
+    listasDeCampos(d).flatMap((l) => l.campos.map((c: any) => [c.tag ?? c.id, c.label])));
   const a = tags(antes);
   const b = tags(depois);
   for (const t of b) if (!a.includes(t)) linhas.push(`+ campo ${t}`);
   for (const t of a) if (!b.includes(t)) linhas.push(`- campo ${t}`);
   if (a.length === b.length && a.join() !== b.join() && !linhas.length) {
     linhas.push(`~ ordem dos campos: ${a.join(", ")} → ${b.join(", ")}`);
+  }
+
+  const ra = rotulos(antes);
+  const rb = rotulos(depois);
+  for (const [t, r] of Object.entries(rb)) {
+    if (t in ra && ra[t] !== r) linhas.push(`~ rótulo de ${t}: ${ra[t]} → ${r}`);
   }
 
   const fa = achatar(antes, "", IGNORAR);
@@ -863,7 +870,15 @@ export function diferenca(antes: Doc, depois: Doc): string[] {
 }
 ```
 
-Nota: rótulo trocado sem mudar a tag não aparece na comparação de tags. Acrescente ao `diferenca` uma passada que compare `label` por tag e emita `~ rótulo de <tag>: <antes> → <depois>`, e um teste para isso.
+Acrescente a `extractor/test/style.test.ts` o teste do rótulo:
+
+```ts
+test("a prévia nomeia rótulo trocado", () => {
+  const antes = base();
+  const depois = aplicar(antes, [{ op: "renomear-campo", alvo: "email", label: "Seu e-mail" }]);
+  assert.ok(diferenca(antes, depois).some((l) => l.includes("rótulo de email")));
+});
+```
 
 - [ ] **Step 5: rodar, typecheck e commit**
 
