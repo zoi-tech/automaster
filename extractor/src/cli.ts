@@ -1093,7 +1093,7 @@ async function runFormularioAcao(opts: {
   });
 }
 
-const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas"];
+const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas", "previa-visual"];
 
 /**
  * Aplica tokens de identidade visual a um formulário/survey, ou lê/grava a
@@ -1103,6 +1103,7 @@ const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas"];
  */
 async function runFormularioEstilo(opts: {
   location: string; acao: string; tipo?: string; id?: string; tokens?: string;
+  versao?: string; saida?: string;
   confirmo?: boolean; json?: boolean;
 }): Promise<void> {
   const log = opts.json ? console.error : console.log;
@@ -1128,13 +1129,33 @@ async function runFormularioEstilo(opts: {
   }
   if (opts.acao === "aplicar" && !opts.id) throw new Error("aplicar exige --id");
 
-  await withClient(opts.location, log, async (client) => {
+  await withClient(opts.location, log, async (client, page) => {
     if (opts.acao === "temas" || opts.acao === "paleta-ver") {
       const r = opts.acao === "temas"
         ? await temas(client, tipo, opts.location)
         : await paletaPadrao(client, opts.location);
       if (opts.json) console.log(JSON.stringify({ resultado: r }));
       else log(JSON.stringify(r, null, 2));
+      return;
+    }
+
+    if (opts.acao === "previa-visual") {
+      if (!opts.id) throw new Error("previa-visual exige --id");
+      const widget = tipo === "survey" ? "survey" : "form";
+      const versao = opts.versao ? `&versionId=${encodeURIComponent(opts.versao)}&nocache=true` : "";
+      // `notrack=true`: o preview não conta como visita na estatística do cliente
+      const url = `https://link.msgsndr.com/widget/${widget}/${encodeURIComponent(opts.id)}?notrack=true${versao}`;
+      const destino = opts.saida ?? path.join(os.tmpdir(), `formulario-${opts.id}.png`);
+      const aba = await page.context().newPage();
+      try {
+        await aba.setViewportSize({ width: 480, height: 900 });
+        await aba.goto(url, { waitUntil: "networkidle" });
+        await aba.screenshot({ path: destino, fullPage: true });
+      } finally {
+        await aba.close();
+      }
+      if (opts.json) console.log(JSON.stringify({ url, arquivo: destino }));
+      else log(`${url}\n${destino}`);
       return;
     }
 
@@ -1945,6 +1966,8 @@ program
   .option("--tipo <t>", "formulario | survey", "formulario")
   .option("-i, --id <id>", "id do formulário ou survey")
   .option("--tokens <json|arquivo>", "tokens de identidade visual")
+  .option("--versao <versionId>", "previa-visual: versão específica do documento")
+  .option("--saida <arquivo>", "previa-visual: caminho do PNG (padrão: temp)")
   .option("--confirmo", "obrigatório para gravar. Sem ele, só mostra a prévia (exceto paleta-gravar)")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runFormularioEstilo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
