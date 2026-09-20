@@ -181,3 +181,31 @@ test("criar slide copia o button do slide anterior, não a referência", () => {
   d.slides[2].button.background = "#123";
   assert.equal(d.slides[1].button.background, "#fff");
 });
+
+test("definir-logica grava as regras em form.conditionalLogic", () => {
+  const regras = [
+    {
+      conditionalOperation: "then",
+      conditions: [{ selectedField: "full_name", selectedOperation: "isEqualTo", inputValue: "x" }],
+      outcome: { jumpTarget: "s2", jumpTargetType: "slide", type: "jumpTo", value: "" },
+    },
+  ];
+  const d = aplicar(survey(), [{ op: "definir-logica", regras }]);
+  assert.deepEqual(d.form.conditionalLogic, regras);
+});
+
+test("definir-logica recusa regra apontando para slide inexistente", () => {
+  const regras = [
+    { conditionalOperation: "then", conditions: [], outcome: { jumpTarget: "naoexiste", jumpTargetType: "slide", type: "jumpTo", value: "" } },
+  ];
+  assert.throws(
+    () => aplicar(survey(), [{ op: "definir-logica", regras }]),
+    /slide naoexiste, que não existe/,
+  );
+});
+
+test("definir-logica em formulário grava sem checar jumpTarget (sem slides p/ validar)", () => {
+  const regras = [{ conditionalOperation: "then", conditions: [], outcome: { jumpTarget: "qualquer-coisa" } }];
+  const d = aplicar(form(), [{ op: "definir-logica", regras }]);
+  assert.deepEqual(d.form.conditionalLogic, regras);
+});

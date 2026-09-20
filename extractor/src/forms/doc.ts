@@ -26,7 +26,8 @@ export type Op =
   | { op: "remover-slide"; alvo: string }
   | { op: "renomear-slide"; alvo: string; nome: string }
   | { op: "reordenar-slides"; ordem: string[] }
-  | { op: "definir"; caminho: string; valor: unknown };
+  | { op: "definir"; caminho: string; valor: unknown }
+  | { op: "definir-logica"; slide?: string; regras: unknown[] };
 
 /** Elementos da lista que não são campo de dado (só existem em formulário). */
 const NAO_CAMPO = new Set(["button", "header", "terms_and_conditions"]);
@@ -175,6 +176,27 @@ export function aplicar(
         const nomeados = o.ordem.map((id) => slidePorId(doc, id));
         const resto = doc.slides.filter((s: any) => !o.ordem.includes(s.id));
         doc.slides = [...nomeados, ...resto];
+        break;
+      }
+      case "definir-logica": {
+        // `slide` do tipo é ignorado de propósito: form.conditionalLogic é do
+        // documento inteiro, não por slide — nenhuma das 29 amostras reais
+        // tem lógica por slide (ver docs/superpowers/.../logica-condicional.md).
+        const regras = o.regras as any[];
+        if (ehSurvey(doc)) {
+          for (const r of regras) {
+            const alvo = (r as any)?.outcome?.jumpTarget;
+            if (alvo != null && !doc.slides.some((s: any) => s.id === alvo)) {
+              throw new Error(
+                `regra de lógica condicional aponta para o slide ${alvo}, que não existe neste survey`,
+              );
+            }
+          }
+        }
+        // formulário (não-survey) também tem form.conditionalLogic, mas sem
+        // slides não há como validar jumpTarget — escreve sem checagem.
+        doc.form ??= {};
+        doc.form.conditionalLogic = clonar(regras);
         break;
       }
       case "definir": {

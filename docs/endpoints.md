@@ -716,3 +716,38 @@ Facebook: ele nunca está na lista de formulários e **não** é referência que
 regras `broken_form_ref` e `unused_form` o ignoram explicitamente.
 
 Não há busca por nome no servidor: `-o buscar` do CLI varre a lista inteira, que é curta.
+
+### Lógica condicional entre slides (`form.conditionalLogic`) — medida, não exercitada por escrita ao vivo
+
+Formato medido nos 29 documentos de survey da Instaltech (baixados direto das URLs
+públicas de `versionHistory[].surveyDataDownloadUrl`, sem precisar da interface do GHL).
+A validação ao vivo do POST/PUT com esse campo fica para a Tarefa 9.
+
+Caminho: **`form.conditionalLogic`**, uma lista, do **documento inteiro** — não por
+slide. Cada entrada:
+
+```json
+{
+  "conditionalOperation": "then",
+  "conditions": [
+    { "selectedField": "<fieldKey do campo>", "selectedOperation": "isEqualTo", "inputValue": "<valor>" }
+  ],
+  "outcome": { "jumpTarget": "<id do slide>", "jumpTargetType": "slide", "type": "jumpTo", "value": "" }
+}
+```
+
+- `conditionalOperation`: `"then"` (20/29 docs), `"and"` (16), `"or"` (10), `null` (23,
+  entrada vazia que o builder cria — `conditions`/`outcome` também `null` nesse caso).
+- `selectedOperation`: só `isEqualTo` apareceu (72 ocorrências), mas o builder oferece
+  outros — não é enum fechado, e a operação `definir-logica` do motor não valida esse campo.
+- `selectedField` é o `fieldKey`/`tag` do campo, não o `id`.
+- `outcome.jumpTarget` é o `id` de um slide; `jumpTargetType` sempre `"slide"`.
+- `surveyLogicLinkById: true` é um booleano no topo do documento (29/29) que diz que
+  `jumpTarget` guarda id de slide, não número — não faz parte da regra em si.
+- `form.conditionalLogic` também existe em documento de **formulário** (não só survey),
+  conferido ao vivo num formulário real da Instaltech.
+
+Operação do motor (`extractor/src/forms/doc.ts`): `{ op: "definir-logica", regras }`
+grava `regras` em `form.conditionalLogic`. Em survey, valida que todo `outcome.jumpTarget`
+citado é id de slide existente — erro em português caso contrário. Em formulário não há
+slides para validar contra, então grava sem checagem.
