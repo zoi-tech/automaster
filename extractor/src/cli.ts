@@ -59,7 +59,7 @@ import {
 } from "./api/opportunities.js";
 import {
   listarWorkflows, getWorkflowMeta, paginaDeInscritos, inscricoesDoContato,
-  resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, cortar,
+  resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, contarNaoTerminados, cortar,
   mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao, nomeContato,
   STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
 } from "./api/workflows-live.js";
@@ -2265,7 +2265,7 @@ async function runWorkflowAcao(opts: {
     if (opts.acao === "publicar" && opts.status !== "published") {
       const contagem = await todosOsInscritos(client, opts.location, wid, WF_TETO_PADRAO).catch(() => null);
       aviso = contagem
-        ? avisoDespublicar(contagem.cruas.length, contagem.cortou || contagem.estrangulado)
+        ? avisoDespublicar(contarNaoTerminados(contagem.cruas), contagem.cortou || contagem.estrangulado)
         : "não deu para contar quem está dentro porque a busca de inscritos falhou. Quem " +
           "estiver dentro não é removido: congela no passo em que está e volta a andar, " +
           "todos de uma vez, quando o workflow for republicado.";

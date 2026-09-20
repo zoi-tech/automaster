@@ -99,6 +99,40 @@ test("resumoPorWorkflow preenche o nome do contato quando ele foi resolvido", ()
   assert.equal(out.inscricoes[0].contato, "Maria Silva");
 });
 
+test("resumoPorWorkflow não conta quem já terminou em dentro_agora", () => {
+  const out = resumoPorWorkflow({
+    workflow: { id: "W1", status: "published" },
+    cruas: [{ ...crua, status: "finished" }],
+    cortou: false, estrangulado: false, nomes: {},
+  });
+  assert.equal(out.dentro_agora, 0);
+  assert.equal(out.inscricoes.length, 1);
+  assert.equal(out.inscricoes[0].status, "finished");
+  assert.ok(out.vazio_porque, "lista com só finished precisa explicar dentro_agora=0");
+  assert.match(out.vazio_porque ?? "", /termin/i);
+});
+
+test("resumoPorWorkflow conta só a viva quando há finished e viva juntas", () => {
+  const out = resumoPorWorkflow({
+    workflow: { id: "W1", status: "published" },
+    cruas: [{ ...crua, status: "finished" }, { ...crua, _id: "S9", status: "waiting" }],
+    cortou: false, estrangulado: false, nomes: {},
+  });
+  assert.equal(out.dentro_agora, 1);
+  assert.equal(out.inscricoes.length, 2);
+  assert.equal(out.vazio_porque, undefined);
+});
+
+test("resumoPorWorkflow mantém precedência do estrangulado sobre finished", () => {
+  const out = resumoPorWorkflow({
+    workflow: { id: "W1", status: "published" },
+    cruas: [{ ...crua, status: "finished" }],
+    cortou: false, estrangulado: true, nomes: {},
+  });
+  assert.equal(out.dentro_agora, 0);
+  assert.match(out.vazio_porque ?? "", /estrangul/i);
+});
+
 test("resumoPorContato usa a mesma linha normalizada do outro lado", () => {
   const out = resumoPorContato({
     contactId: "C1",
@@ -130,6 +164,42 @@ test("resumoPorContato não conta quem já terminou em dentro_agora", () => {
   assert.equal(out.dentro_agora, 0);
   assert.equal(out.inscricoes.length, 2);
   assert.ok(out.vazio_porque, "lista com só finished precisa explicar dentro_agora=0");
+});
+
+test("resumoPorContato só emite os campos que a rota do contato manda: workflowId, status e workflow resolvido", () => {
+  const out = resumoPorContato({
+    contactId: "C1",
+    cruas: [{ workflowId: "W1", status: "wait_time" }],
+    nomesWorkflow: { W1: "Boas-vindas" },
+  });
+  const linha = out.inscricoes[0];
+  assert.equal(linha.workflowId, "W1");
+  assert.equal(linha.status, "wait_time");
+  assert.equal(linha.workflow, "Boas-vindas");
+  for (const campo of [
+    "inscricaoId", "contactId", "entrouEm", "passo", "passoTipo", "proximaExecucao", "origem", "origemNome",
+  ]) {
+    assert.ok(!(campo in linha), `${campo} não deveria estar na linha`);
+  }
+});
+
+test("resumoPorContato mantém todos os campos quando a fixture completa vem preenchida", () => {
+  const out = resumoPorContato({
+    contactId: "C1",
+    cruas: [{ ...crua, workflowId: "W1" }],
+    nomesWorkflow: { W1: "Boas-vindas" },
+  });
+  const linha = out.inscricoes[0];
+  assert.equal(linha.inscricaoId, "S1");
+  assert.equal(linha.contactId, "C1");
+  assert.equal(linha.entrouEm, "2026-09-01T10:00:00.000Z");
+  assert.equal(linha.passo, "Espera 2 dias");
+  assert.equal(linha.passoTipo, "wait");
+  assert.equal(linha.proximaExecucao, "2026-09-03T10:00:00.000Z");
+  assert.equal(linha.origem, "trigger");
+  assert.equal(linha.origemNome, "Formulário enviado");
+  assert.equal(linha.workflowId, "W1");
+  assert.equal(linha.workflow, "Boas-vindas");
 });
 
 test("resumoPorContato conta só as inscrições ativas quando há finished e ativa juntas", () => {

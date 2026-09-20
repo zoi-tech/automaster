@@ -158,12 +158,29 @@ export function cortar<T>(linhas: T[], limite: number): { linhas: T[]; cortou: b
 /**
  * Por que a lista veio vazia. Lista vazia muda vale um bug inteiro: foi assim que a
  * agenda sumiu em silêncio quando a data ia em texto (docs/endpoints.md, seção Agenda).
+ * `apenasTerminadas` é o terceiro caso: a busca trouxe linhas, mas todas `finished` —
+ * achado ao vivo (item 7 da prova de leitura) — e dizer só "nenhum contato" seria omitir
+ * que houve gente ali.
  */
-export function porqueVazio(estrangulado: boolean): string {
-  return estrangulado
-    ? "o servidor estrangulou a subconta (isLocationRateLimited) e devolveu a busca cortada; " +
-      "não dá para afirmar que não há ninguém dentro. Tente de novo em alguns minutos."
-    : "nenhum contato está dentro deste workflow agora.";
+export function porqueVazio(estrangulado: boolean, apenasTerminadas = false): string {
+  if (estrangulado) {
+    return "o servidor estrangulou a subconta (isLocationRateLimited) e devolveu a busca cortada; " +
+      "não dá para afirmar que não há ninguém dentro. Tente de novo em alguns minutos.";
+  }
+  if (apenasTerminadas) {
+    return "há inscrição(ões) neste workflow, mas todas já terminaram; nenhum contato está dentro agora.";
+  }
+  return "nenhum contato está dentro deste workflow agora.";
+}
+
+/**
+ * Um status `finished` é inscrição terminada; qualquer outro conta como "dentro agora".
+ * Único critério observado ao vivo — não supor outros status terminais. Usado dos dois
+ * lados (`resumoPorWorkflow` e `resumoPorContato`) e por `runWorkflowAcao` no aviso de
+ * despublicar, que usava o tamanho cru da lista e mentia contando quem já tinha saído.
+ */
+export function contarNaoTerminados(linhas: { status?: string }[]): number {
+  return linhas.filter((l) => l.status !== "finished").length;
 }
 
 export interface SaidaPorWorkflow {
@@ -179,6 +196,9 @@ export interface SaidaPorWorkflow {
  * O lado "quem está dentro deste workflow". `total_historico`/`terminados` saíram:
  * `enroll-stats` é 404 em todas as variantes testadas ao vivo, e não há substituto —
  * `count` da busca paginada é o tamanho da página, não o total (confirmado ao vivo).
+ * `workflow-with-filter` devolve as linhas `finished` junto das vivas (achado ao vivo,
+ * item 7) — `dentro_agora` conta só quem não terminou; as linhas `finished` continuam
+ * em `inscricoes`, com o status delas, para quem quiser ver que passou por ali.
  */
 export function resumoPorWorkflow(a: {
   workflow: WorkflowLinha;
@@ -192,25 +212,34 @@ export function resumoPorWorkflow(a: {
     const nome = a.nomes[i.contactId];
     return nome ? { ...i, contato: nome } : i;
   });
+  const dentroAgora = contarNaoTerminados(inscricoes);
   return {
     workflow: { id: a.workflow.id, name: a.workflow.name, status: a.workflow.status },
-    dentro_agora: inscricoes.length,
+    dentro_agora: dentroAgora,
     cortou: a.cortou,
     estrangulado: a.estrangulado,
     inscricoes,
-    ...(inscricoes.length ? {} : { vazio_porque: porqueVazio(a.estrangulado) }),
+    ...(dentroAgora
+      ? {}
+      : { vazio_porque: porqueVazio(a.estrangulado, inscricoes.length > 0) }),
   };
 }
 
 export interface SaidaPorContato {
   contactId: string;
   dentro_agora: number;
-  inscricoes: (Inscricao & { workflowId: string; workflow?: string })[];
+  inscricoes: (Partial<Inscricao> & { workflowId: string; status: string; workflow?: string })[];
   vazio_porque?: string;
 }
 
 /**
- * O lado "em que workflows este contato está". Mesma linha normalizada do outro lado.
+ * O lado "em que workflows este contato está". A rota (`statuses_v2`) devolve só
+ * `{workflowId, status}` (achado ao vivo, item 5 da prova de leitura) — os outros seis
+ * campos de `Inscricao` vêm sempre vazios daqui, então a linha só leva o que de fato veio:
+ * campo ausente não entra na chave, para quem lê (inclusive o MCP) não confundir "a rota
+ * não manda isso" com "o campo está vazio". `workflowId` e `status` sempre saem, mesmo
+ * vazios, porque são a identidade da linha.
+ *
  * `dentro_agora` conta só quem NÃO terminou (`status !== "finished"`) — o lado do contato
  * costuma trazer um histórico cheio de `finished` (visto ao vivo: 9 de 10 linhas), e contar
  * a lista inteira mentia que o contato estava dentro de workflows que já acabou de percorrer.
@@ -224,9 +253,14 @@ export function resumoPorContato(a: {
   const inscricoes = a.cruas.map((c) => {
     const wid = String(c.workflowId ?? "");
     const nome = a.nomesWorkflow[wid];
-    return { ...normalizarInscricao(c), workflowId: wid, ...(nome ? { workflow: nome } : {}) };
+    const i = normalizarInscricao(c);
+    const { status, ...resto } = i;
+    const preenchidos = Object.fromEntries(
+      Object.entries(resto).filter(([, v]) => v !== ""),
+    );
+    return { ...preenchidos, workflowId: wid, status, ...(nome ? { workflow: nome } : {}) };
   });
-  const dentroAgora = inscricoes.filter((i) => i.status !== "finished").length;
+  const dentroAgora = contarNaoTerminados(inscricoes);
   const vazioPorque = inscricoes.length
     ? "este contato já terminou todos os workflows por onde passou; nenhum está com ele dentro agora."
     : "nenhum workflow tem este contato dentro agora.";
