@@ -33,11 +33,13 @@ def test_previa_nao_exige_confirmo(espiao):
 def test_acao_invalida(espiao):
     with pytest.raises(srv.ToolError, match="acao inválida"):
         srv.formulario_acao(loc="L1", acao="voar", id="F1", confirmo=True)
+    assert espiao == []
 
 
 def test_editar_sem_ops(espiao):
     with pytest.raises(srv.ToolError, match="ops"):
         srv.formulario_acao(loc="L1", acao="editar", id="F1", confirmo=True)
+    assert espiao == []
 
 
 def test_ops_viram_json_no_argumento(espiao):
@@ -51,6 +53,7 @@ def test_ops_viram_json_no_argumento(espiao):
 def test_estilo_exige_tokens(espiao):
     with pytest.raises(srv.ToolError, match="tokens"):
         srv.formulario_estilo(loc="L1", acao="aplicar", id="F1", confirmo=True)
+    assert espiao == []
 
 
 def test_paleta_gravar_exige_confirmo(espiao):
