@@ -5,7 +5,7 @@ import type { GhlClient } from "./client.js";
  * mesmas rotas existem na API pública v3, mas devolvendo só id e nome.
  * Rotas em docs/endpoints.md, seção `## Formulários e surveys`.
  */
-const BASE = "https://backend.leadconnectorhq.com";
+const BASE = "https://services.leadconnectorhq.com";
 
 /** O servidor recusa mais que isto por página (422). */
 const PAGINA = 50;
