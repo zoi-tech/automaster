@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import path from "node:path";
 import { openSession } from "./auth/session.js";
-import { captureTokens, decodeCompanyId, type Tokens } from "./auth/token.js";
+import { captureTokens, decodeCompanyId, decodeUserId, type Tokens } from "./auth/token.js";
 import type { Page } from "playwright";
 import { GhlClient } from "./api/client.js";
 import {
@@ -57,6 +57,12 @@ import {
   createOpportunity, updateOpportunity, deleteOpportunity, restoreOpportunity,
   createPipeline, updatePipeline, deletePipeline,
 } from "./api/opportunities.js";
+import {
+  listarWorkflows, getWorkflowMeta, paginaDeInscritos, contarInscritos, inscricoesDoContato,
+  resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, cortar,
+  mudarStatus, inscreverContato, removerContato, retomarInscricao,
+  STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
+} from "./api/workflows-live.js";
 import {
   listCalendars, getCalendar, freeSlots, listEvents, getAppointment, listNotes,
   AGENDA_SITUACOES, isoComFuso, createAppointment, updateAppointment,
@@ -547,6 +553,10 @@ function registroEscrita(loc: string, pasta: string, chave: string, dados: unkno
   fs.writeFileSync(registro, JSON.stringify({ em: now.toISOString(), ...(dados as object) }, null, 2));
   return registro;
 }
+
+const WF_LEITURA = ["lista", "dentro", "contato"];
+const WF_ACOES = ["publicar", "inscrever", "remover", "retomar"];
+const WF_TETO_PADRAO = 500;
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
@@ -2101,5 +2111,115 @@ program
   .option("--confirmo", "obrigatório: muda a estrutura do funil e não tem desfazer")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runPipeline(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+/** Busca páginas até o teto. O cursor vem da última linha de cada página. */
+async function todosOsInscritos(
+  client: GhlClient, loc: string, wid: string, teto: number,
+): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
+  const cruas: InscricaoCrua[] = [];
+  let cursor: Cursor | undefined;
+  let estrangulado = false;
+  // teto + 1 para saber que havia mais; `cortar` apara depois
+  while (cruas.length <= teto) {
+    const p = await paginaDeInscritos(client, loc, wid, 100, cursor);
+    estrangulado = estrangulado || p.estrangulado;
+    cruas.push(...p.linhas);
+    if (p.linhas.length < 100 || !p.cursor) break;
+    cursor = p.cursor;
+  }
+  const c = cortar(cruas, teto);
+  return { cruas: c.linhas, cortou: c.cortou, estrangulado };
+}
+
+/** Nome de cada contato, uma chamada por id. Falha em um não derruba a lista. */
+async function nomesDeContatos(
+  client: GhlClient, loc: string, ids: string[],
+): Promise<Record<string, string>> {
+  const nomes: Record<string, string> = {};
+  for (const id of [...new Set(ids)].filter(Boolean)) {
+    try {
+      const c = await getContact(client, loc, id) as { contact?: { name?: string } };
+      if (c?.contact?.name) nomes[id] = c.contact.name;
+    } catch {
+      // contato apagado depois de entrar no workflow: segue sem o nome
+    }
+  }
+  return nomes;
+}
+
+async function runWorkflowsAoVivo(opts: {
+  location: string; o: string; id?: string; contato?: string;
+  limite?: string; nomes?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!WF_LEITURA.includes(opts.o)) {
+    throw new Error(`-o inválido: ${opts.o}. Aceitos: ${WF_LEITURA.join(", ")}`);
+  }
+  if (opts.o === "dentro" && !opts.id) throw new Error("-o dentro exige --id do workflow");
+  if (opts.o === "contato" && !opts.contato) throw new Error("-o contato exige --contato");
+
+  const teto = numeroOpcional(opts.limite, "limite", log) ?? WF_TETO_PADRAO;
+
+  await withClient(opts.location, log, async (client) => {
+    let out: unknown;
+    switch (opts.o) {
+      case "lista": {
+        const linhas = await listarWorkflows(client, opts.location);
+        out = {
+          quantos: linhas.length,
+          workflows: linhas.map((w) => ({
+            id: w.id, name: w.name, status: w.status, updatedAt: w.updatedAt,
+          })),
+          ...(linhas.length ? {} : { vazio_porque: "a subconta não tem nenhum workflow." }),
+        };
+        break;
+      }
+      case "dentro": {
+        const wid = opts.id!;
+        const meta = await getWorkflowMeta(client, opts.location, wid) as
+          { workflow?: { id?: string; name?: string; status?: string } };
+        const w = meta?.workflow ?? {};
+        const { cruas, cortou, estrangulado } = await todosOsInscritos(client, opts.location, wid, teto);
+        const stats = await contarInscritos(client, opts.location, wid)
+          .catch(() => ({}) as { total?: number; finished?: number });
+        const nomes = opts.nomes
+          ? await nomesDeContatos(client, opts.location, cruas.map((c) => String(c.contactId ?? "")))
+          : {};
+        out = resumoPorWorkflow({
+          workflow: { id: String(w.id ?? wid), name: w.name, status: w.status },
+          cruas, total: stats.total, finished: stats.finished, cortou, estrangulado, nomes,
+        });
+        break;
+      }
+      case "contato": {
+        const cid = opts.contato!;
+        const d = await inscricoesDoContato(client, opts.location, cid);
+        const cruas = d.workflowStatuses ?? [];
+        const nomesWorkflow: Record<string, string> = {};
+        if (cruas.length) {
+          for (const w of await listarWorkflows(client, opts.location)) {
+            if (w.name) nomesWorkflow[w.id] = w.name;
+          }
+        }
+        out = resumoPorContato({ contactId: cid, cruas, nomesWorkflow });
+        break;
+      }
+    }
+    if (opts.json) console.log(JSON.stringify(out));
+    else console.log(JSON.stringify(out, null, 2));
+  });
+}
+
+program
+  .command("workflows-ao-vivo")
+  .description("Leitura ao vivo de workflows, de quem está dentro deles e de onde um contato está")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .option("-o, --o <op>", "lista | dentro | contato", "lista")
+  .option("-i, --id <id>", "id do workflow (com -o dentro)")
+  .option("--contato <id>", "id do contato (com -o contato)")
+  .option("--limite <n>", `teto de inscritos trazidos (padrão ${WF_TETO_PADRAO})`)
+  .option("--nomes", "resolve o nome de cada contato: uma chamada por contato, é lento em lista grande")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runWorkflowsAoVivo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program.parseAsync(process.argv);

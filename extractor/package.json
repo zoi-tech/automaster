@@ -28,6 +28,7 @@
     "oportunidade-acao": "tsx src/cli.ts oportunidade-acao",
     "pipeline": "tsx src/cli.ts pipeline",
     "agenda": "tsx src/cli.ts agenda",
+    "workflows-ao-vivo": "tsx src/cli.ts workflows-ao-vivo",
     "formularios": "tsx src/cli.ts formularios",
     "formulario-acao": "tsx src/cli.ts formulario-acao",
     "formulario-estilo": "tsx src/cli.ts formulario-estilo",
