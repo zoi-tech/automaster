@@ -1149,7 +1149,18 @@ async function runFormularioEstilo(opts: {
       const aba = await page.context().newPage();
       try {
         await aba.setViewportSize({ width: 480, height: 900 });
-        await aba.goto(url, { waitUntil: "networkidle" });
+        // não é `networkidle`: medido nesta página, ele nunca resolve — o
+        // widget mantém alguma conexão de fundo aberta (analytics/chat)
+        await aba.goto(url, { waitUntil: "domcontentloaded" });
+        try {
+          await aba.waitForSelector("form, input, button", { timeout: 15000 });
+        } catch {
+          throw new Error(
+            `a página pública não renderizou nenhum campo em 15s — o formulário/survey ` +
+            `pode estar despublicado ou o --id errado. URL: ${url}`,
+          );
+        }
+        await aba.waitForTimeout(1500); // espera curta p/ fonte e CSS assentarem
         await aba.screenshot({ path: destino, fullPage: true });
       } finally {
         await aba.close();
