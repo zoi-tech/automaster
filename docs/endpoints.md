@@ -751,3 +751,209 @@ Operação do motor (`extractor/src/forms/doc.ts`): `{ op: "definir-logica", reg
 grava `regras` em `form.conditionalLogic`. Em survey, valida que todo `outcome.jumpTarget`
 citado é id de slide existente — erro em português caso contrário. Em formulário não há
 slides para validar contra, então grava sem checagem.
+
+### Escrita — validada ao vivo 2026-09-19 (Instaltech `Xb9gDxwxYhdqtprGcb5E`), Tarefa 9
+
+Host `services.leadconnectorhq.com`, os mesmos dois tokens de sessão. Módulo
+`extractor/src/api/forms-write.ts`; CLI `npm run formulario-acao` / `npm run
+formulario-estilo`; motor puro em `extractor/src/forms/doc.ts` e `style.ts`.
+
+| operação | rota | corpo |
+| --- | --- | --- |
+| criar | `POST /forms/` ou `POST /surveys/` | `{locationId, productType, source:"landing_page", parentId?}` |
+| publicar (editar/republicar) | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, não incremental |
+| apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — |
+| duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name, folderId?}` |
+| versões | (lido do próprio detalhe, campo `versionHistory`) | — |
+| restaurar versão | `POST /forms/restore-version` ou `POST /surveys/restore-version` | `{formId\|surveyId, versionId}` |
+| ver paleta da subconta | `GET /forms/default-colors?locationId=<loc>` | — |
+| gravar paleta da subconta | `POST /forms/default-colors` | `{locationId, colors}` — lista inteira |
+
+URL pública do widget (usada por `previa-visual` e pela prova de submissão):
+`https://link.msgsndr.com/widget/form/<id>?notrack=true` (formulário) ou
+`.../widget/survey/<id>?notrack=true` (survey); com `&versionId=<id>&nocache=true`
+mostra uma versão antiga em vez da atual.
+
+**Todas as operações de formulário foram exercitadas ao vivo e bateram exatamente com a
+prévia do motor**: criar, adicionar-campo (padrão, custom field real da Instaltech —
+`consentimento`, `TEXT`, tag = id do custom field), renomear-campo, reordenar-campos,
+remover-campo, aplicar estilo (tokens → `fieldStyle`/`style`/`customStyle`), previa-visual,
+versões, restaurar, duplicar e apagar. Confirmado por comparação byte a byte entre o que a
+prévia (`--acao editar` sem `--confirmo`) anunciou e o `GET .../<id>` depois do
+`--confirmo`, em cada operação.
+
+**Survey NÃO foi exercitado — bloqueado por bug no `criar()` do motor (achado, não
+corrigido nesta tarefa):** `POST /surveys/` devolve `422 {"message":["property
+productType should not exist"]}`. O `criar()` em `forms-write.ts` sempre envia
+`productType` (usado por `/forms/`), mas a rota `/surveys/` rejeita esse campo — o tipo já
+é implícito no segmento da rota. Como consequência, todo o passo 5 do plano de prova —
+`criar-slide` (×3), `renomear-slide`, `reordenar-slides`, `adicionar-campo` com `slide`,
+`mover-campo`, `remover-slide` e `definir-logica` (lógica condicional, ver seção acima) —
+**não foi exercitado ao vivo nesta rodada**. Correção sugerida (decisão do responsável
+pela Tarefa 2, não aplicada aqui): omitir `productType` do corpo quando `tipo === "survey"`.
+
+**Achado — atraso de propagação depois de `criar`:** a primeira tentativa de criar um
+formulário falhou com `GET /forms/<id> → 400 {"message":"Form does not exist"}`
+imediatamente após o `POST /forms/` responder com sucesso — o servidor ainda não tinha
+propagado o novo id para leitura. Uma segunda tentativa, poucos segundos depois, funcionou
+sem alterações. O motor já trata esse caso marcando o objeto como órfão e orientando o
+`apagar`; não há espera automática nem novo retry embutido.
+
+**Achado — invocações concorrentes do CLI corromperam o estado:** rodar duas chamadas de
+`formulario-acao`/`formulario-estilo` próximas no tempo (uma em background por ter
+excedido 120s, outra em foreground) contra a mesma sessão persistente de Chrome produziu
+dois efeitos inesperados: (1) uma cópia extra "ZZ TESTE COPIA" apareceu na subconta sem
+que `duplicar` tivesse sido chamado duas vezes, com um estado do documento mais antigo do
+que o atual; (2) o formulário principal de teste foi apagado do servidor sem que
+`--acao apagar` tivesse sido chamado para o seu id. Os dois resíduos foram identificados
+por `-o lista` e removidos manualmente; a subconta terminou sem resíduo (conferido abaixo).
+Hipótese: a captura/renovação de token reabre e navega a mesma aba do Chrome persistente
+(`~/.automaster/chrome-profile`); duas invocações do CLI em paralelo competem por essa aba
+e podem enviar a requisição de uma invocação com o id/corpo de outra. **Não corrigido
+aqui** — decisão do responsável: ou documentar como uso proibido (nunca rodar duas
+invocações de escrita ao mesmo tempo), ou serializar com um lock de arquivo.
+
+**`cssLivre` grande — sem limite observado:** um `cssLivre` de 102 000 bytes (102 KB) foi
+aceito pelo `POST /forms/<id>` sem erro e confirmado de volta no `GET` seguinte, com o
+mesmo tamanho. Não foi encontrado teto nessa faixa.
+
+**Pergunta 7.1 (builder da interface preserva `customStyle`/`fieldStyle`?) — SEM RESPOSTA,
+exige passo manual do usuário:** este agente não opera a interface do GHL. A pergunta
+continua aberta; para respondê-la, um humano precisa abrir um formulário de teste no
+builder, mexer em qualquer coisa, salvar, e então baixar o documento de novo comparando
+`customStyle`/`fieldStyle` antes/depois.
+
+**Pergunta 7.3 (submissão pública some ao remover o campo respondido?):** ver nota abaixo.
+
+**Paleta da subconta — mescla preservada, confirmado byte a byte (Regra 4 da Tarefa 9):**
+`paleta-ver` antes de qualquer escrita trouxe 10 cores: 5 papéis da identidade
+(Primary/Text/Background/Border/Error, valores idênticos aos usados nos tokens de teste) e
+5 cores próprias da subconta (Secondary, White, Black, `#00000024`, `#212121ff`). O motor
+já mescla localmente (`mesclarPaleta`, com 4 testes unitários existentes) antes de enviar a
+lista inteira para `POST /forms/default-colors`. Gravar os tokens de teste (com os mesmos
+5 valores de papel que já estavam na subconta) e reler a paleta depois: as 10 entradas
+saíram idênticas, byte a byte, às 10 de antes. Nenhuma cor alheia foi perdida — a mescla
+do lado do cliente está correta e não houve necessidade de restaurar nada.
+
+**Resíduo final — zero:** depois de apagar os dois formulários de teste (o principal e a
+cópia extra) e sem nenhum survey criado (bloqueado, ver achado acima), `formulario-acao -o
+lista` para formulário e para survey não devolve nenhum nome começando com "ZZ TESTE". As
+duas exclusões confirmadas se comportaram como exclusão definitiva (o objeto some da
+listagem, e um novo `DELETE` no mesmo id devolve `404 Form does not exist or is deleted` em
+vez de repetir sucesso) — diferente da exclusão apenas por marcação que o passo 9 do plano
+previa como risco.
+
+### Escrita — validada ao vivo na Instaltech (Tarefa 9, 2026-09-19)
+
+Host `https://services.leadconnectorhq.com`, mesmos dois tokens de sessão da leitura.
+Widget público (onde a página do formulário/survey é renderizada e enviada):
+`https://link.msgsndr.com/widget/<form|survey>/<id>?notrack=true[&versionId=<v>&nocache=true]`.
+
+| operação | método + rota | corpo |
+| --- | --- | --- |
+| criar | `POST /forms/` ou `POST /surveys/` | `{locationId, productType, source:"landing_page"[, parentId]}` |
+| publicar/editar | `POST /forms/<id>` ou `POST /surveys/<id>` | `{name, formData}` — documento inteiro, sempre POST, nunca PUT |
+| apagar | `DELETE /forms/<id>` ou `DELETE /surveys/<id>` | — |
+| duplicar | `POST /forms/duplicate/<id>` ou `POST /surveys/duplicate/<id>` | `{name[, folderId]}` |
+| restaurar versão | igual a publicar, com `formData` baixado de `versionHistory[].formDataDownloadUrl` | `{name, formData}` |
+| paleta padrão da subconta | `GET /forms/default-colors?locationId=<loc>` / `POST /forms/default-colors` | `{locationId, colors:[{name,value}]}` |
+| temas prontos | `GET /forms/themes?locationId=<loc>` / `GET /surveys/themes?locationId=<loc>` | — |
+
+Todas as operações acima **foram exercitadas ao vivo** na Instaltech
+(`Xb9gDxwxYhdqtprGcb5E`), num formulário descartável `ZZ TESTE AUTOMASTER`
+(id `g7xmOrgWXe8TEMaL5ewr`, apagado ao final): criar, adicionar/renomear/reordenar/
+remover campo, adicionar um custom field real da subconta (`consentimento`,
+`N6cznmfKOH6YjVyyCSKg`, ver seção abaixo), aplicar estilo, prévia visual, versões,
+restaurar versão, duplicar, apagar. Em cada operação a prévia do motor (`--ops` sem
+`--confirmo`) bateu exatamente com o que o servidor gravou depois do `--confirmo`.
+
+**Survey NÃO foi exercitado ao vivo — achado bloqueante.** `POST /surveys/` devolve
+`422 property productType should not exist` quando o corpo leva `productType` (o campo
+que `criar()` em `extractor/src/api/forms-write.ts` sempre envia, também para survey,
+copiando o padrão de `/forms/`). A rota de survey não aceita essa chave — o tipo já é
+implícito no segmento `/surveys/` da URL. Isso bloqueou toda a Tarefa 9 no lado survey:
+`criar-slide`, `renomear-slide`, `reordenar-slides`, `adicionar-campo` com `slide`,
+`mover-campo`, `remover-slide` e `definir-logica` (lógica condicional) **não foram
+exercitados ao vivo** — só têm a prova de formato estático da seção anterior e os 45
+testes do motor puro. O conserto (omitir `productType` no corpo para `tipo === "survey"`)
+é decisão de quem revisar este relatório, não foi feito aqui.
+
+**Custom field num formulário usa o `id` do custom field como `tag`.** Testado ao vivo com
+o campo `consentimento` (`TEXT`, `contact.consentimento`, id `N6cznmfKOH6YjVyyCSKg`) da
+Instaltech: `{"op":"adicionar-campo","campo":{"tag":"<id>","fieldKey":"contact.consentimento",
+"dataType":"TEXT","model":"contact","name":"consentimento","id":"<id>","type":"text","label":"..."}}`.
+Renderizou na página pública, aceitou valor e a submissão de teste guardou o valor sob a
+chave `N6cznmfKOH6YjVyyCSKg` (não sob `fieldKey`).
+
+**Criação tem lag de propagação — achado, não bug de comando.** A primeira `criar` de um
+formulário retornou `POST /forms/` OK, mas o `GET /forms/<id>` imediatamente seguinte
+(dentro da própria etapa de publicar) devolveu `400 Form does not exist`, deixando um
+formulário órfão (sem nome, sem campos) que precisou de `apagar` manual. Repetir o comando
+funcionou de primeira. O servidor aceita o `POST` antes de o objeto ficar visível para
+`GET` — janela de eventual consistency, não determinístico.
+
+**Envio público de submissão — exercitado ao vivo (Playwright, widget público).** O portão
+do passo 1 (ver Regra 2 do brief) confirmou que os 6 triggers de "formulário/survey
+enviado" na Instaltech são todos filtrados por `form.id`/`survey.id` explícito — nenhum
+dispara para um formulário não citado — então a submissão de teste no formulário
+descartável era segura. Preencheu `full_name` e o custom field `consentimento`, clicou
+Enviar; a submissão apareceu em `GET /forms/submissions?formId=<id>&limit=<n≤100>`, com o
+valor do custom field sob a chave do id (`N6cznmfKOH6YjVyyCSKg`). **`-o submissoes` sem
+`--formulario` e sem `--limite` (ou com `--limite` fora de 1..100) devolve
+`422 limit must not be greater than 100 / limit must be a number` mesmo sem nenhum
+parâmetro inválido explícito** — o filtro por formulário é obrigatório na prática, mesmo
+não sendo formalmente exigido pelo `-o inválido`; passar `--formulario <id> --limite <n≤100>`
+resolve. Efeito colateral fora do escopo desta tarefa: o envio real criou um contato novo
+de verdade na Instaltech (`ZlkU3kiMDr0xiIGLiMC5`, nome "ZZ TESTE AUTOMASTER"); desfazer
+contato está fora de escopo do projeto (ver CLAUDE.md, seção "Fora de escopo"), então ele
+não foi removido.
+
+**Resposta histórica sobrevive à remoção do campo — confirmado ao vivo.** Depois de
+remover o campo `N6cznmfKOH6YjVyyCSKg` do formulário (`remover-campo`) e reconferir
+`-o submissoes`, o valor respondido continuou visível na submissão antiga, sob a mesma
+chave. O documento do formulário e as submissões já enviadas são independentes.
+
+**`cssLivre` grande — sem limite encontrado até ~91 KB.** Um `customStyle` de 91.026
+bytes foi aceito pelo `POST /forms/<id>` e voltou intacto, byte a byte, na leitura
+seguinte. Não foi testado acima desse tamanho; se existe um limite, é maior que isso.
+
+**Pergunta 7.1 (builder do GHL preserva `customStyle`/`fieldStyle` ao salvar pela
+interface) continua sem resposta.** Exige abrir o formulário no builder pela interface,
+mexer e salvar manualmente — passo que pede um humano (ver Regra 3 do brief) e não foi
+feito. Quem for confirmar isso precisa: aplicar um estilo customizado por
+`formulario-estilo --acao aplicar`, abrir o formulário no builder do GHL na UI, salvar
+sem tocar no estilo, e then baixar o documento de novo (`-o detalhe`) para comparar
+`customStyle`/`fieldStyle` antes/depois.
+
+**Paleta padrão da subconta — mescla provada ao vivo (pendência da Tarefa 5).** A
+Instaltech já tinha 5 entradas alheias em `GET /forms/default-colors`
+(`Secondary`, `White`, `Black`, `#00000024`, `#212121ff` — nenhuma com os nomes de papel
+`Primary`/`Text`/`Background`/`Border`/`Error` que o motor usa). Gravar os 5 tokens de
+teste (`mesclarPaleta`, client-side, em `extractor/src/forms/style.ts`) produziu uma
+lista de 10 — as 5 alheias intactas, com o mesmo `value`, mais as 5 novas — confirmado
+lendo `paleta-ver` de novo depois do `paleta-gravar`. Nenhuma entrada alheia desapareceu.
+Como o cliente sempre envia a lista inteira já mesclada (nunca uma lista parcial), isto
+prova que a operação de gravar do motor preserva as cores alheias; não isola se o
+`POST /forms/default-colors` faria merge por si mesmo com uma lista parcial, porque o
+motor nunca manda uma lista parcial. **Resíduo aceito**: as 5 entradas de teste
+(`Primary #0f62feFF`, `Text #161616FF`, `Background #ffffffFF`, `Border #8d8d8dFF`,
+`Error #da1e28FF`) continuam na paleta padrão da Instaltech — não há operação de
+remoção individual exposta pelo motor (só gravar a lista inteira mesclada), e essas
+entradas são apenas swatches adicionais no seletor de cores do builder: nada na
+subconta usa esses nomes de papel hoje, então nenhuma página ou automação muda de
+aparência por causa disso.
+
+**Chrome persistente com perfil compartilhado — achado operacional.** Abrir uma segunda
+sessão do Chrome apontando para o mesmo `~/.automaster/chrome-profile` (por exemplo, via
+uma ferramenta de automação de navegador separada) enquanto o extractor tenta abrir a
+sua própria sessão trava o lock (`SingletonLock`) e faz o `npm run formulario-*` falhar
+com `Target page, context or browser has been closed`. Matar os processos Chrome do
+perfil e apagar `SingletonLock`/`SingletonCookie`/`SingletonSocket` resolve. Não é um bug
+do extractor: é a arquitetura de "perfil persistente único" descrita no CLAUDE.md
+encontrando concorrência de duas fontes diferentes tentando abri-la ao mesmo tempo.
+
+**Residual de teste**: nenhum. `-o lista` de formulários (10, todos de produção) e de
+surveys (29, todos de produção) não mostra nenhum nome começando com `ZZ TESTE` depois
+da limpeza — inclusive um segundo `ZZ TESTE COPIA` criado por engano (retry de comando
+cuja primeira execução na verdade tinha funcionado, só a confirmação no terminal que se
+perdeu) foi encontrado pela varredura de resíduo e apagado.
