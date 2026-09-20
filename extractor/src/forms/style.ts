@@ -119,3 +119,31 @@ export function mesclarPaleta(atual: CorNomeada[], t: Tokens): CorNomeada[] {
   }
   return resultado;
 }
+
+/**
+ * Decide o que gravar em `POST /forms/default-colors`, dado o resultado de
+ * tentar ler a paleta atual (`null` = leitura falhou; objeto sem `colors`
+ * em lista = leitura respondeu num formato inesperado). Extraído puro para
+ * ser testável sem rede — o CLI só chama isto e decide o que fazer com
+ * `aviso` (log em stderr, campo na saída JSON).
+ */
+export function resolverPaleta(
+  antes: { colors?: unknown } | null, t: Tokens,
+): { colors: CorNomeada[]; aviso?: string } {
+  const atualColors = antes?.colors;
+  if (Array.isArray(atualColors)) {
+    return { colors: mesclarPaleta(atualColors as CorNomeada[], t) };
+  }
+  if (antes === null) {
+    return {
+      colors: paletaDeTokens(t),
+      aviso: "a paleta anterior não pôde ser lida; as cores que existiam na subconta " +
+        "podem ter sido substituídas.",
+    };
+  }
+  return {
+    colors: paletaDeTokens(t),
+    aviso: "a paleta anterior foi lida, mas não veio no formato esperado (colors não é " +
+      "uma lista); as cores que já existiam na subconta podem ter sido substituídas.",
+  };
+}

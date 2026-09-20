@@ -32,7 +32,7 @@ import {
 import { aplicar, type Op } from "./forms/doc.js";
 import { diferenca } from "./forms/diff.js";
 import {
-  opsDeEstilo, paletaDeTokens, mesclarPaleta, type Tokens as TokensEstilo, type CorNomeada,
+  opsDeEstilo, resolverPaleta, type Tokens as TokensEstilo, type CorNomeada,
 } from "./forms/style.js";
 import {
   fetchPipelines,
@@ -936,12 +936,16 @@ const FORM_ACOES = [
  * pública no Cloud Storage e baixa sem header de auth, igual aos steps de
  * workflow (por isso `baixarVersao` usa `getJsonNoAuth`).
  */
+async function carregarRaw(
+  client: GhlClient, tipo: "formulario" | "survey", loc: string, id: string,
+): Promise<any> {
+  return tipo === "survey" ? await getSurvey(client, loc, id) : await getForm(client, id);
+}
+
 async function carregarDoc(
   client: GhlClient, tipo: "formulario" | "survey", loc: string, id: string,
 ): Promise<{ nome: string; doc: Record<string, unknown>; raw: any }> {
-  const raw: any = tipo === "survey"
-    ? await getSurvey(client, loc, id)
-    : await getForm(client, id);
+  const raw: any = await carregarRaw(client, tipo, loc, id);
   const obj = raw.form ?? raw.survey ?? raw;
   let doc = obj.formData ?? obj.surveyData;
   if (!doc) {
@@ -991,7 +995,11 @@ async function runFormularioAcao(opts: {
   await withClient(opts.location, log, async (client) => {
     // `versoes` é leitura: sai antes de qualquer guarda de escrita
     if (opts.acao === "versoes") {
-      const { raw } = await carregarDoc(client, tipo, opts.location, opts.id!);
+      // só precisa de `raw.versionHistory` — usar carregarDoc aqui faria um
+      // documento novo (sem formData nem versão) estourar em vez de listar
+      // zero versões, e baixaria o documento do Cloud Storage só para
+      // descartá-lo.
+      const raw = await carregarRaw(client, tipo, opts.location, opts.id!);
       const obj = raw.form ?? raw.survey ?? raw;
       const versoes = (obj.versionHistory ?? []).map((v: any) => ({
         versionId: v.versionId, em: v.updatedAt, por: v.updatedByUser,
@@ -1021,9 +1029,16 @@ async function runFormularioAcao(opts: {
       throw new Error("Isto muda dado real da subconta e não tem desfazer. Repita com --confirmo.");
     }
 
+    // `editar` PRECISA do doc de `antes` para montar `novo` (linha abaixo,
+    // `antes!.doc`) — engolir a falha em `null` troca o erro real da API por
+    // um TypeError enganoso mais adiante. As outras ações (apagar/duplicar/
+    // restaurar) só usam `antes` como registro de auditoria opcional, daí a
+    // tolerância continuar valendo pra elas.
     const antes = opts.acao === "criar"
       ? null
-      : await carregarDoc(client, tipo, opts.location, opts.id!).catch(() => null);
+      : opts.acao === "editar"
+        ? await carregarDoc(client, tipo, opts.location, opts.id!)
+        : await carregarDoc(client, tipo, opts.location, opts.id!).catch(() => null);
     const registro = registroEscrita(opts.location, "_formularios", opts.id ?? "novo", {
       acao: opts.acao, tipo, ops, antes, aplicado: false,
     });
@@ -1200,7 +1215,12 @@ async function runFormularioEstilo(opts: {
 
     if (opts.acao === "aplicar") {
       const { nome, doc } = await carregarDoc(client, tipo, opts.location, opts.id!);
-      const novo = aplicar(doc, opsDeEstilo(doc, tokens!));
+      // opsDeEstilo só gera "definir" em caminhos de estilo — nunca toca
+      // campo nem botão — então as guardas de "documento sem campo" e "sem
+      // botão de envio" não fazem sentido aqui: elas checariam um estado que
+      // já existia antes desta operação, e bloqueariam estilo por um
+      // problema que estilo não causou nem pode resolver.
+      const novo = aplicar(doc, opsDeEstilo(doc, tokens!), { permitirSemBotao: true, permitirVazio: true });
       if (!opts.confirmo) {
         const previa = diferenca(doc, novo);
         if (opts.json) console.log(JSON.stringify({ aplicado: false, previa }));
@@ -1239,22 +1259,15 @@ async function runFormularioEstilo(opts: {
       );
     }
     const antes = await paletaPadrao(client, opts.location).catch(() => null);
-    const atualColors = (antes as { colors?: CorNomeada[] } | null)?.colors;
-    let colors: CorNomeada[];
-    if (Array.isArray(atualColors)) {
-      colors = mesclarPaleta(atualColors, tokens!);
-    } else {
-      // leitura da paleta atual falhou: sem ela não há o que mesclar. Avisa
-      // em voz alta — as cores que já existiam na subconta podem ser
-      // substituídas por só as cinco nossas.
-      log(
-        "aviso: a paleta anterior não pôde ser lida; as cores que existiam na subconta " +
-        "podem ter sido substituídas.",
-      );
-      colors = paletaDeTokens(tokens!);
-    }
+    // `aviso`, quando presente, vai no JSON de saída — não só no stderr do
+    // `log` — porque o servidor MCP (`_run_extractor`) só parseia a última
+    // linha do stdout e descarta o stderr inteiro no caminho de sucesso: sem
+    // isso, quem chama pela tool MCP nunca vê que a paleta foi SUBSTITUÍDA
+    // em vez de mesclada.
+    const { colors, aviso } = resolverPaleta(antes as { colors?: CorNomeada[] } | null, tokens!);
+    if (aviso) log(`aviso: ${aviso}`);
     const registro = registroEscrita(opts.location, "_formularios", "paleta", {
-      acao: "paleta-gravar", tokens, antes, colors, aplicado: false,
+      acao: "paleta-gravar", tokens, antes, colors, aviso, aplicado: false,
     });
     log(`snapshot: ${registro}`);
     let r: unknown;
@@ -1262,14 +1275,14 @@ async function runFormularioEstilo(opts: {
       r = await gravarPaletaPadrao(client, opts.location, colors);
     } catch (e) {
       fs.writeFileSync(registro, JSON.stringify({
-        em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aplicado: false, erro: String(e),
+        em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aviso, aplicado: false, erro: String(e),
       }, null, 2));
       throw e;
     }
     fs.writeFileSync(registro, JSON.stringify({
-      em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aplicado: true, resposta: r,
+      em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aviso, aplicado: true, resposta: r,
     }, null, 2));
-    const out = { aplicado: true, acao: "paleta-gravar", resposta: r, registro };
+    const out = { aplicado: true, acao: "paleta-gravar", resposta: r, registro, ...(aviso ? { aviso } : {}) };
     if (opts.json) console.log(JSON.stringify(out));
     else log(`ok — paleta gravada; registro em ${registro}`);
   });
@@ -1988,7 +2001,9 @@ program
   .option("--tipo <t>", "formulario | survey", "formulario")
   .option("-i, --id <id>", "id do formulário ou survey")
   .option("--nome <texto>", "nome do formulário (criar, duplicar, editar)")
-  .option("--ops <json>", 'operações: [{"op":"remover-campo","alvo":"email"}]')
+  .option("--ops <json>", 'operações: [{"op":"remover-campo","alvo":"email"}]. Em --acao criar, ' +
+    "publica com as duas guardas (--permitir-sem-botao/--permitir-vazio) sempre liberadas — " +
+    "o documento nasce vazio, então bloquear não ajudaria — e pode publicar sem botão de envio")
   .option("--versao <versionId>", "versão a restaurar")
   .option("--pasta <id>", "pasta de destino (survey)")
   .option("--permitir-sem-botao", "libera deixar o documento sem botão de envio")

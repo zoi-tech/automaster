@@ -629,6 +629,8 @@ def formulario_estilo(loc: str, acao: str, tipo: str = "formulario", id: str | N
     """ESCREVE: aplica tokens visuais a um formulário, ou grava a paleta da subconta."""
     if acao not in ESTILO_ACOES:
         raise ToolError(f"acao inválida: {acao}. Aceitas: {', '.join(ESTILO_ACOES)}")
+    if tipo not in FORM_TIPOS:
+        raise ToolError(f"tipo inválido: {tipo}. Aceitos: {', '.join(FORM_TIPOS)}")
     if acao in ("aplicar", "previa", "previa-visual") and not id:
         raise ToolError(f"{acao} exige o id do formulário ou survey")
     if acao in ("aplicar", "previa", "paleta-gravar") and not tokens:
@@ -1008,8 +1010,10 @@ TOOLS = {
                         "que entra, campo que sai e estilo alterado sem gravar nada. "
                         "acao='versoes' lista o histórico e 'restaurar' volta a uma versão. "
                         "Remover exige nomear o campo; deixar o documento sem botão de envio ou "
-                        "sem campo nenhum é recusado (permitir_sem_botao / permitir_vazio). "
-                        "Slide só existe em survey. Exige confirmo=true; registro em "
+                        "sem campo nenhum é recusado (permitir_sem_botao / permitir_vazio) — "
+                        "exceto em acao='criar' com ops: o documento nasce vazio, então as duas "
+                        "guardas saem sempre liberadas, e o formulário pode publicar sem botão "
+                        "de envio. Slide só existe em survey. Exige confirmo=true; registro em "
                         "<dumps>/_formularios/.",
                         {"loc": _LOC, "acao": {"type": "string", "enum": list(FORM_ACOES)},
                          "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},
@@ -1034,7 +1038,11 @@ TOOLS = {
                           "('paleta-gravar' — muda a cor de TODO formulário novo da subconta). "
                           "Os tokens saem da skill automaster-formulario-visual. O estilo vai "
                           "para fieldStyle e customStyle; fieldCSS NUNCA é escrito, porque o "
-                          "builder o regenera e apagaria o trabalho. Exige confirmo=true para "
+                          "builder o regenera e apagaria o trabalho. Em 'paleta-gravar' a "
+                          "resposta pode trazer um campo 'aviso': presente quando não deu para "
+                          "ler a paleta atual da subconta antes de gravar, e por isso a "
+                          "gravação SUBSTITUIU a paleta em vez de mesclar nela — leia esse "
+                          "campo antes de assumir que nada se perdeu. Exige confirmo=true para "
                           "gravar; registro em <dumps>/_formularios/.",
                           {"loc": _LOC, "acao": {"type": "string", "enum": list(ESTILO_ACOES)},
                            "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},

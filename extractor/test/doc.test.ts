@@ -210,6 +210,57 @@ test("definir-logica em formulário grava sem checar jumpTarget (sem slides p/ v
   assert.deepEqual(d.form.conditionalLogic, regras);
 });
 
+test("remover slide destino de salto condicional é recusado", () => {
+  const regras = [{
+    conditionalOperation: "then",
+    conditions: [{ selectedField: "full_name", selectedOperation: "isEqualTo", inputValue: "x" }],
+    outcome: { jumpTarget: "s2", jumpTargetType: "slide", type: "jumpTo", value: "" },
+  }];
+  const d = aplicar(survey(), [{ op: "definir-logica", regras }]);
+  assert.throws(
+    () => aplicar(d, [{ op: "remover-slide", alvo: "s2" }]),
+    /slide s2 é o destino de uma regra de lógica condicional/,
+  );
+});
+
+test("remover campo usado numa condição é recusado", () => {
+  const regras = [{
+    conditionalOperation: "then",
+    conditions: [{ selectedField: "full_name", selectedOperation: "isEqualTo", inputValue: "x" }],
+    outcome: { jumpTarget: "s2", jumpTargetType: "slide", type: "jumpTo", value: "" },
+  }];
+  const d = aplicar(survey(), [{ op: "definir-logica", regras }]);
+  assert.throws(
+    () => aplicar(d, [{ op: "remover-campo", alvo: "full_name" }]),
+    /campo full_name é usado numa condição de lógica condicional/,
+  );
+});
+
+test("adicionar campo com posicao explícita entra exatamente ali", () => {
+  const d = aplicar(form(), [{ op: "adicionar-campo", campo: campo("phone", "Telefone"), posicao: 0 }]);
+  assert.deepEqual(d.form.fields.map((f: any) => f.tag), ["phone", "full_name", "email", "button"]);
+});
+
+test("reordenar campos em survey sem slide vai para o último, igual adicionar-campo", () => {
+  const s = survey();
+  s.slides[1].slideData.push(campo("phone", "Telefone"));
+  const d = aplicar(s, [{ op: "reordenar-campos", ordem: ["phone", "email"] }]);
+  assert.deepEqual(d.slides[1].slideData.map((f: any) => f.tag), ["phone", "email"]);
+  assert.deepEqual(d.slides[0].slideData.map((f: any) => f.tag), ["full_name"]);
+});
+
+test("reordenar campos em survey com slide explícito respeita o slide pedido", () => {
+  const d = aplicar(survey(), [{ op: "reordenar-campos", ordem: ["full_name"], slide: "s1" }]);
+  assert.deepEqual(d.slides[0].slideData.map((f: any) => f.tag), ["full_name"]);
+});
+
+test("definir recusa caminho que desce dentro de fieldCSS", () => {
+  assert.throws(
+    () => aplicar(form(), [{ op: "definir", caminho: "form.fieldCSS.algo", valor: "x" }]),
+    /gerado pelo builder/,
+  );
+});
+
 test("op desconhecido estoura, não é ignorado em silêncio", () => {
   assert.throws(
     () => aplicar(form(), [{ op: "renomear-cmpo", alvo: "email", label: "x" } as any]),

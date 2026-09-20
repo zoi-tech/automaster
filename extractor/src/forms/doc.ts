@@ -35,7 +35,10 @@ const NAO_CAMPO = new Set(["button", "header", "terms_and_conditions"]);
 // fieldCSS/mobileFieldCSS aparecem tanto na raiz do documento quanto sob
 // `form.` no documento real — pegar só a segunda forma deixaria passar
 // exatamente o caminho que existe de verdade.
-export const CAMINHO_PROIBIDO = /^(form\.)?(mobileF|f)ieldCSS$/;
+// `(\.|$)` em vez de só `$`: pega também um caminho que desce dentro do
+// campo proibido (ex.: "form.fieldCSS.algo"), sem confundir com um nome
+// vizinho que só começa igual (ex.: "fieldCSSExtra").
+export const CAMINHO_PROIBIDO = /^(form\.)?(mobileF|f)ieldCSS(\.|$)/;
 
 export function ehSurvey(doc: Doc): boolean {
   return Array.isArray(doc.slides);
@@ -56,6 +59,18 @@ function identifica(campo: any): string {
 
 function clonar<T>(v: T): T {
   return structuredClone(v);
+}
+
+/** Regra de `form.conditionalLogic` cujo salto aponta para o slide `id`, se existir. */
+function regraQueSaltaPara(doc: Doc, id: string): any | undefined {
+  const regras = (doc.form?.conditionalLogic ?? []) as any[];
+  return regras.find((r) => r?.outcome?.jumpTarget === id);
+}
+
+/** Regra de `form.conditionalLogic` cuja condição depende do campo `tag`, se existir. */
+function regraQueDependeDe(doc: Doc, tag: string): any | undefined {
+  const regras = (doc.form?.conditionalLogic ?? []) as any[];
+  return regras.find((r) => (r?.conditions ?? []).some((c: any) => c?.selectedField === tag));
 }
 
 function slidePorId(doc: Doc, id: string): any {
@@ -105,6 +120,8 @@ export function aplicar(
   for (const o of ops) {
     switch (o.op) {
       case "adicionar-campo": {
+        // Sem `slide`, cai no ÚLTIMO — mesmo default de `reordenar-campos`,
+        // de propósito (ver comentário lá).
         let lista: any[];
         if (ehSurvey(doc)) {
           const s = o.slide ? slidePorId(doc, o.slide) : doc.slides.at(-1);
@@ -122,6 +139,14 @@ export function aplicar(
       }
       case "remover-campo": {
         const { lista, indice } = acharCampo(doc, o.alvo);
+        const regra = regraQueDependeDe(doc, o.alvo);
+        if (regra) {
+          throw new Error(
+            `campo ${o.alvo} é usado numa condição de lógica condicional (regra que salta ` +
+            `para ${regra.outcome?.jumpTarget}) e removê-lo deixaria a regra órfã. Ajuste ou ` +
+            "remova a regra primeiro (op definir-logica).",
+          );
+        }
         lista.splice(indice, 1);
         break;
       }
@@ -131,9 +156,20 @@ export function aplicar(
         break;
       }
       case "reordenar-campos": {
-        const alvo = ehSurvey(doc)
-          ? (o.slide ? slidePorId(doc, o.slide) : doc.slides[0]).slideData
-          : doc.form.fields;
+        // Sem `slide`, cai no ÚLTIMO — mesmo default de `adicionar-campo`,
+        // para que "adicionar três campos, depois reordenar sem --slide"
+        // opere no mesmo slide nos dois passos.
+        let alvo: any[];
+        if (ehSurvey(doc)) {
+          const s = o.slide ? slidePorId(doc, o.slide) : doc.slides.at(-1);
+          if (!s) throw new Error("survey sem slides — nada para reordenar");
+          s.slideData ??= [];
+          alvo = s.slideData;
+        } else {
+          doc.form ??= {};
+          doc.form.fields ??= [];
+          alvo = doc.form.fields;
+        }
         const nomeados = o.ordem.map((t) => {
           const c = alvo.find((x: any) => identifica(x) === t);
           if (!c) throw new Error(`campo ${t} não existe neste documento`);
@@ -163,6 +199,14 @@ export function aplicar(
         if (!ehSurvey(doc)) throw new Error("slide só existe em survey");
         const i = doc.slides.findIndex((s: any) => s.id === o.alvo);
         if (i < 0) throw new Error(`slide ${o.alvo} não existe neste survey`);
+        const regra = regraQueSaltaPara(doc, o.alvo);
+        if (regra) {
+          throw new Error(
+            `slide ${o.alvo} é o destino de uma regra de lógica condicional (salto para este ` +
+            "slide) e removê-lo deixaria a regra órfã. Ajuste ou remova a regra primeiro " +
+            "(op definir-logica).",
+          );
+        }
         doc.slides.splice(i, 1);
         break;
       }

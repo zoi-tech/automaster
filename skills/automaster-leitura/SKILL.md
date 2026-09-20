@@ -121,9 +121,15 @@ calendário apontando para formulário apagado nunca dispara.
 `unused_form` é revisão, não conserto. Formulário embutido num site externo, num funil ou
 numa landing page não aparece no dump, então aparecer aí não prova que está morto.
 
-**`formulario_acao` e `formulario_estilo` escrevem ao vivo, como `editar`.** A resposta traz
-`aplicado`: `false` é prévia — mostrou campo que entra, campo que sai e estilo alterado, mas
-não tocou no servidor, então "a prévia disse X" nunca significa "o servidor já tem X". Só
-`aplicado:true` (depois de `--confirmo`) grava de fato. `criar`, `apagar`, `duplicar`,
-`restaurar` e leitura de paleta/temas não têm prévia por construção — são ações diretas,
-sem "antes" e "depois" para comparar.
+**`formulario_acao` e `formulario_estilo` escrevem ao vivo, como `editar`.** Nem toda ação
+devolve `aplicado` — cada uma tem sua própria forma de resposta:
+
+- `formulario_acao`: toda ação exceto `versoes` traz `aplicado` (`false` é prévia — mostrou
+  campo que entra, campo que sai e estilo alterado, mas não tocou no servidor, então "a
+  prévia disse X" nunca significa "o servidor já tem X"; `true`, depois de `confirmo`, grava
+  de fato). `criar`, `apagar`, `duplicar`, `restaurar` não têm prévia por construção — são
+  ações diretas, sem "antes" e "depois" para comparar, mas ainda trazem `aplicado:true`.
+  `versoes` é leitura pura e devolve `{versoes}`, sem `aplicado`.
+- `formulario_estilo`: `aplicar`, `previa` e `paleta-gravar` trazem `aplicado`. `temas` e
+  `paleta-ver` devolvem `{resultado}`; `previa-visual` devolve `{url, arquivo}` — nenhuma
+  das três tem `aplicado`.

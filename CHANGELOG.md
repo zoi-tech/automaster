@@ -13,7 +13,9 @@ Escrita de formulários e surveys. Duas tools novas (`formulario_acao`,
   republica o documento inteiro a partir do que está no servidor, aplicando operações
   declaradas — campo que o automaster não modela atravessa intacto.
 - Slide do survey é entidade de primeira classe: criar, remover, renomear, reordenar,
-  mover campo entre slides, navegação, barra de progresso e lógica condicional.
+  mover campo entre slides e lógica condicional entre slides (salto). Navegação e barra
+  de progresso são atributos de estilo (`form.isProgressBarEnabled` etc.) escritos pela
+  op genérica `definir`, não operações próprias.
 - Prévia antes de publicar: sem `--confirmo`, o comando mostra campo que entra, campo que
   sai e estilo alterado, sem tocar no servidor. É o primeiro comando do projeto com esse
   comportamento; os outros continuam dando erro seco.

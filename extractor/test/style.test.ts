@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cor, opsDeEstilo, paletaDeTokens, mesclarPaleta, type Tokens } from "../src/forms/style.js";
+import { cor, opsDeEstilo, paletaDeTokens, mesclarPaleta, resolverPaleta, type Tokens } from "../src/forms/style.js";
 import { diferenca } from "../src/forms/diff.js";
 import { aplicar, type Doc } from "../src/forms/doc.js";
 
@@ -88,6 +88,26 @@ test("mesclar paleta casa rótulo sem diferenciar maiúscula de minúscula", () 
   assert.equal(primary?.value, "0f62feFF");
 });
 
+test("resolverPaleta mescla e não avisa quando a leitura veio em lista (C1)", () => {
+  const r = resolverPaleta({ colors: [{ name: "Secondary", value: "188BF6FF" }] }, tokens);
+  assert.equal(r.aviso, undefined);
+  assert.ok(r.colors.some((c) => c.name === "Secondary"));
+  assert.ok(r.colors.some((c) => c.name === "Primary" && c.value === "0f62feFF"));
+});
+
+test("resolverPaleta substitui e avisa quando a leitura falhou (antes=null) (C1)", () => {
+  const r = resolverPaleta(null, tokens);
+  assert.match(r.aviso ?? "", /não pôde ser lida/);
+  assert.deepEqual(r.colors, paletaDeTokens(tokens));
+});
+
+test("resolverPaleta substitui e avisa com frase diferente quando colors não é lista (C1)", () => {
+  const r = resolverPaleta({ colors: "não é lista" } as any, tokens);
+  assert.match(r.aviso ?? "", /não veio no formato esperado/);
+  assert.doesNotMatch(r.aviso ?? "", /não pôde ser lida/);
+  assert.deepEqual(r.colors, paletaDeTokens(tokens));
+});
+
 const base = (): Doc => ({
   form: { fields: [{ tag: "email", label: "E-mail" }, { tag: "button", type: "submit" }], fieldStyle: { fontColor: "000000FF" } },
 });
@@ -103,6 +123,12 @@ test("a prévia nomeia campo que entra, campo que sai e estilo alterado", () => 
   assert.ok(linhas.some((l) => l.includes("+ campo phone")));
   assert.ok(linhas.some((l) => l.includes("- campo email")));
   assert.ok(linhas.some((l) => l.includes("form.fieldStyle.fontColor")));
+});
+
+test("opsDeEstilo aplica mesmo num documento sem botão nem campo (I1: guarda de conteúdo não vale para estilo)", () => {
+  const semNada: Doc = { form: { fields: [] } };
+  const depois = aplicar(semNada, opsDeEstilo(semNada, tokens), { permitirSemBotao: true, permitirVazio: true });
+  assert.equal(depois.form.fieldStyle.fontColor, "161616FF");
 });
 
 test("documento igual não tem diferença", () => {

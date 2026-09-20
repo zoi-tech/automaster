@@ -56,6 +56,12 @@ def test_estilo_exige_tokens(espiao):
     assert espiao == []
 
 
+def test_estilo_tipo_invalido(espiao):
+    with pytest.raises(srv.ToolError, match="tipo inválido"):
+        srv.formulario_estilo(loc="L1", acao="paleta-ver", tipo="voar")
+    assert espiao == []
+
+
 def test_paleta_gravar_exige_confirmo(espiao):
     with pytest.raises(srv.ToolError, match="confirmo=true"):
         srv.formulario_estilo(loc="L1", acao="paleta-gravar", tokens={"corPrimaria": "#000000"})

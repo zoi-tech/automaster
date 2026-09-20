@@ -753,7 +753,7 @@ citado é id de slide existente — erro em português caso contrário. Em formu
 slides para validar contra, então grava sem checagem.
 
 
-### Escrita — validada ao vivo na Instaltech (Tarefa 9, 4 rodadas, 2026-09-19)
+### Escrita — validada ao vivo na Instaltech (Tarefa 9, 5 rodadas, 2026-09-19)
 
 Host `https://services.leadconnectorhq.com`, mesmos dois tokens de sessão da leitura.
 Widget público (onde a página do formulário/survey é renderizada e enviada):
@@ -1046,12 +1046,18 @@ outra**, nem em dois terminais, nem em dois agentes/processos, nem numa mistura 
 Quem for operar este comando deve sempre rodá-lo em série, um de cada vez, até o fim — é a
 regra que as rodadas 2, 3 e 4 desta tarefa seguiram, e a 1ª rodada não seguiu.
 
-**Residual de teste (conferido nas quatro rodadas)**: nenhum, em formulário ou survey. A
+**Residual de teste (conferido nas cinco rodadas)**: nenhum, em formulário ou survey. A
 conferência de cada rodada foi: rodar `formulario-acao -o lista` (formulário) e `-o lista
 --tipo survey` (survey) depois da limpeza e procurar por `"name":"ZZ TESTE` no JSON
-completo da resposta — nenhuma ocorrência, nas quatro vezes. Na 1ª rodada, isso incluiu
+completo da resposta — nenhuma ocorrência, nas cinco vezes. Na 1ª rodada, isso incluiu
 achar e apagar manualmente uma cópia extra que tinha aparecido por causa da concorrência.
 Na 4ª rodada, a conferência final mostrou `"total":10` em formulários e `"total":29` em
-surveys, os mesmos totais de produção de antes de qualquer escrita desta tarefa. Fora do
-escopo de formulário/survey, o contato de teste `ZlkU3kiMDr0xiIGLiMC5` (ver seção de
-submissão pública acima) continua na subconta, por decisão — não é resíduo esquecido.
+surveys, os mesmos totais de produção de antes de qualquer escrita desta tarefa. A 5ª
+rodada escreveu depois dessa conferência (o `restaurar` de survey e a investigação do
+`duplicar` fantasma, ambos acima) e teve a sua própria: o total de surveys foi checado de
+novo depois do episódio `restaurar`/`apagar` anômalo (voltou a `29`) e outras três vezes
+ao longo da investigação do duplicado fantasma (sempre `29`, sem o nome `u0WIsApG4MDPfCDqcFRf`
+nem `FuKXZth8OYvPJuzwr7u9` na listagem) — é a mesma checagem de total, repetida, não uma
+conferência nova inventada aqui. Fora do escopo de formulário/survey, o contato de teste
+`ZlkU3kiMDr0xiIGLiMC5` (ver seção de submissão pública acima) continua na subconta, por
+decisão — não é resíduo esquecido.
