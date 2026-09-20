@@ -130,11 +130,14 @@ test("definir recusa fieldCSS", () => {
   );
 });
 
-test("definir recusa fieldCSS na raiz do documento", () => {
-  assert.throws(
-    () => aplicar(form(), [{ op: "definir", caminho: "fieldCSS", valor: "a{}" }]),
-    /gerado pelo builder/,
-  );
+test("definir recusa fieldCSS e mobileFieldCSS, na raiz e sob form", () => {
+  for (const caminho of ["fieldCSS", "mobileFieldCSS", "form.fieldCSS", "form.mobileFieldCSS"]) {
+    assert.throws(
+      () => aplicar(form(), [{ op: "definir", caminho, valor: "a{}" }]),
+      /gerado pelo builder/,
+      `esperava recusa para ${caminho}`,
+    );
+  }
 });
 
 test("aplicar não muda o documento de entrada", () => {
@@ -152,4 +155,29 @@ test("campo que o motor não entende sobrevive intacto", () => {
 
 test("validar botão de envio não roda em survey", () => {
   assert.doesNotThrow(() => aplicar(survey(), [{ op: "renomear-slide", alvo: "s1", nome: "Dados" }]));
+});
+
+test("aplicar não muda objetos aninhados do documento de entrada (imutabilidade profunda)", () => {
+  const d0 = form();
+  const labelOriginal = d0.form.fields[1].label;
+  aplicar(d0, [{ op: "renomear-campo", alvo: "email", label: "outro label" }]);
+  assert.equal(d0.form.fields[1].label, labelOriginal);
+
+  const d1 = form();
+  aplicar(d1, [{ op: "definir", caminho: "form.fieldStyle.fontColor", valor: "#000000" }]);
+  assert.equal(d1.form.fieldStyle, undefined);
+
+  const d2 = survey();
+  const nomeOriginal = d2.slides[0].slideName;
+  aplicar(d2, [{ op: "renomear-slide", alvo: "s1", nome: "outro nome" }]);
+  assert.equal(d2.slides[0].slideName, nomeOriginal);
+});
+
+test("criar slide copia o button do slide anterior, não a referência", () => {
+  const s = survey();
+  s.slides[1].button = { background: "#fff", color: "#000", border: "1px" };
+  const d = aplicar(s, [{ op: "criar-slide", nome: "Slide 3" }]);
+  assert.deepEqual(d.slides[2].button, { background: "#fff", color: "#000", border: "1px" });
+  d.slides[2].button.background = "#123";
+  assert.equal(d.slides[1].button.background, "#fff");
 });
