@@ -178,6 +178,17 @@ rebaixa o workflow para rascunho sozinho; nós preferimos não mudar o estado de
 lado. Como a checagem de "sem nenhuma ação" já recusa antes, o rebaixamento nunca chega a
 acontecer.
 
+## O dump depois da escrita
+
+O comando **não mexe no dump**. Um dump é o retrato de um momento; gravar dentro dele o
+workflow recém-editado criaria um retrato que nunca existiu, misturando dois momentos — e o
+contrato do projeto é `raw` intocado, resposta da API como ela veio. Reextrair a subconta
+inteira a cada escrita é caro demais para o ganho.
+
+O que muda: toda saída que dependa do dump (validação, diff contra o estado auditado)
+imprime a idade do dump usado. Quem quiser o retrato novo roda `extract` de novo, como
+sempre. `schemaVersion` não muda: o formato do dump é o mesmo.
+
 ## Testes
 
 Unitários no extractor: montagem de cada corpo, e a aplicação de cada operação cirúrgica
@@ -259,3 +270,7 @@ A regra de escrita serial do projeto continua valendo: o perfil persistente do C
   (`github.com/drleadflow/ghl-automation-builder`, útil para B, com a ressalva de que a
   maior parte do catálogo dele não tem prova ao vivo); e o handoff da 0.13.0 fala em oito
   premissas enquanto a memória do projeto fala em nove — corrigir de passagem.
+- **Galho aberto (sem achado)** — o comando não atualiza o dump após escrever; passa a
+  imprimir a idade do dump que usou para validar. Motivo: gravar o workflow novo num dump
+  antigo produz um retrato que nunca existiu, e reextrair a cada escrita é caro.
+  `schemaVersion` fica em 1 — o formato não muda.
