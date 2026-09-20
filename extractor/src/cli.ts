@@ -26,6 +26,11 @@ import {
   listFormSubmissions, listSurveySubmissions,
 } from "./api/forms.js";
 import {
+  criar, publicar, apagar, duplicar, restaurarVersao, baixarVersao,
+} from "./api/forms-write.js";
+import { aplicar, type Op } from "./forms/doc.js";
+import { diferenca } from "./forms/diff.js";
+import {
   fetchPipelines,
   fetchCustomFields,
   fetchTags,
@@ -914,6 +919,155 @@ async function runFormularios(opts: {
   });
 }
 
+const FORM_ACOES = [
+  "criar", "apagar", "duplicar", "editar", "versoes", "restaurar",
+];
+
+/**
+ * O documento vivo de um formulário ou survey, mais o nome atual.
+ * O objeto da API às vezes já traz `formData`/`surveyData` embutido; quando
+ * não traz, cai para a última entrada do `versionHistory` — a URL dela é
+ * pública no Cloud Storage e baixa sem header de auth, igual aos steps de
+ * workflow (por isso `baixarVersao` usa `getJsonNoAuth`).
+ */
+async function carregarDoc(
+  client: GhlClient, tipo: "formulario" | "survey", loc: string, id: string,
+): Promise<{ nome: string; doc: Record<string, unknown>; raw: any }> {
+  const raw: any = tipo === "survey"
+    ? await getSurvey(client, loc, id)
+    : await getForm(client, id);
+  const obj = raw.form ?? raw.survey ?? raw;
+  let doc = obj.formData ?? obj.surveyData;
+  if (!doc) {
+    const ultima = (obj.versionHistory ?? []).at(-1);
+    const url = ultima?.formDataDownloadUrl ?? ultima?.surveyDataDownloadUrl;
+    if (url) doc = await baixarVersao(client, url);
+  }
+  if (!doc) {
+    throw new Error(
+      `o servidor não devolveu formData/surveyData nem uma URL de versionHistory para ${id}`,
+    );
+  }
+  return { nome: obj.name ?? "", doc, raw };
+}
+
+async function runFormularioAcao(opts: {
+  location: string; acao: string; tipo?: string; id?: string; nome?: string;
+  ops?: string; versao?: string; pasta?: string;
+  permitirSemBotao?: boolean; permitirVazio?: boolean;
+  confirmo?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!FORM_ACOES.includes(opts.acao)) {
+    throw new Error(`--acao inválida: ${opts.acao}. Aceitas: ${FORM_ACOES.join(", ")}`);
+  }
+  const tipo = (opts.tipo ?? "formulario") as "formulario" | "survey";
+  if (tipo !== "formulario" && tipo !== "survey") {
+    throw new Error("--tipo aceita formulario ou survey");
+  }
+  if (opts.acao !== "criar" && !opts.id) throw new Error(`${opts.acao} exige --id`);
+  if (opts.acao === "criar" && !opts.nome) throw new Error("criar exige --nome");
+  if (opts.acao === "restaurar" && !opts.versao) throw new Error("restaurar exige --versao");
+
+  let ops: Op[] = [];
+  if (opts.ops) {
+    try {
+      ops = JSON.parse(opts.ops);
+    } catch {
+      throw new Error('--ops precisa ser JSON: [{"op":"adicionar-campo","campo":{...}}]');
+    }
+    if (!Array.isArray(ops)) throw new Error("--ops precisa ser uma lista JSON");
+  }
+  if (opts.acao === "editar" && ops.length === 0) {
+    throw new Error("editar exige --ops com ao menos uma operação");
+  }
+
+  await withClient(opts.location, log, async (client) => {
+    // `versoes` é leitura: sai antes de qualquer guarda de escrita
+    if (opts.acao === "versoes") {
+      const { raw } = await carregarDoc(client, tipo, opts.location, opts.id!);
+      const obj = raw.form ?? raw.survey ?? raw;
+      const versoes = (obj.versionHistory ?? []).map((v: any) => ({
+        versionId: v.versionId, em: v.updatedAt, por: v.updatedByUser,
+        documento: v.formDataDownloadUrl ?? v.surveyDataDownloadUrl,
+      }));
+      if (opts.json) console.log(JSON.stringify({ versoes }));
+      else versoes.forEach((v: any) => log(`${v.em}  ${v.versionId}  ${v.por ?? ""}`));
+      return;
+    }
+
+    // prévia: monta o documento novo e mostra a diferença, sem tocar no servidor
+    if (opts.acao === "editar" && !opts.confirmo) {
+      const { doc } = await carregarDoc(client, tipo, opts.location, opts.id!);
+      const novo = aplicar(doc, ops, {
+        permitirSemBotao: opts.permitirSemBotao, permitirVazio: opts.permitirVazio,
+      });
+      const previa = diferenca(doc, novo);
+      if (opts.json) console.log(JSON.stringify({ aplicado: false, previa }));
+      else {
+        log(previa.length ? previa.join("\n") : "nada mudaria");
+        log("\nnada foi gravado. Repita com --confirmo para publicar.");
+      }
+      return;
+    }
+
+    if (!opts.confirmo) {
+      throw new Error("Isto muda dado real da subconta e não tem desfazer. Repita com --confirmo.");
+    }
+
+    const antes = opts.acao === "criar"
+      ? null
+      : await carregarDoc(client, tipo, opts.location, opts.id!).catch(() => null);
+    const registro = registroEscrita(opts.location, "_formularios", opts.id ?? "novo", {
+      acao: opts.acao, tipo, ops, antes, aplicado: false,
+    });
+    log(`snapshot: ${registro}`);
+
+    let r: unknown;
+    try {
+      switch (opts.acao) {
+        case "criar": {
+          const criado: any = await criar(client, tipo, {
+            locationId: opts.location,
+            productType: tipo === "survey" ? "Survey" : "Form",
+            parentId: opts.pasta,
+          });
+          const novoId = criado?.form?._id ?? criado?.survey?._id ?? criado?._id;
+          if (!novoId) throw new Error(`o servidor não devolveu o id do novo ${tipo}`);
+          // o objeto nasce vazio e sem nome; publicar de novo grava nome e campos
+          const { doc } = await carregarDoc(client, tipo, opts.location, novoId);
+          const corpo = ops.length
+            ? aplicar(doc, ops, { permitirSemBotao: true, permitirVazio: true })
+            : doc;
+          r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
+          break;
+        }
+        case "editar": {
+          const novo = aplicar(antes!.doc, ops, {
+            permitirSemBotao: opts.permitirSemBotao, permitirVazio: opts.permitirVazio,
+          });
+          r = await publicar(client, tipo, opts.id!, opts.nome ?? antes!.nome, novo);
+          break;
+        }
+        case "apagar": r = await apagar(client, tipo, opts.id!); break;
+        case "duplicar": r = await duplicar(client, tipo, opts.id!, opts.nome ?? "cópia", opts.pasta); break;
+        case "restaurar": r = await restaurarVersao(client, tipo, opts.id!, opts.versao!); break;
+      }
+    } catch (e) {
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes, aplicado: false, erro: String(e),
+      }, null, 2));
+      throw e;
+    }
+    fs.writeFileSync(registro, JSON.stringify({
+      em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes, aplicado: true, resposta: r,
+    }, null, 2));
+    const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
+    if (opts.json) console.log(JSON.stringify(out));
+    else log(`ok — ${opts.acao}; registro em ${registro}`);
+  });
+}
+
 async function runOportunidades(opts: {
   location: string; o: string; id?: string; pipeline?: string; estagio?: string;
   status?: string; contato?: string; termo?: string; limite?: string; pagina?: string;
@@ -1618,6 +1772,23 @@ program
   .option("--pagina <n>", "página das submissões, a partir de 1")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runFormularios(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("formulario-acao")
+  .description("ESCREVE: cria, edita, duplica, apaga ou restaura formulário e survey")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("--acao <a>", FORM_ACOES.join(" | "))
+  .option("--tipo <t>", "formulario | survey", "formulario")
+  .option("-i, --id <id>", "id do formulário ou survey")
+  .option("--nome <texto>", "nome do formulário (criar, duplicar, editar)")
+  .option("--ops <json>", 'operações: [{"op":"remover-campo","alvo":"email"}]')
+  .option("--versao <versionId>", "versão a restaurar")
+  .option("--pasta <id>", "pasta de destino (survey)")
+  .option("--permitir-sem-botao", "libera deixar o documento sem botão de envio")
+  .option("--permitir-vazio", "libera deixar o documento sem nenhum campo")
+  .option("--confirmo", "obrigatório: publica de verdade. Sem ele, só mostra a prévia")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runFormularioAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("agenda")

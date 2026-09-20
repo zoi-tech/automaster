@@ -29,6 +29,7 @@
     "pipeline": "tsx src/cli.ts pipeline",
     "agenda": "tsx src/cli.ts agenda",
     "formularios": "tsx src/cli.ts formularios",
+    "formulario-acao": "tsx src/cli.ts formulario-acao",
     "agenda-acao": "tsx src/cli.ts agenda-acao",
     "test": "tsx --test test/*.test.ts"
   },
