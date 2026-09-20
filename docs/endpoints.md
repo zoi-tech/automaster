@@ -779,12 +779,9 @@ está no fim desta seção.
   opção `{label: "None - Free form message", value: "0"}`, e nesses steps o texto vive em
   `attributes.message`. Sem essa exceção, a regra acusava 90 falsos positivos só na
   Instaltech.
-- **E-mail ficou de fora da auditoria, de propósito.** Nenhum dos 13 `email.template_id` da
-  Instaltech casa com id do email builder — nem com a varredura de pastas completa, nem com
-  `deleted=true`, e as rotas de item único (`/emails/builder/<id>`, `?templateId=`) não
-  resolvem o id. Os ids citados compartilham prefixo de ObjectId (mesmo segundo de
-  criação), o que aponta para cópia guardada dentro do step. Cruzar as duas coleções daria
-  13 de 13 falsos positivos.
+- **E-mail tem regra própria, não entra nesta.** É verdade que o `email.template_id` não casa
+  com nenhum id do email builder, mas o campo certo é outro: o id real está no `previewUrl` do
+  step. A regra é `stale_email_template` (WARN) e está na seção `## Templates de e-mail`.
 - `internal_notification.template_id` (citado na doc antiga como o alvo desta regra) **não
   aparece em nenhum dos 12 dumps**. Os campos de template que existem de verdade são
   `whatsapp_v2.template_id` (789 usos), `sms.template_id` (131), `email.template_id` (67),

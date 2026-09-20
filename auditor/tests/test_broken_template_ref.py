@@ -52,7 +52,7 @@ def test_canal_sem_lista_nao_contamina_canal_com_lista(make_dump):
 
 
 def test_email_fica_fora_da_regra(make_dump):
-    """O template_id de um step de e-mail não casa com o email builder; não julgamos."""
+    """E-mail tem regra própria (`stale_email_template`, WARN); aqui não é julgado."""
     ctx = load_dump(make_dump(
         workflows=[wf(id="w1", steps=[_step("email", "QUALQUER")])],
         message_templates=[{"id": "T1", "name": "Follow-up"}],

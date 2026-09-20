@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.14.0 — 2026-09-20
+
+Templates de e-mail. Uma tool nova (`modelos_email`), 30 no total, módulo
+`extractor/src/api/emails.ts` e a entidade `email_templates` no dump.
+
+- **A premissa antiga estava errada.** A doc dizia que e-mail não dava para auditar porque o
+  `template_id` do step não casa com o email builder. O campo certo é outro: o id real do
+  template está no `previewUrl` do step. Quando o usuário escolhe um template existente, o GHL
+  guarda uma cópia dentro do step, e o `template_id` passa a ser o dessa cópia.
+- Duas regras novas, 18 no total: `stale_email_template` (WARN) para step cujo template sumiu do
+  builder, e `unused_email_template` (INFO) para template que nenhum workflow usa.
+- É WARN e não ERROR porque o e-mail continua sendo enviado: o conteúdo vive no Storage. O que
+  se perdeu é poder editá-lo pelo app.
+- Provado comparando duas subcontas: a Cliente B casa 6 de 6 no mesmo formato que falha 5
+  vezes na Instaltech, então template fora da lista é template apagado, não cópia oculta.
+- `modelos_email` tem `lista`, `usos` (qual workflow cita cada template) e `conteudo` (texto e
+  links, baixados na hora de uma URL pública, sem Chrome e sem token).
+- `comparar` e a seção "Regras cegas" do relatório passam a cobrir e-mail.
+
 ## 0.13.0 — 2026-09-20
 
 Workflows ao vivo. Duas tools novas (`workflows_ao_vivo`, `workflow_acao`), 29 no total,

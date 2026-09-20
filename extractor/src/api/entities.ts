@@ -54,7 +54,6 @@ export function fetchMessageTemplates(client: GhlClient, locationId: string): Pr
   return client.getJson(`${BACKEND}/locations/${locationId}/templates?limit=10000`);
 }
 
-// Templates do email builder NÃO entram no dump: o `email.template_id` dos steps
-// não casa com nenhum id de `/emails/builder` (nem descendo nas pastas via
-// `parentId`, nem com `deleted=true`) — o step guarda uma cópia própria. Cruzar
-// os dois só produziria falso positivo. Detalhes em docs/endpoints.md.
+// Templates do email builder vivem em `./emails.ts`: a lista precisa descer nas
+// pastas por `parentId`, e o cruzamento com o step sai do `previewUrl`, não do
+// `template_id`. Detalhes em docs/endpoints.md, seção `## Templates de e-mail`.

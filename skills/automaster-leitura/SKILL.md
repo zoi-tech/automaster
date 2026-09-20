@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, modelos_email) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -160,3 +160,28 @@ contato ainda, sem que a escrita tenha falhado — reler depois de alguns segund
 concluir que não funcionou. **Inscrever num workflow que não está `published` devolve
 sucesso e não cria inscrição nenhuma** — a resposta do servidor é idêntica ao caso que
 funciona; o comando lê o status antes de escrever e avisa quando ele não é `published`.
+
+
+## Templates de e-mail (modelos_email, stale_email_template, unused_email_template)
+
+`modelos_email` é sobre template do email builder, o que um step de workflow manda. Não
+confunda com `conversas(email=...)`, que traz o corpo de um e-mail já enviado a um contato,
+nem com `enviar(tipo="Email")`, que manda um.
+
+**`stale_email_template` é WARN, e WARN aqui não é "quase erro".** O e-mail continua sendo
+enviado: o conteúdo renderizado vive no Storage do GHL e não depende da lista do builder. O que
+o achado diz é que ninguém consegue mais editar aquele e-mail pelo app — quem abrir o template
+de mesmo nome no builder vai mexer em outro registro. Na Instaltech isso vale para 5 steps, que
+apontam para templates refeitos dois dias depois.
+
+**O id do template nunca sai do `template_id` do step.** Sai do `previewUrl`. Se você vir um
+`template_id` que não existe em lugar nenhum, isso é o normal, não um achado: é a cópia que o
+GHL guarda dentro do step quando o usuário escolhe um template existente.
+
+**`unused_email_template` é INFO e costuma vir em quantidade** — 29 na Instaltech. Template de
+e-mail é usado em campanha e em disparo manual, que o dump não enxerga. Trate como inventário
+para revisão humana, nunca como lista de coisas para apagar.
+
+**Dump antigo não tem `email_templates.json`.** Nesse caso as duas regras ficam no-op e o
+relatório diz isso na seção "Regras cegas". Ausência de achado de e-mail num dump velho não
+significa que está tudo certo.

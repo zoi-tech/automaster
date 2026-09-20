@@ -6,9 +6,10 @@ Meta). Canal sem lista no dump — subconta sem WhatsApp, dump antigo — não g
 achado nenhum: a regra fica no-op para ele, senão todo step viraria falso
 positivo.
 
-Ficam de fora, por falta de lista contra a qual cruzar: `email` (o
-`template_id` do step não casa com nenhum id do email builder, nem descendo nas
-pastas — o step guarda cópia própria) e `proposals_estimates_send_document`.
+`email` tem regra própria, `stale_email_template`, com severidade WARN: o id do
+template está no `previewUrl` do step, não no `template_id`, e um e-mail cujo
+template sumiu do builder continua sendo enviado. `proposals_estimates_send_document`
+fica de fora por falta de lista contra a qual cruzar.
 """
 from __future__ import annotations
 
