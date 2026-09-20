@@ -59,6 +59,7 @@ def test_estilo_exige_tokens(espiao):
 def test_paleta_gravar_exige_confirmo(espiao):
     with pytest.raises(srv.ToolError, match="confirmo=true"):
         srv.formulario_estilo(loc="L1", acao="paleta-gravar", tokens={"corPrimaria": "#000000"})
+    assert espiao == []
 
 
 def test_as_duas_tools_estao_declaradas():
