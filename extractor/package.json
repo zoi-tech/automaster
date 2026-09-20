@@ -29,7 +29,8 @@
     "pipeline": "tsx src/cli.ts pipeline",
     "agenda": "tsx src/cli.ts agenda",
     "formularios": "tsx src/cli.ts formularios",
-    "agenda-acao": "tsx src/cli.ts agenda-acao"
+    "agenda-acao": "tsx src/cli.ts agenda-acao",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "commander": "^12.1.0",
