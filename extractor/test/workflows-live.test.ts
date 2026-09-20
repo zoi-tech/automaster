@@ -138,6 +138,25 @@ test("avisoDespublicar no vazio não fala de congelamento", () => {
   assert.match(avisoDespublicar(0), /nenhum contato/i);
 });
 
+test("avisoDespublicar com aoMenos e n>0 diz que a contagem é um piso, mas continua avisando o resto", () => {
+  const a = avisoDespublicar(3, true);
+  assert.match(a, /pelo menos/i);
+  assert.match(a, /3/);
+  assert.match(a, /congel/i);
+  assert.match(a, /republic/i);
+  assert.doesNotMatch(a, /perd/i);
+});
+
+test("avisoDespublicar com um argumento só mantém o texto de hoje", () => {
+  const a = avisoDespublicar(3);
+  assert.doesNotMatch(a, /pelo menos/i);
+});
+
+test("avisoDespublicar com aoMenos e n=0 não afirma que ninguém está dentro", () => {
+  const a = avisoDespublicar(0, true);
+  assert.doesNotMatch(a, /nenhum contato/i);
+});
+
 test("resolverInscricao acha a única inscrição do contato naquele workflow", () => {
   const r = resolverInscricao([{ _id: "S1", workflowId: "W1" }, { _id: "S2", workflowId: "W2" }], "W1");
   assert.deepEqual(r, { id: "S1" });

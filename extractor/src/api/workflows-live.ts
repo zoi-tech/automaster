@@ -265,9 +265,16 @@ export function saidaWorkflowAcao(a: {
  * `paused_due_to_draft_mode` e os contatos retomam de onde pararam na republicação —
  * todos de uma vez, que é o risco de verdade.
  */
-export function avisoDespublicar(n: number): string {
-  if (n <= 0) return "nenhum contato está dentro; despublicar não afeta ninguém agora.";
-  return `${n} contato(s) estão dentro agora. Eles não são removidos: congelam no passo em ` +
+export function avisoDespublicar(n: number, aoMenos = false): string {
+  if (n <= 0) {
+    return aoMenos
+      ? "não deu para contar quantos estão dentro (busca cortada ou estrangulada). Quem " +
+        "estiver dentro não é removido: congela no passo em que está e volta a andar, " +
+        "todos de uma vez, quando o workflow for republicado."
+      : "nenhum contato está dentro; despublicar não afeta ninguém agora.";
+  }
+  const quantos = aoMenos ? `pelo menos ${n}` : `${n}`;
+  return `${quantos} contato(s) estão dentro agora. Eles não são removidos: congelam no passo em ` +
     "que estão e voltam a andar, todos de uma vez, quando o workflow for republicado.";
 }
 

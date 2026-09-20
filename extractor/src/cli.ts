@@ -2261,10 +2261,12 @@ async function runWorkflowAcao(opts: {
 
     // despublicar: conta quem está dentro ANTES, porque depois a busca reflete o novo estado
     if (opts.acao === "publicar" && opts.status !== "published") {
-      const p = await paginaDeInscritos(client, opts.location, wid, 100).catch(() => null);
-      const stats = await contarInscritos(client, opts.location, wid).catch(() => ({} as { total?: number }));
-      const dentro = p ? p.linhas.length : (stats.total ?? 0);
-      aviso = avisoDespublicar(dentro);
+      const contagem = await todosOsInscritos(client, opts.location, wid, WF_TETO_PADRAO).catch(() => null);
+      aviso = contagem
+        ? avisoDespublicar(contagem.cruas.length, contagem.cortou || contagem.estrangulado)
+        : "não deu para contar quem está dentro porque a busca de inscritos falhou. Quem " +
+          "estiver dentro não é removido: congela no passo em que está e volta a andar, " +
+          "todos de uma vez, quando o workflow for republicado.";
       log(`aviso: ${aviso}`);
     }
 
