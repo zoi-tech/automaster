@@ -1023,23 +1023,42 @@ async function runFormularioAcao(opts: {
     });
     log(`snapshot: ${registro}`);
 
+    // fora do try: se `criar` já respondeu mas a segunda chamada falhar, o catch
+    // externo ainda precisa saber qual id ficou órfão no servidor.
+    let novoId: string | undefined;
+    let criado: unknown;
     let r: unknown;
     try {
       switch (opts.acao) {
         case "criar": {
-          const criado: any = await criar(client, tipo, {
+          criado = await criar(client, tipo, {
             locationId: opts.location,
             productType: tipo === "survey" ? "Survey" : "Form",
             parentId: opts.pasta,
           });
-          const novoId = criado?.form?._id ?? criado?.survey?._id ?? criado?._id;
+          novoId = (criado as any)?.form?._id ?? (criado as any)?.survey?._id ?? (criado as any)?._id;
           if (!novoId) throw new Error(`o servidor não devolveu o id do novo ${tipo}`);
-          // o objeto nasce vazio e sem nome; publicar de novo grava nome e campos
-          const { doc } = await carregarDoc(client, tipo, opts.location, novoId);
-          const corpo = ops.length
-            ? aplicar(doc, ops, { permitirSemBotao: true, permitirVazio: true })
-            : doc;
-          r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
+          // grava o id do órfão AGORA: se a etapa seguinte falhar, o rastro já
+          // sabe o que limpar, em vez de só o horário do arquivo.
+          fs.writeFileSync(registro, JSON.stringify({
+            em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes,
+            aplicado: false, criadoId: novoId, criado,
+          }, null, 2));
+          try {
+            // o objeto nasce vazio e sem nome; publicar de novo grava nome e campos
+            const { doc } = await carregarDoc(client, tipo, opts.location, novoId);
+            const corpo = ops.length
+              ? aplicar(doc, ops, { permitirSemBotao: true, permitirVazio: true })
+              : doc;
+            r = { criado, publicado: await publicar(client, tipo, novoId, opts.nome!, corpo), id: novoId };
+          } catch (e2) {
+            throw new Error(
+              `o ${tipo} ${novoId} foi criado no servidor, mas a etapa de publicar falhou: ` +
+              `ele ficou órfão, sem nome e sem campos, na subconta. Rode ` +
+              `"formulario-acao --acao apagar -i ${novoId} --confirmo" para removê-lo. ` +
+              `Erro original: ${e2 instanceof Error ? e2.message : String(e2)}`,
+            );
+          }
           break;
         }
         case "editar": {
@@ -1055,7 +1074,9 @@ async function runFormularioAcao(opts: {
       }
     } catch (e) {
       fs.writeFileSync(registro, JSON.stringify({
-        em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes, aplicado: false, erro: String(e),
+        em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes, aplicado: false,
+        ...(novoId ? { criadoId: novoId, criado } : {}),
+        erro: String(e),
       }, null, 2));
       throw e;
     }

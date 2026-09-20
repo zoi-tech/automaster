@@ -215,6 +215,15 @@ export function aplicar(
         alvo[partes.at(-1)!] = o.valor;
         break;
       }
+      default:
+        // sem este default, um `op` com typo era ignorado em silêncio: o loop
+        // seguia, a operação não acontecia, e quem chamou terminava com
+        // "aplicado:true" sem saber que nada mudou.
+        throw new Error(
+          `operação desconhecida: "${(o as any).op}". Aceitas: adicionar-campo, remover-campo, ` +
+          "renomear-campo, reordenar-campos, mover-campo, criar-slide, remover-slide, " +
+          "renomear-slide, reordenar-slides, definir-logica, definir.",
+        );
     }
   }
 

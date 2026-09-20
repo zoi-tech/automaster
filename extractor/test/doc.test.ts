@@ -209,3 +209,10 @@ test("definir-logica em formulário grava sem checar jumpTarget (sem slides p/ v
   const d = aplicar(form(), [{ op: "definir-logica", regras }]);
   assert.deepEqual(d.form.conditionalLogic, regras);
 });
+
+test("op desconhecido estoura, não é ignorado em silêncio", () => {
+  assert.throws(
+    () => aplicar(form(), [{ op: "renomear-cmpo", alvo: "email", label: "x" } as any]),
+    /operação desconhecida: "renomear-cmpo"/,
+  );
+});
