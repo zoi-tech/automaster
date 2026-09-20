@@ -60,7 +60,7 @@ export class DumpWriter {
   /** Entidade no envelope {fetchedAt, raw: <resposta API intocada>}. */
   async writeEntity(
     name: "pipelines" | "tags" | "custom_fields" | "users" | "calendars" | "custom_values"
-      | "message_templates" | "whatsapp_templates" | "forms" | "surveys",
+      | "message_templates" | "whatsapp_templates" | "forms" | "surveys" | "email_templates",
     raw: unknown,
   ): Promise<void> {
     await writeJson(path.join(this.dir, `${name}.json`), { fetchedAt: new Date().toISOString(), raw });

@@ -21,6 +21,7 @@ import {
 } from "./api/settings.js";
 import { createGroup, sendGroupMessage, checkInternalChat, updateInternalChatParticipants } from "./api/group.js";
 import { listWorkflows, fetchWorkflow } from "./api/workflows.js";
+import { fetchEmailTemplates } from "./api/emails.js";
 import {
   listForms, listSurveys, getForm, getSurvey,
   listFormSubmissions, listSurveySubmissions,
@@ -160,6 +161,7 @@ async function runExtract(opts: { location: string }): Promise<void> {
     for (const [nome, buscar] of [
       ["message_templates", () => fetchMessageTemplates(client, locationId)],
       ["whatsapp_templates", () => waTemplates(client, locationId)],
+      ["email_templates", () => fetchEmailTemplates(client, locationId)],
       ["forms", () => listForms(client, locationId)],
       ["surveys", () => listSurveys(client, locationId)],
     ] as const) {
