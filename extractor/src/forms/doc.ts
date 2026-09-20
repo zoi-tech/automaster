@@ -27,7 +27,7 @@ export type Op =
   | { op: "renomear-slide"; alvo: string; nome: string }
   | { op: "reordenar-slides"; ordem: string[] }
   | { op: "definir"; caminho: string; valor: unknown }
-  | { op: "definir-logica"; slide?: string; regras: unknown[] };
+  | { op: "definir-logica"; regras: unknown[] };
 
 /** Elementos da lista que não são campo de dado (só existem em formulário). */
 const NAO_CAMPO = new Set(["button", "header", "terms_and_conditions"]);
@@ -179,9 +179,9 @@ export function aplicar(
         break;
       }
       case "definir-logica": {
-        // `slide` do tipo é ignorado de propósito: form.conditionalLogic é do
-        // documento inteiro, não por slide — nenhuma das 29 amostras reais
-        // tem lógica por slide (ver docs/superpowers/.../logica-condicional.md).
+        // Sem `slide`: form.conditionalLogic é do documento inteiro, não por
+        // slide — nenhuma das 29 amostras reais tem lógica por slide (ver
+        // docs/superpowers/.../logica-condicional.md).
         const regras = o.regras as any[];
         if (ehSurvey(doc)) {
           for (const r of regras) {
