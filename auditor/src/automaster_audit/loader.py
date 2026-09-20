@@ -82,6 +82,7 @@ class DumpContext:
     cv_keys: set[str] = field(default_factory=set)  # chaves custom_values, lower-case
     # templates por canal (ausentes em dumps anteriores; lista vazia = regra no-op)
     template_ids: dict[str, set[str]] = field(default_factory=dict)
+    email_templates: list[dict] = field(default_factory=list)
     template_names: dict[str, str] = field(default_factory=dict)
     # formulários e surveys (ausentes em dumps anteriores; chave ausente = regra no-op)
     form_ids: dict[str, set[str]] = field(default_factory=dict)
@@ -188,6 +189,7 @@ def _load_templates(ctx: DumpContext, path: Path) -> None:
     arquivos = {
         "message": path / "message_templates.json",
         "whatsapp": path / "whatsapp_templates.json",
+        "email": path / "email_templates.json",
     }
     msgs = _entity_raw_optional(arquivos["message"]).get("templates", []) or []
     # a resposta de WhatsApp é uma lista, não um objeto — _entity_raw a descartaria
@@ -197,7 +199,12 @@ def _load_templates(ctx: DumpContext, path: Path) -> None:
         wa_raw = wa_raw.get("templates")
     was = wa_raw if isinstance(wa_raw, list) else []
 
-    for canal, itens in (("message", msgs), ("whatsapp", was)):
+    # `builders` traz pastas junto; pasta não é template e não pode virar achado.
+    builders = _entity_raw_optional(arquivos["email"]).get("builders", []) or []
+    emails = [b for b in builders if b.get("templateType") != "folder"]
+    ctx.email_templates = emails
+
+    for canal, itens in (("message", msgs), ("whatsapp", was), ("email", emails)):
         if not arquivos[canal].exists():
             continue  # canal ausente do dump: fica fora do template_ids (≠ lista vazia)
         ids = set()
