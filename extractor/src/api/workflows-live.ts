@@ -124,3 +124,149 @@ export function inscricoesDoContato(
 ): Promise<{ count?: number; workflowStatuses?: InscricaoCrua[] }> {
   return client.getJson(`${WF}/${loc}/contact/${cid}/statuses_v2`);
 }
+
+/** Uma inscrição achatada nos campos que a gente usa nos dois lados da leitura. */
+export interface Inscricao {
+  inscricaoId: string;
+  contactId: string;
+  contato?: string;
+  status: string;
+  entrouEm: string;
+  passo: string;
+  passoTipo: string;
+  proximaExecucao: string;
+  origem: string;
+  origemNome: string;
+}
+
+/** Campo ausente vira string vazia: a rota é interna e pode parar de mandar qualquer um. */
+export function normalizarInscricao(c: InscricaoCrua): Inscricao {
+  return {
+    inscricaoId: String(c._id ?? c.id ?? ""),
+    contactId: String(c.contactId ?? ""),
+    status: String(c.status ?? ""),
+    entrouEm: String(c.createdAt ?? ""),
+    passo: String(c.currentStepName ?? ""),
+    passoTipo: String(c.currentStepType ?? ""),
+    proximaExecucao: String(c.nextExecutionOn ?? ""),
+    origem: String(c.meta?.addedSource?.source ?? ""),
+    origemNome: String(c.meta?.addedSource?.sourceName ?? ""),
+  };
+}
+
+/** Apara no teto e diz se aparou. Quem chama precisa declarar o corte na resposta. */
+export function cortar<T>(linhas: T[], limite: number): { linhas: T[]; cortou: boolean } {
+  if (linhas.length <= limite) return { linhas, cortou: false };
+  return { linhas: linhas.slice(0, limite), cortou: true };
+}
+
+/**
+ * Por que a lista veio vazia. Lista vazia muda vale um bug inteiro: foi assim que a
+ * agenda sumiu em silêncio quando a data ia em texto (docs/endpoints.md, seção Agenda).
+ */
+export function porqueVazio(estrangulado: boolean): string {
+  return estrangulado
+    ? "o servidor estrangulou a subconta (isLocationRateLimited) e devolveu a busca cortada; " +
+      "não dá para afirmar que não há ninguém dentro. Tente de novo em alguns minutos."
+    : "nenhum contato está dentro deste workflow agora.";
+}
+
+export interface SaidaPorWorkflow {
+  workflow: { id: string; name?: string; status?: string };
+  total_historico?: number;
+  terminados?: number;
+  dentro_agora: number;
+  cortou: boolean;
+  estrangulado: boolean;
+  inscricoes: Inscricao[];
+  vazio_porque?: string;
+}
+
+/** O lado "quem está dentro deste workflow". */
+export function resumoPorWorkflow(a: {
+  workflow: WorkflowLinha;
+  cruas: InscricaoCrua[];
+  total?: number;
+  finished?: number;
+  cortou: boolean;
+  estrangulado: boolean;
+  nomes: Record<string, string>;
+}): SaidaPorWorkflow {
+  const inscricoes = a.cruas.map((c) => {
+    const i = normalizarInscricao(c);
+    const nome = a.nomes[i.contactId];
+    return nome ? { ...i, contato: nome } : i;
+  });
+  return {
+    workflow: { id: a.workflow.id, name: a.workflow.name, status: a.workflow.status },
+    total_historico: a.total,
+    terminados: a.finished,
+    dentro_agora: inscricoes.length,
+    cortou: a.cortou,
+    estrangulado: a.estrangulado,
+    inscricoes,
+    ...(inscricoes.length ? {} : { vazio_porque: porqueVazio(a.estrangulado) }),
+  };
+}
+
+export interface SaidaPorContato {
+  contactId: string;
+  dentro_agora: number;
+  inscricoes: (Inscricao & { workflowId: string; workflow?: string })[];
+  vazio_porque?: string;
+}
+
+/** O lado "em que workflows este contato está". Mesma linha normalizada do outro lado. */
+export function resumoPorContato(a: {
+  contactId: string;
+  cruas: InscricaoCrua[];
+  nomesWorkflow: Record<string, string>;
+}): SaidaPorContato {
+  const inscricoes = a.cruas.map((c) => {
+    const wid = String(c.workflowId ?? "");
+    const nome = a.nomesWorkflow[wid];
+    return { ...normalizarInscricao(c), workflowId: wid, ...(nome ? { workflow: nome } : {}) };
+  });
+  return {
+    contactId: a.contactId,
+    dentro_agora: inscricoes.length,
+    inscricoes,
+    ...(inscricoes.length
+      ? {}
+      : { vazio_porque: "nenhum workflow tem este contato dentro agora." }),
+  };
+}
+
+export interface SaidaAcao {
+  aplicado: true;
+  acao: string;
+  workflowId: string;
+  resposta: unknown;
+  registro: string;
+  aviso?: string;
+}
+
+/**
+ * Saída de `workflow-acao`, pura para que um teste morda se alguém tirar o `aviso` —
+ * é exatamente o que já aconteceu com `saidaPaletaGravar` (src/forms/style.ts:151).
+ */
+export function saidaWorkflowAcao(a: {
+  acao: string; workflowId: string; resposta: unknown; registro: string; aviso?: string;
+}): SaidaAcao {
+  return {
+    aplicado: true, acao: a.acao, workflowId: a.workflowId,
+    resposta: a.resposta, registro: a.registro,
+    ...(a.aviso ? { aviso: a.aviso } : {}),
+  };
+}
+
+/**
+ * O que despublicar faz com quem está dentro. Não é perda: o app tem o estado
+ * `paused_due_to_draft_mode` e os contatos retomam de onde pararam na republicação —
+ * todos de uma vez, que é o risco de verdade.
+ */
+export function avisoDespublicar(n: number): string {
+  if (n <= 0) return "nenhum contato está dentro; despublicar não afeta ninguém agora.";
+  return `${n} contato(s) estão dentro agora. Eles não são removidos: congelam no passo em ` +
+    "que estão e voltam a andar, todos de uma vez, quando o workflow for republicado.";
+}
