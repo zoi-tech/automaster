@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizarInscricao, cortar, porqueVazio, resumoPorWorkflow, resumoPorContato,
-  saidaWorkflowAcao, avisoDespublicar, type InscricaoCrua,
+  saidaWorkflowAcao, avisoDespublicar, resolverInscricao, type InscricaoCrua,
 } from "../src/api/workflows-live.js";
 
 const crua: InscricaoCrua = {
@@ -136,4 +136,23 @@ test("avisoDespublicar diz o número e que os contatos retomam, não somem", () 
 
 test("avisoDespublicar no vazio não fala de congelamento", () => {
   assert.match(avisoDespublicar(0), /nenhum contato/i);
+});
+
+test("resolverInscricao acha a única inscrição do contato naquele workflow", () => {
+  const r = resolverInscricao([{ _id: "S1", workflowId: "W1" }, { _id: "S2", workflowId: "W2" }], "W1");
+  assert.deepEqual(r, { id: "S1" });
+});
+
+test("resolverInscricao recusa quando o contato está duas vezes no mesmo workflow", () => {
+  const r = resolverInscricao([{ _id: "S1", workflowId: "W1" }, { _id: "S3", workflowId: "W1" }], "W1");
+  assert.ok("erro" in r);
+  assert.match(r.erro, /S1/);
+  assert.match(r.erro, /S3/);
+  assert.match(r.erro, /--inscricao/);
+});
+
+test("resolverInscricao recusa quando o contato não está no workflow", () => {
+  const r = resolverInscricao([{ _id: "S1", workflowId: "W2" }], "W1");
+  assert.ok("erro" in r);
+  assert.match(r.erro, /não está/i);
 });

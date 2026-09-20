@@ -29,6 +29,7 @@
     "pipeline": "tsx src/cli.ts pipeline",
     "agenda": "tsx src/cli.ts agenda",
     "workflows-ao-vivo": "tsx src/cli.ts workflows-ao-vivo",
+    "workflow-acao": "tsx src/cli.ts workflow-acao",
     "formularios": "tsx src/cli.ts formularios",
     "formulario-acao": "tsx src/cli.ts formulario-acao",
     "formulario-estilo": "tsx src/cli.ts formulario-estilo",

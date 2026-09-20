@@ -60,7 +60,7 @@ import {
 import {
   listarWorkflows, getWorkflowMeta, paginaDeInscritos, contarInscritos, inscricoesDoContato,
   resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, cortar,
-  mudarStatus, inscreverContato, removerContato, retomarInscricao,
+  mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao,
   STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
 } from "./api/workflows-live.js";
 import {
@@ -2221,5 +2221,125 @@ program
   .option("--nomes", "resolve o nome de cada contato: uma chamada por contato, é lento em lista grande")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runWorkflowsAoVivo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+async function runWorkflowAcao(opts: {
+  location: string; acao: string; id?: string; contato?: string; inscricao?: string;
+  status?: string; usuario?: string; inicio?: string; confirmo?: boolean; json?: boolean;
+}): Promise<void> {
+  const log = opts.json ? console.error : console.log;
+  if (!WF_ACOES.includes(opts.acao)) {
+    throw new Error(`--acao inválida: ${opts.acao}. Aceitas: ${WF_ACOES.join(", ")}`);
+  }
+  if (!opts.confirmo) {
+    throw new Error("Isto muda dado real da subconta e não tem desfazer. Repita com --confirmo.");
+  }
+  if (!opts.id) throw new Error(`${opts.acao} exige --id do workflow`);
+  if (opts.acao === "publicar") {
+    if (!opts.status) throw new Error("publicar exige --status: " + STATUS_WORKFLOW.join(" | "));
+    if (!STATUS_WORKFLOW.includes(opts.status as StatusWorkflow)) {
+      throw new Error(`--status inválido: ${opts.status}. Aceitos: ${STATUS_WORKFLOW.join(", ")}`);
+    }
+  } else if (opts.acao !== "retomar" && !opts.contato) {
+    throw new Error(`${opts.acao} exige --contato`);
+  } else if (opts.acao === "retomar" && !opts.contato && !opts.inscricao) {
+    throw new Error("retomar exige --inscricao <id> ou --contato <id>");
+  }
+
+  await withClient(opts.location, log, async (client, _page, tokens) => {
+    const userId = opts.usuario || decodeUserId(tokens.bearer, tokens.tokenId);
+    if (!userId) {
+      throw new Error(
+        "não deu para descobrir o usuário logado a partir dos tokens, e toda escrita de " +
+        "workflow é carimbada com o autor no histórico do GHL. Repita com --usuario <id>; " +
+        "o id está no users.json do dump.",
+      );
+    }
+
+    const wid = opts.id!;
+    let aviso: string | undefined;
+    let alvoInscricao = opts.inscricao;
+
+    // despublicar: conta quem está dentro ANTES, porque depois a busca reflete o novo estado
+    if (opts.acao === "publicar" && opts.status !== "published") {
+      const p = await paginaDeInscritos(client, opts.location, wid, 100).catch(() => null);
+      const stats = await contarInscritos(client, opts.location, wid).catch(() => ({} as { total?: number }));
+      const dentro = p ? p.linhas.length : (stats.total ?? 0);
+      aviso = avisoDespublicar(dentro);
+      log(`aviso: ${aviso}`);
+    }
+
+    if (opts.acao === "retomar" && !alvoInscricao) {
+      const d = await inscricoesDoContato(client, opts.location, opts.contato!);
+      const r = resolverInscricao(d.workflowStatuses ?? [], wid);
+      if ("erro" in r) throw new Error(r.erro);
+      alvoInscricao = r.id;
+    }
+
+    const corpo = {
+      acao: opts.acao,
+      workflowId: wid,
+      ...(opts.contato ? { contactId: opts.contato } : {}),
+      ...(alvoInscricao ? { inscricaoId: alvoInscricao } : {}),
+      ...(opts.status ? { status: opts.status } : {}),
+      usuario: userId,
+    };
+    const antes = await getWorkflowMeta(client, opts.location, wid).catch(() => null);
+    const registro = registroEscrita(opts.location, "_workflows", wid, {
+      ...corpo, antes, aplicado: false,
+    });
+    log(`snapshot: ${registro}`);
+
+    let r: unknown;
+    try {
+      switch (opts.acao) {
+        case "publicar":
+          r = await mudarStatus(client, opts.location, wid, opts.status as StatusWorkflow, userId);
+          break;
+        case "inscrever":
+          r = await inscreverContato(client, opts.location, wid, opts.contato!, userId, opts.inicio);
+          break;
+        case "remover":
+          r = await removerContato(client, opts.location, opts.contato!, wid, userId);
+          break;
+        case "retomar":
+          r = await retomarInscricao(client, opts.location, alvoInscricao!, userId);
+          break;
+      }
+    } catch (e) {
+      fs.writeFileSync(registro, JSON.stringify({
+        em: new Date().toISOString(), ...corpo, antes, aplicado: false, erro: String(e),
+      }, null, 2));
+      throw e;
+    }
+    fs.writeFileSync(registro, JSON.stringify({
+      em: new Date().toISOString(), ...corpo, antes, aplicado: true, resposta: r,
+    }, null, 2));
+
+    if (opts.acao === "inscrever") {
+      aviso = "a entrada no workflow é enfileirada pelo servidor: ler o estado agora pode " +
+        "não mostrar o contato ainda, sem que nada tenha falhado.";
+      log(`aviso: ${aviso}`);
+    }
+
+    const out = saidaWorkflowAcao({ acao: opts.acao, workflowId: wid, resposta: r, registro, aviso });
+    if (opts.json) console.log(JSON.stringify(out));
+    else log(`ok — ${opts.acao}; registro em ${registro}`);
+  });
+}
+
+program
+  .command("workflow-acao")
+  .description("ESCREVE: publica/despublica workflow, inscreve, remove ou retoma um contato")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("--acao <a>", WF_ACOES.join(" | "))
+  .requiredOption("-i, --id <id>", "id do workflow")
+  .option("--contato <id>", "id do contato (inscrever, remover, retomar)")
+  .option("--inscricao <id>", "id da inscrição (retomar); sem ele, resolve pelo contato")
+  .option("--status <s>", STATUS_WORKFLOW.join(" | ") + " (com --acao publicar)")
+  .option("--usuario <id>", "autor da ação; sem ele, sai do token")
+  .option("--inicio <iso>", "início programado da execução (inscrever), ISO com fuso")
+  .option("--confirmo", "obrigatório: muda dado real e não tem desfazer")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runWorkflowAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program.parseAsync(process.argv);

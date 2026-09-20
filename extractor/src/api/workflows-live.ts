@@ -316,3 +316,24 @@ export function retomarInscricao(
     actionFrom: { userId, channel: CANAL, source: FONTE_INSCRICAO },
   });
 }
+
+/**
+ * Qual inscrição deste contato retomar num workflow. Duas inscrições no mesmo workflow é
+ * possível (a flag `allowMultiple` do GHL), e aí escolher por conta própria seria adivinhar.
+ */
+export function resolverInscricao(
+  cruas: InscricaoCrua[], wid: string,
+): { id: string } | { erro: string } {
+  const minhas = cruas
+    .filter((c) => String(c.workflowId ?? "") === wid)
+    .map((c) => String(c._id ?? c.id ?? ""))
+    .filter(Boolean);
+  if (!minhas.length) return { erro: `este contato não está no workflow ${wid} agora.` };
+  if (minhas.length > 1) {
+    return {
+      erro: `o contato tem ${minhas.length} inscrições neste workflow (${minhas.join(", ")}). ` +
+        "Escolha uma com --inscricao <id>.",
+    };
+  }
+  return { id: minhas[0] };
+}
