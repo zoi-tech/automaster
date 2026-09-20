@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizarInscricao, cortar, porqueVazio, resumoPorWorkflow, resumoPorContato,
-  saidaWorkflowAcao, avisoDespublicar, resolverInscricao, nomeContato, type InscricaoCrua,
+  saidaWorkflowAcao, avisoDespublicar, resolverInscricao, nomeContato, juntarPaginas,
+  type InscricaoCrua,
 } from "../src/api/workflows-live.js";
 
 const crua: InscricaoCrua = {
@@ -329,4 +330,29 @@ test("nomeContato cai para email quando não há nome nenhum", () => {
 
 test("nomeContato devolve string vazia quando nada serve", () => {
   assert.equal(nomeContato({}), "");
+});
+
+// O cursor da paginação é INCLUSIVO: a página seguinte repete a linha de referência
+// (achado ao vivo, item 8 da prova de leitura). `juntarPaginas` descarta essa repetição.
+test("juntarPaginas descarta a linha repetida no início da página seguinte", () => {
+  const acumulado: InscricaoCrua[] = [{ _id: "A" }, { _id: "B" }];
+  const novas: InscricaoCrua[] = [{ _id: "B" }, { _id: "C" }];
+  assert.deepEqual(juntarPaginas(acumulado, novas), [{ _id: "A" }, { _id: "B" }, { _id: "C" }]);
+});
+
+test("juntarPaginas não descarta nada quando a página seguinte não repete", () => {
+  const acumulado: InscricaoCrua[] = [{ _id: "A" }];
+  const novas: InscricaoCrua[] = [{ _id: "B" }, { _id: "C" }];
+  assert.deepEqual(juntarPaginas(acumulado, novas), [{ _id: "A" }, { _id: "B" }, { _id: "C" }]);
+});
+
+test("juntarPaginas com acumulado vazio (primeira página) devolve as novas inteiras", () => {
+  const novas: InscricaoCrua[] = [{ _id: "A" }, { _id: "B" }];
+  assert.deepEqual(juntarPaginas([], novas), novas);
+});
+
+test("juntarPaginas não descarta quando a linha não tem _id", () => {
+  const acumulado: InscricaoCrua[] = [{ contactId: "A" }];
+  const novas: InscricaoCrua[] = [{ contactId: "B" }];
+  assert.deepEqual(juntarPaginas(acumulado, novas), [{ contactId: "A" }, { contactId: "B" }]);
 });

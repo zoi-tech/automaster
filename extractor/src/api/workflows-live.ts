@@ -20,6 +20,7 @@ export interface WorkflowLinha {
   name?: string;
   status?: string;
   updatedAt?: string;
+  type?: string;
 }
 
 /**
@@ -29,6 +30,10 @@ export interface WorkflowLinha {
 export interface InscricaoCrua {
   _id?: string;
   id?: string;
+  /** Campo que o cursor de paginação exige (`referenceSid`) — é DIFERENTE de `contactId`
+   * (achado ao vivo, item 8 da prova de leitura). Mandar `contactId` no lugar dele estoura
+   * com erro HTTP na segunda página. */
+  sid?: string;
   contactId?: string;
   workflowId?: string;
   status?: string;
@@ -60,8 +65,10 @@ export function getWorkflowMeta(client: GhlClient, loc: string, wid: string): Pr
 }
 
 /**
- * Lista plana de workflows da subconta. Mesma rota que a extração usa, paginada por
- * offset; aqui só interessam id, nome e status correntes.
+ * Lista plana de workflows da subconta. Mesma rota que a extração usa (`workflows.ts`),
+ * paginada por offset; aqui só interessam id, nome e status correntes. `?type=workflow`
+ * já filtra no servidor, mas a extração original filtra de novo por `type` na resposta —
+ * mantido aqui para as duas não divergirem.
  */
 export async function listarWorkflows(client: GhlClient, loc: string): Promise<WorkflowLinha[]> {
   const limit = 100;
@@ -72,7 +79,7 @@ export async function listarWorkflows(client: GhlClient, loc: string): Promise<W
     );
     const rows = d.rows ?? [];
     todos.push(...rows);
-    if (!rows.length || todos.length >= (d.count ?? 0)) return todos;
+    if (!rows.length || todos.length >= (d.count ?? 0)) return todos.filter((r) => r.type === "workflow");
   }
 }
 
@@ -80,6 +87,14 @@ export async function listarWorkflows(client: GhlClient, loc: string): Promise<W
  * Uma página de inscritos. Sem `cursor`, traz a primeira; com `cursor`, a seguinte.
  * `isLocationRateLimited` é uma bandeira do próprio servidor dizendo que estrangulou a
  * subconta — resposta curta com ela ligada é resposta cortada, não lista curta.
+ *
+ * O cursor é `referenceId`/`referenceCreatedAt`/`referenceSid`, e `referenceSid` é o campo
+ * `sid` da linha — NÃO `contactId` (achado ao vivo, item 8): mandar `contactId` faz o
+ * servidor devolver erro HTTP na segunda página. `action=prev`, `skip`, `offset` e `page`
+ * não existem, também dão erro HTTP.
+ *
+ * Se a última linha não tiver `sid`, não dá para montar o próximo cursor: a página sai
+ * sem `cursor`, e quem chama para de paginar. Melhor parar do que estourar.
  */
 export async function paginaDeInscritos(
   client: GhlClient, loc: string, wid: string, limite: number, cursor?: Cursor,
@@ -102,15 +117,27 @@ export async function paginaDeInscritos(
   const ultima = linhas.at(-1);
   return {
     linhas,
-    cursor: ultima
+    cursor: ultima?.sid
       ? {
           referenceId: String(ultima._id ?? ultima.id ?? ""),
           referenceCreatedAt: String(ultima.createdAt ?? ""),
-          referenceSid: String(ultima.contactId ?? ""),
+          referenceSid: String(ultima.sid),
         }
       : undefined,
     estrangulado: d.isLocationRateLimited === true,
   };
+}
+
+/**
+ * Junta uma nova página ao acumulado, descartando a repetição: o cursor é INCLUSIVO e a
+ * página seguinte traz de novo a linha de referência na frente (achado ao vivo, item 8).
+ * Função pura — a fiação de paginação não tinha teste, e foi lá que os defeitos desta
+ * feature se esconderam.
+ */
+export function juntarPaginas(acumulado: InscricaoCrua[], novas: InscricaoCrua[]): InscricaoCrua[] {
+  const ultimoId = acumulado.at(-1)?._id;
+  const repete = ultimoId !== undefined && novas[0]?._id === ultimoId;
+  return [...acumulado, ...(repete ? novas.slice(1) : novas)];
 }
 
 /** O lado inverso: em que workflows este contato está agora. */

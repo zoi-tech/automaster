@@ -22,10 +22,10 @@ módulo `extractor/src/api/workflows-live.ts` e dois comandos de CLI.
 - A tool `workflow` passa a declarar na descrição que lê o dump — o estado corrente é da
   tool nova. Comportamento inalterado.
 - Teto de 500 inscritos por leitura, ajustável, com declaração de corte.
-- Despublicar e inscrever foram exercitados ao vivo na Instaltech; quatro comportamentos
-  (retomar inscrição pausada, despublicar com gente congelando de verdade, remover contato
-  parado no meio, e efeito sobre inscrição dupla) ficaram sem prova — nenhum workflow
-  descartável tinha passo de espera. Detalhe em
+- As quatro escritas (publicar/despublicar, inscrever, remover, retomar) foram exercitadas
+  ao vivo na Instaltech; quatro comportamentos (retomar inscrição pausada, despublicar com
+  gente congelando de verdade, remover contato parado no meio, e efeito sobre inscrição
+  dupla) ficaram sem prova — nenhum workflow descartável tinha passo de espera. Detalhe em
   `docs/superpowers/handoffs/2026-09-20-workflows-ao-vivo-prova.md`.
 
 Rotas em `docs/endpoints.md`, seção `## Workflows ao vivo`.

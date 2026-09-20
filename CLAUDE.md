@@ -91,7 +91,7 @@ claude plugin install automaster@zoi
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
-Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 94 workflows). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
+Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
 
 ## Pontos críticos
 

@@ -61,7 +61,7 @@ import {
   listarWorkflows, getWorkflowMeta, paginaDeInscritos, inscricoesDoContato,
   resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, contarNaoTerminados, cortar,
   mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao, nomeContato,
-  STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
+  juntarPaginas, STATUS_WORKFLOW, type Cursor, type InscricaoCrua, type StatusWorkflow,
 } from "./api/workflows-live.js";
 import {
   listCalendars, getCalendar, freeSlots, listEvents, getAppointment, listNotes,
@@ -2112,18 +2112,22 @@ program
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runPipeline(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
-/** Busca páginas até o teto. O cursor vem da última linha de cada página. */
+/**
+ * Busca páginas até o teto. O cursor vem da última linha de cada página, e é INCLUSIVO:
+ * a página seguinte repete essa linha na frente. `juntarPaginas` descarta a repetição
+ * (achado ao vivo, item 8 da prova de leitura).
+ */
 async function todosOsInscritos(
   client: GhlClient, loc: string, wid: string, teto: number,
 ): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
-  const cruas: InscricaoCrua[] = [];
+  let cruas: InscricaoCrua[] = [];
   let cursor: Cursor | undefined;
   let estrangulado = false;
   // teto + 1 para saber que havia mais; `cortar` apara depois
   while (cruas.length <= teto) {
     const p = await paginaDeInscritos(client, loc, wid, 100, cursor);
     estrangulado = estrangulado || p.estrangulado;
-    cruas.push(...p.linhas);
+    cruas = juntarPaginas(cruas, p.linhas);
     if (p.linhas.length < 100 || !p.cursor) break;
     cursor = p.cursor;
   }
@@ -2161,7 +2165,9 @@ async function runWorkflowsAoVivo(opts: {
   if (opts.o === "dentro" && !opts.id) throw new Error("-o dentro exige --id do workflow");
   if (opts.o === "contato" && !opts.contato) throw new Error("-o contato exige --contato");
 
-  const teto = numeroOpcional(opts.limite, "limite", log) ?? WF_TETO_PADRAO;
+  // teto <= 0 faria o laço de busca não rodar nenhuma iteração e a resposta mentir
+  // "nenhum contato" sem ter perguntado nada ao servidor — piso de 1.
+  const teto = Math.max(1, numeroOpcional(opts.limite, "limite", log) ?? WF_TETO_PADRAO);
 
   await withClient(opts.location, log, async (client) => {
     let out: unknown;
@@ -2323,8 +2329,16 @@ async function runWorkflowAcao(opts: {
     }, null, 2));
 
     if (opts.acao === "inscrever") {
+      // `antes` já foi lido para o snapshot: dá para saber o status sem chamada nova.
+      // Achado ao vivo: inscrever num workflow que não está `published` devolve 200
+      // idêntico ao caso que funciona, e NENHUMA inscrição é criada — sucesso mudo.
+      const statusAntes = (antes as { status?: string } | null)?.status;
+      const naoPublicado = statusAntes && statusAntes !== "published"
+        ? ` O workflow está com status "${statusAntes}": o servidor aceita a chamada, ` +
+          "mas não cria inscrição nenhuma enquanto ele não estiver publicado."
+        : "";
       aviso = "a entrada no workflow é enfileirada pelo servidor: ler o estado agora pode " +
-        "não mostrar o contato ainda, sem que nada tenha falhado.";
+        "não mostrar o contato ainda, sem que nada tenha falhado." + naoPublicado;
       log(`aviso: ${aviso}`);
     }
 

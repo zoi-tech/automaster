@@ -74,7 +74,7 @@ são serviços diferentes no backend.
 |---|---|---|
 | Lista de workflows | `GET .../workflow/<loc>/list?type=workflow&limit=&offset=&sortBy=name&sortOrder=asc` | ✓ |
 | Meta de um workflow | `GET .../workflow/<loc>/<wid>?includeScheduledPauseInfo=true` | ✓ |
-| Inscritos de um workflow (paginado) | `GET .../workflows/status/search/workflow-with-filter?workflowId=&locationId=&limit=&action=first\|next&referenceId=&referenceCreatedAt=&referenceSid=` | ✓ |
+| Inscritos de um workflow (paginado) | `GET .../workflows/status/search/workflow-with-filter?workflowId=&locationId=&limit=&action=first\|next&referenceId=&referenceCreatedAt=&referenceSid=` | ✓ (primeira e segunda página) |
 | Workflows de um contato | `GET .../workflow/<loc>/contact/<cid>/statuses_v2` | ✓ |
 | Contagem de inscritos (`enroll-stats`) | `GET .../workflows/status/enroll-stats?workflowId=&locationId=` e as 3 variantes abaixo | ✓ (todas 404/401) |
 
@@ -86,8 +86,17 @@ são serviços diferentes no backend.
     GET /workflows/status/stats?...                                 → 404
 
 Não existe rota de contagem. O `count` que `workflow-with-filter` devolve é **tamanho da
-página**, não total de inscritos — confirmado ao vivo. Não há como saber quantas pessoas já
-passaram por um workflow sem paginar a lista inteira.
+página**, não total de inscritos — confirmado ao vivo com dois limites diferentes no mesmo
+workflow (`limit=1` → `count: 1`; `limit=10` → `count: 4`, com 4 linhas). Não há como saber
+quantas pessoas já passaram por um workflow sem paginar a lista inteira.
+
+**O cursor da segunda página são os três parâmetros `referenceId`/`referenceCreatedAt`/
+`referenceSid`, e `referenceSid` é o campo `sid` da linha — NÃO `contactId`.** Mandar
+`contactId` no lugar de `sid` devolve erro HTTP; foi assim que a paginação estourava em
+qualquer workflow com mais de 100 inscritos. **O cursor é INCLUSIVO**: a página seguinte traz
+de novo a própria linha de referência, na frente das novas — quem pagina precisa descartar
+essa repetição ou duplica uma inscrição por virada de página. `action=prev`, `skip`, `offset`
+e `page` **não existem**: todos dão erro HTTP.
 
 A meta do workflow vem na **raiz** da resposta, não sob `meta.workflow`: `{"_id":"...",
 "name":"...","status":"draft","updatedBy":"...","fileUrl":"...","version":10,...}`. O id fica
@@ -114,7 +123,7 @@ tamanho da lista mentia que ele estava em dez workflows.
 | O que | Rota | Corpo | Ao vivo |
 |---|---|---|---|
 | Publicar/despublicar | `PUT .../workflow/<loc>/change-status/<wid>` | `{status, updatedBy}` | ✓ |
-| Inscrever contato | `POST .../workflow/<loc>/<wid>/start-workflow` | `{contactId, actionFrom:{userId, source, channel}, eventStartTime?}` | ✓ |
+| Inscrever contato | `POST .../workflow/<loc>/<wid>/start-workflow` | `{contactId, actionFrom:{userId, source, channel}, eventStartTime?}` | ✓ (sem `eventStartTime`: o parâmetro não aparece em nenhum dos sete rastros de escrita, nunca foi exercitado) |
 | Remover contato | `POST .../workflow/<loc>/contact/<cid>/stop-execution` | `{workflowId, removedFrom:{userId, channel, source}}` | ✓ |
 | Retomar inscrição | `POST .../workflow/<loc>/<inscricaoId>/force-resume` | `{actionFrom:{userId, channel, source}}` | ✓ (sobre inscrição `finished`, ver abaixo) |
 
@@ -125,8 +134,9 @@ usuário do token — a autoria funciona de ponta a ponta (confirmado ao vivo: m
 **Inscrever num workflow em `draft` devolve 200 e não cria inscrição nenhuma.** A resposta é
 idêntica à de uma inscrição que funciona (`200 {"msg":"ADD To WF:... PubSub
 StartWorker:...","error":false}`), em duas tentativas, sem nenhuma linha nova depois. Só
-publicar o workflow fez a inscrição aparecer. O comando não tem como distinguir os dois casos
-pela resposta.
+publicar o workflow fez a inscrição aparecer. A resposta do servidor é idêntica nos dois
+casos, mas o comando já lê o status do workflow antes de escrever (para o snapshot) e agora
+avisa quando ele não é `published`.
 
 **Despublicar não remove ninguém: congela.** Quem está dentro para no passo em que está e
 volta a andar, todo mundo de uma vez, quando o workflow for republicado.

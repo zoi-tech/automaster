@@ -5,7 +5,7 @@ description: Como ler o que as tools automaster (dumps, comparar, inventario, ac
 
 # Leitura do domínio automaster
 
-As tools devolvem fatos do dump. Esta skill diz o que cada fato costuma significar. Números de referência: subconta Instaltech, 94 workflows.
+As tools devolvem fatos do dump. Esta skill diz o que cada fato costuma significar. Números de referência: subconta Instaltech, 72 workflows.
 
 **Comece pelo mapa.** `inventario(loc)` custa ~130 tokens e responde quantos workflows, tags, fields, órfãs. Só peça uma fatia (`fatia="workflows"`, ~10k tokens) quando a pergunta exigir a lista. Toda resposta traz `_snapshot.idade_dias`: você decide se a idade importa para a pergunta; não há aviso automático.
 
@@ -157,4 +157,6 @@ presença atual. `dentro_agora` já conta só quem não terminou; não some o ta
 passo em que está e volta a andar, todo mundo de uma vez, quando o workflow for republicado.
 **Inscrever é enfileirado pelo servidor**: conferir logo em seguida pode não mostrar o
 contato ainda, sem que a escrita tenha falhado — reler depois de alguns segundos antes de
-concluir que não funcionou.
+concluir que não funcionou. **Inscrever num workflow que não está `published` devolve
+sucesso e não cria inscrição nenhuma** — a resposta do servidor é idêntica ao caso que
+funciona; o comando lê o status antes de escrever e avisa quando ele não é `published`.
