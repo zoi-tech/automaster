@@ -85,7 +85,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
-.venv/bin/python -m pytest -q                             # suíte (328 testes)
+.venv/bin/python -m pytest -q                             # suíte (329 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -109,7 +109,10 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
   estreia rota: as três mandam o corpo pelo mesmo save. O step novo vai em JSON cru (`--corpo`)
   porque os `attributes` dos 41 tipos não são modelados — copie um step do mesmo tipo como
   molde. A âncora (`--depois-de`) pode ser um nó de ramo (é assim que se põe ação dentro do
-  "sim"), nunca um container. Nó de ramo (`transition`, `branch-yes`, `branch-no`) não se
+  "sim"), nunca um container; **sem `--depois-de` o step entra no início do fluxo**, que é a
+  única porta num workflow recém-criado (ele nasce sem step nenhum). Com `--ramos` o step
+  nasce container: `if_else` ganha condition-node, `branch-yes`/`branch-no`, `sibling` e
+  `attributes.branches` com os ids batendo; os outros containers usam `transition`. Nó de ramo (`transition`, `branch-yes`, `branch-no`) não se
   remove sozinho: é estrutura do container, indexada por `attributes.branches` e pelo
   `sibling[]`. Container só sai com `--com-subarvore`. Step criado sem
   `advanceCanvasMeta.position` aparece no lugar certo — o editor calcula o layout (provado ao

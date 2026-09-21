@@ -292,6 +292,21 @@ por isso ramo não se remove sozinho.
 **`order` não é endereço.** Existe em todos os steps, mas em 42 dos 71 workflows a sequência
 não é contígua (num deles todo step tem `order: 0`). Serve como campo a preencher.
 
+**Workflow criado pela API nasce com `workflowData.templates` VAZIO**, e por isso o primeiro
+step não tem âncora: `step-criar` sem `--depois-de` põe o step no início do fluxo, que é a
+única porta de entrada num workflow do zero. Com steps já existentes e uma entrada só, o step
+novo vira a entrada e a antiga pendura nele; com mais de uma entrada, recusa.
+
+**Container montado pela API abre certo no editor.** Um `if_else` criado com dois ramos
+(`Tem` + `None`) apareceu como condição com as duas saídas, com o step de dentro do ramo no
+lugar. O app mostra o rótulo de `attributes.conditionName` ("Condition"), não o `name` do
+step — quem quiser o nome na caixa, escreve os dois.
+
+**O `conditions` de um trigger usa `field`, não `key`.** O POST recusa com
+`400 {"errors":["conditions.0.field: Condition field is required"]}`. A forma que funciona,
+copiada de um trigger real: `{operator, field, value, title, type, id}` — por exemplo
+`{"operator":"index-of-true","field":"tagsAdded","value":"<tag>","title":"Tag adicionada","type":"select","id":"tag-added"}`.
+
 Removido um container com a subárvore inteira (um `whatsapp_v2` multi-path com dois
 `transition` e o step que pendia deles), o editor desenhou o fluxo terminando na âncora, sem
 seta solta nem caixa fantasma.

@@ -41,6 +41,28 @@ inclusive na de uma prévia que não escreveu nada — foi assim que ela aparece
 recusas acima. Agora só sai quando a invocação pedia gravação (`--confirmo`, ou
 `contato-editar`, que grava direto por não ter prévia). Dois testes fixam os dois lados.
 
+## Segunda rodada: workflow inteiro do zero
+
+Feita logo depois, na mesma sessão. `ZZ automaster do zero`, criado e apagado: criar o
+workflow numa pasta, plantar o primeiro step sem âncora, inserir um `if_else` com dois ramos,
+pôr uma ação dentro do ramo "Tem", adicionar um trigger de tag. O editor desenhou tudo —
+trigger, ação, condição com as duas saídas, ação dentro do ramo, FIM nas duas pontas.
+
+**Workflow criado pela API nasce sem step nenhum.** Era o buraco: `step-criar` exigia
+`--depois-de`, e não havia âncora. Sem a flag, o step agora entra no início do fluxo.
+
+**O `conditions` de um trigger usa `field`, não `key`** — `400 {"errors":["conditions.0.field:
+Condition field is required"]}`. A forma que funciona está em `docs/endpoints.md`.
+
+**O app rotula o `if_else` por `attributes.conditionName`, não pelo `name` do step.** A caixa
+saiu como "Condition" mesmo com `name: "Tem a tag?"`. Escreva os dois.
+
+**Publicar não foi exercitado**: a chamada foi barrada pela guarda local de deploy da sessão,
+e publicar um workflow com trigger de tag na subconta de um cliente não é coisa de teste. O
+que isso deixa em aberto é se o servidor aceita publicar um workflow inteiramente montado por
+API — ele recusa publicar workflow com referência quebrada, e nada aqui tinha referência
+quebrada, mas ninguém viu.
+
 ## O que continua fora, por decisão
 
 **Mover container.** A cauda de um container pende dos ramos, não dele: "o que emenda onde"
@@ -48,11 +70,6 @@ não tem resposta única, e qualquer escolha seria semântica inventada.
 
 **Remover um ramo isolado.** Pelo mesmo motivo — ramo é estrutura do container, indexada por
 `attributes.branches` e pelo `sibling[]` dos irmãos.
-
-**Criar container.** `step-criar` aceita qualquer JSON, então tecnicamente dá para mandar um
-`if_else` com ramos; mas isso exigiria montar à mão o condition-node, os nós de ramo e o
-`attributes.branches` coerentes entre si, e nada disso foi exercitado. Quem tentar, tente numa
-cópia descartável.
 
 **Nenhuma das três ações foi exercitada em workflow PUBLICADO.** A guarda existe
 (`guardaPublicado` exige `--publicado`), e é a mesma das ações da parte A, já provada. Mas

@@ -6,8 +6,9 @@ instalado faz sobe a versão aqui; o time atualiza com
 
 ## 0.18.0 — 2026-09-21
 
-O corpo do workflow passa a se montar pelo MCP: criar, remover e mover step do canvas.
-Continuam 31 tools e 18 regras; 179 testes no extractor, 328 no auditor.
+O corpo do workflow passa a se montar pelo MCP: criar, remover e mover step do canvas — e,
+com isso, montar um workflow inteiro do zero, trigger e bifurcação inclusive. Continuam 31
+tools e 18 regras; 186 testes no extractor, 329 no auditor.
 
 - **Três ações novas no `workflow_editar`: `step-criar`, `step-remover` e `step-mover`.**
   Como mexem no corpo, herdam tudo que a parte A construiu — snapshot antes da escrita,
@@ -17,6 +18,14 @@ Continuam 31 tools e 18 regras; 179 testes no extractor, 328 no auditor.
   modelados: o comando decide só o encadeamento (`id`, `parentKey`/`parent`, `next`, `order`).
   Copie um step existente do mesmo tipo como molde — schema inventado por tipo geraria caixa
   que o editor do app não abre.
+- **`step-criar` sem `depois_de` põe o step no INÍCIO do fluxo.** Era o que faltava para
+  nascer do zero: workflow criado pela API vem sem step nenhum, e sem âncora não havia como
+  plantar o primeiro. Com steps já existentes, o novo vira a entrada e a antiga pendura nele;
+  com mais de uma entrada, recusa e manda escolher.
+- **`step-criar` com `ramos` monta um container de N saídas.** Um `if_else` nasce com o
+  condition-node, os nós de ramo (`branch-yes`/`branch-no`), o `sibling[]` cruzado e o
+  `attributes.branches` com os ids batendo; os outros containers usam `transition`. A cauda da
+  âncora vai para o primeiro ramo, com aviso — um container não tem cauda própria.
 - **A âncora (`depois_de`) pode ser um nó de ramo**, que é como se põe uma ação dentro do
   "sim" de um `if_else`. Container de N saídas é recusado, com a mensagem dizendo em qual
   ramo ancorar.

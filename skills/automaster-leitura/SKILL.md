@@ -184,6 +184,10 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
   qual ramo ancorar; `step-remover` recusa nó de ramo (`transition`, `branch-yes`, `branch-no`),
   porque ele é estrutura do container e não um passo do fluxo, e recusa container sem
   `com_subarvore`, dizendo quantos steps sairiam junto. `step-mover` só move step simples.
+- **Workflow do zero monta-se assim:** `criar` (com `pasta`), `step-criar` SEM `depois_de`
+  para o primeiro step, `step-criar` com `ramos` para bifurcar, `trigger adicionar`, e por fim
+  publicar. Workflow recém-criado nasce sem step nenhum — é por isso que o primeiro step não
+  tem âncora.
 - **O `corpo` de `step-criar` é JSON cru, e os attributes não são validados.** Copie um step
   existente do mesmo tipo (via `workflow(loc, id)`) como molde: um `attributes` errado vira caixa
   que o editor do app não abre, e nenhuma das 18 regras acha isso estranho.

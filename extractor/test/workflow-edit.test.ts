@@ -329,3 +329,81 @@ test("moverStep recusa container e ramo", () => {
   assert.throws(() => moverStep(comRamos(), "cond", "a"), /container de N saídas/);
   assert.throws(() => moverStep(comRamos(), "sim", "a"), /ramo de container/);
 });
+
+// ---- primeiro step e containers (workflow do zero) ----
+
+test("criarStep sem âncora põe o primeiro step de um workflow vazio", () => {
+  const r = criarStep(doc([]), { type: "assign_user", name: "Atribui" });
+  const [novo] = r.doc.workflowData.templates as any[];
+  assert.equal(novo.type, "assign_user");
+  assert.equal("parentKey" in novo, false);
+  assert.equal("next" in novo, false);
+  assert.match(r.mudancas[0], /no início do fluxo/);
+});
+
+test("criarStep sem âncora vira a nova entrada e empurra a antiga para baixo", () => {
+  const r = criarStep(linha(), { type: "webhook" });
+  const novo = r.doc.workflowData.templates.find((s: any) => s.type === "webhook") as any;
+  assert.equal("parentKey" in novo, false);
+  assert.equal(novo.next, "a");
+  assert.equal(acha(r.doc, "a").parentKey, novo.id);
+});
+
+test("criarStep sem âncora recusa workflow com mais de uma entrada", () => {
+  const d = doc([
+    { id: "a", type: "sms", attributes: {} },
+    { id: "b", type: "sms", attributes: {} },
+  ]);
+  assert.throws(() => criarStep(d, { type: "webhook" }), /2 entradas[\s\S]*--depois-de/);
+});
+
+test("criarStep com ramos monta o if_else de três camadas", () => {
+  const r = criarStep(doc([]), { type: "if_else", name: "Tem tag?" }, undefined, [
+    { name: "Sim", branch: { operator: "and", segments: [{ conditions: [] }] } },
+    { name: "None", else: true },
+  ]);
+  const steps = r.doc.workflowData.templates as any[];
+  const cont = steps.find((s) => s.name === "Tem tag?");
+  const [sim, nao] = (cont.next as string[]).map((id) => steps.find((s) => s.id === id));
+  assert.equal(cont.nodeType, "condition-node");
+  assert.equal(cont.attributes.branches.length, 1);
+  // o id do ramo "sim" É a entrada em attributes.branches, como o servidor grava
+  assert.equal(cont.attributes.branches[0].id, sim.id);
+  assert.equal(cont.attributes.branches[0].operator, "and");
+  assert.equal(sim.nodeType, "branch-yes");
+  assert.deepEqual(sim.sibling, [nao.id]);
+  assert.equal(nao.nodeType, "branch-no");
+  assert.deepEqual(nao.attributes, { else: true });
+  assert.equal(nao.parentKey, cont.id);
+});
+
+test("criarStep com ramos fora do if_else usa transition, sem branches nem sibling", () => {
+  const r = criarStep(doc([]), { type: "workflow_split" }, undefined, [{ name: "A" }, { name: "B" }]);
+  const steps = r.doc.workflowData.templates as any[];
+  const cont = steps.find((s) => s.type === "workflow_split");
+  const ramos = (cont.next as string[]).map((id) => steps.find((s) => s.id === id));
+  assert.equal(cont.attributes.branches, undefined);
+  assert.deepEqual(ramos.map((x: any) => x.type), ["transition", "transition"]);
+  assert.equal(ramos[0].sibling, undefined);
+  assert.deepEqual(ramos.map((x: any) => x.name), ["A", "B"]);
+});
+
+test("criarStep com ramos manda a cauda da âncora para o primeiro ramo, e avisa", () => {
+  const r = criarStep(linha(), { type: "if_else" }, "a", [{ name: "Sim" }, { else: true }]);
+  const steps = r.doc.workflowData.templates as any[];
+  const cont = steps.find((s) => s.type === "if_else");
+  const primeiro = steps.find((s) => s.id === (cont.next as string[])[0]);
+  assert.equal(acha(r.doc, "a").next, cont.id);
+  assert.equal(primeiro.next, "b");
+  assert.equal(acha(r.doc, "b").parentKey, primeiro.id);
+  assert.match(r.avisos!.join(" "), /foi para o primeiro ramo/);
+});
+
+test("criarStep recusa um ramo só e mais de um else", () => {
+  assert.throws(() => criarStep(doc([]), { type: "if_else" }, undefined, [{ name: "Só" }]),
+    /pelo menos 2 ramos/);
+  assert.throws(() => criarStep(doc([]), { type: "if_else" }, undefined,
+    [{ else: true }, { else: true }]), /só um ramo pode ser o `else`/);
+  assert.throws(() => criarStep(doc([]), { type: "workflow_split" }, undefined,
+    [{ name: "A" }, { else: true }]), /só existe em if_else/);
+});

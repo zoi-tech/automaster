@@ -1027,6 +1027,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
                     trigger_acao: str | None = None,
                     trigger_id: str | None = None, trigger_corpo: dict | str | None = None,
                     corpo: dict | str | None = None, depois_de: str | None = None,
+                    ramos: list | str | None = None,
                     com_subarvore: bool = False, confirmo: bool = False,
                     publicado: bool = False, snapshot: str | None = None) -> dict:
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
@@ -1054,6 +1055,8 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         trigger_corpo = json.dumps(trigger_corpo, ensure_ascii=False)
     if corpo is not None and not isinstance(corpo, str):
         corpo = json.dumps(corpo, ensure_ascii=False)
+    if ramos is not None and not isinstance(ramos, str):
+        ramos = json.dumps(ramos, ensure_ascii=False)
 
     def _args(com_confirmo: bool, versao: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
@@ -1067,7 +1070,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
             ("--step", step), ("--caminho", caminho), ("--valor", valor),
             ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
             ("--trigger-corpo", trigger_corpo),
-            ("--corpo", corpo), ("--depois-de", depois_de),
+            ("--corpo", corpo), ("--depois-de", depois_de), ("--ramos", ramos),
         ):
             if valor_opcional is not None:
                 a += [flag, str(valor_opcional)]
@@ -1538,7 +1541,15 @@ TOOLS = {
                                                   "são modelados. `id`, `parentKey` e `next` são ignorados"},
                          "depois_de": {"type": "string",
                                        "description": "id do step que fica logo ANTES (step-criar, step-mover); "
-                                                      "pode ser um nó de ramo, não pode ser um container"},
+                                                      "pode ser um nó de ramo, não pode ser um container. Em "
+                                                      "step-criar, sem ele o step entra no INÍCIO do fluxo — é "
+                                                      "assim que nasce o primeiro step de um workflow do zero"},
+                         "ramos": {"type": "array",
+                                   "description": "step-criar: lista de ramos, e o step nasce container de N "
+                                                  "saídas. Cada ramo é {name, branch?, else?}; `branch` é a "
+                                                  "condição do if_else (segments/operator) e `else` marca o "
+                                                  "ramo None. Sem if_else os ramos viram `transition`",
+                                   "items": {"type": "object"}},
                          "com_subarvore": {"type": "boolean",
                                            "description": "step-remover: o container sai levando os ramos e "
                                                           "tudo que pende deles"},

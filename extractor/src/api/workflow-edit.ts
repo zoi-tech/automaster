@@ -421,28 +421,114 @@ function acharAncora(steps: Step[], depoisDe: string): Step {
   return ancora;
 }
 
-/** Costura `no` entre a âncora e o que ela apontava. Muta `steps` — uso interno, sobre clone. */
-function inserirDepois(steps: Step[], no: Step, ancora: Step): void {
-  const filho = primeiroNext(ancora);
-  reparentar(no, ancora.id);
-  if (filho) no.next = filho;
-  else delete no.next;
-  if (filho) {
-    const f = steps.find((s) => s.id === filho);
-    if (f) reparentar(f, no.id);
+/** Onde o step entra: o pai que passa a apontar para ele, e a cauda que ele herda. */
+interface Ponto { pai?: Step; cauda?: string }
+
+/**
+ * Sem `depoisDe` o step entra no INÍCIO do fluxo: vira a entrada do workflow e a entrada
+ * antiga passa a pendurar nele. Workflow sem step nenhum cai aqui também — é o único jeito
+ * de pôr o primeiro step, já que não existe âncora para ancorar.
+ */
+function pontoDeInsercao(steps: Step[], depoisDe?: string): Ponto {
+  if (depoisDe) {
+    const pai = acharAncora(steps, depoisDe);
+    return { pai, cauda: primeiroNext(pai) };
   }
-  ancora.next = Array.isArray(ancora.next) ? [no.id] : no.id;
+  const raizes = steps.filter((s) => s.id && !paiDe(s));
+  if (raizes.length > 1) {
+    throw new Error(
+      `sem --depois-de o step entra no início do fluxo, mas este workflow tem ${raizes.length} entradas ` +
+      `(${raizes.map((r) => r.id).join(", ")}): diga em qual ancorar com --depois-de.`,
+    );
+  }
+  return { cauda: raizes[0]?.id };
+}
+
+/** Costura `no` no ponto, com `recebeCauda` herdando o que vinha depois (o ramo, num container). */
+function costurar(steps: Step[], no: Step, ponto: Ponto, recebeCauda: Step): void {
+  reparentar(no, ponto.pai?.id);
+  if (ponto.cauda) {
+    recebeCauda.next = ponto.cauda;
+    const f = steps.find((s) => s.id === ponto.cauda);
+    if (f) reparentar(f, recebeCauda.id);
+  } else {
+    delete recebeCauda.next;
+  }
+  if (ponto.pai) ponto.pai.next = Array.isArray(ponto.pai.next) ? [no.id] : no.id;
+}
+
+/** Um ramo pedido na linha de comando: o rótulo humano, a condição, e quem é o "else". */
+export interface Ramo {
+  name?: string;
+  /** Conteúdo da entrada em `attributes.branches` do `if_else` (segments, operator…). */
+  branch?: Record<string, unknown>;
+  /** O ramo "None" do `if_else`: nasce `branch-no` e não entra em `attributes.branches`. */
+  else?: boolean;
 }
 
 /**
- * Insere um step novo entre `depoisDe` e o que ele apontava.
+ * Transforma `no` num container de N saídas e devolve os nós de ramo.
+ *
+ * Duas famílias, medidas nos 4.017 steps da Instaltech: o `if_else` tem nós de ramo que são
+ * eles mesmos `if_else` (`branch-yes`/`branch-no`), com `sibling[]` cruzado, e cujos ids são
+ * exatamente os `attributes.branches[].id` do container; os outros containers (`workflow_split`,
+ * `find_opportunity`, `wait` e `whatsapp_v2` multi-path) usam `transition`.
+ */
+function montarRamos(no: Step, ramos: Ramo[], ordemBase: number): Step[] {
+  if (ramos.length < 2) {
+    throw new Error("--ramos precisa de pelo menos 2 ramos: container de uma saída só é um step comum");
+  }
+  const elses = ramos.filter((r) => r.else).length;
+  if (elses > 1) throw new Error("--ramos: só um ramo pode ser o `else` (o \"None\" do if_else)");
+  const ehIf = no.type === "if_else";
+  if (!ehIf && elses) {
+    throw new Error(`--ramos: \`else\` só existe em if_else; num container ${no.type} todo ramo é uma saída nomeada`);
+  }
+  const nos: Step[] = ramos.map((r, i) => {
+    const base = {
+      id: randomUUID(),
+      name: r.name ?? (r.else ? "None" : `Ramo ${i + 1}`),
+      order: ordemBase + i + 1,
+      parentKey: no.id,
+    };
+    return ehIf
+      ? {
+          ...base, type: "if_else", cat: "conditions",
+          nodeType: r.else ? "branch-no" : "branch-yes",
+          attributes: r.else ? { else: true } : { if: false, conditionName: "Condition", operator: "and", branches: [] },
+        }
+      : { ...base, type: "transition", cat: "transition", attributes: {} };
+  });
+  no.next = nos.map((n) => n.id);
+  if (ehIf) {
+    for (const n of nos) n.sibling = nos.filter((o) => o.id !== n.id).map((o) => o.id);
+    no.nodeType = "condition-node";
+    no.cat = "conditions";
+    no.attributes = {
+      ...(no.attributes ?? {}),
+      branches: ramos.flatMap((r, i) =>
+        r.else ? [] : [{ ...(r.branch ?? {}), id: nos[i].id, name: nos[i].name }]),
+    };
+  }
+  return nos;
+}
+
+/**
+ * Insere um step novo entre `depoisDe` e o que ele apontava. Sem `depoisDe`, no início do
+ * fluxo — é assim que nasce o primeiro step de um workflow criado do zero.
  *
  * O corpo vem em JSON CRU: os `attributes` dos 41 tipos de step não são modelados aqui, e
  * inventar schema por tipo produziria step que o editor do app não abre — o caminho seguro é
  * copiar um step existente do mesmo tipo como molde. O que esta função decide é só o
  * encadeamento: `id`, `parentKey`/`parent`, `next` e `order`.
+ *
+ * Com `ramos`, o step nasce container de N saídas, com os nós de ramo já costurados. A cauda
+ * da âncora vai para o PRIMEIRO ramo: um container não tem "depois" próprio, o fluxo continua
+ * dentro de cada ramo, e mandar a cauda para o primeiro é a única escolha determinística.
  */
-export function criarStep(doc: Documento, corpo: Record<string, unknown>, depoisDe: string): Resultado {
+export function criarStep(
+  doc: Documento, corpo: Record<string, unknown>, depoisDe?: string, ramos?: Ramo[],
+): Resultado {
   if (!corpo || typeof corpo !== "object" || Array.isArray(corpo)) {
     throw new Error("--corpo precisa ser um objeto JSON com o step (pelo menos `type`)");
   }
@@ -453,7 +539,7 @@ export function criarStep(doc: Documento, corpo: Record<string, unknown>, depois
   out.workflowData ??= { templates: [] };
   out.workflowData.templates ??= [];
   const steps = out.workflowData.templates;
-  const ancora = acharAncora(steps, depoisDe);
+  const ponto = pontoDeInsercao(steps, depoisDe);
 
   const avisos: string[] = [];
   const ignorados = ["id", "parentKey", "parent", "next"].filter((k) => k in corpo);
@@ -474,13 +560,24 @@ export function criarStep(doc: Documento, corpo: Record<string, unknown>, depois
     order: ordem,
   } as Step;
 
-  inserirDepois(steps, novo, ancora);
-  steps.push(novo);
-  return {
-    doc: out,
-    mudancas: [`step ${novo.id} (${novo.type}) inserido depois de ${ancora.id}`],
-    avisos: avisos.length ? avisos : undefined,
-  };
+  const filhos = ramos?.length ? montarRamos(novo, ramos, ordem) : [];
+  costurar(steps, novo, ponto, filhos[0] ?? novo);
+  steps.push(novo, ...filhos);
+
+  const onde = depoisDe ? `depois de ${depoisDe}` : "no início do fluxo";
+  const mudancas = [
+    filhos.length
+      ? `container ${novo.id} (${novo.type}) com ${filhos.length} ramos inserido ${onde}`
+      : `step ${novo.id} (${novo.type}) inserido ${onde}`,
+    ...filhos.map((f) => `ramo ${f.id} (${f.name})`),
+  ];
+  if (filhos.length && ponto.cauda) {
+    avisos.push(
+      `o que vinha depois (${ponto.cauda}) foi para o primeiro ramo (${filhos[0].name}): um container ` +
+      "não tem cauda própria, o fluxo segue dentro de cada ramo",
+    );
+  }
+  return { doc: out, mudancas, avisos: avisos.length ? avisos : undefined };
 }
 
 /**
@@ -555,7 +652,8 @@ export function moverStep(doc: Documento, stepId: string, depoisDe: string): Res
   const { doc: out } = removerStep(doc, stepId);
   const restantes = out.workflowData.templates;
   const movido = clonar(alvo);
-  inserirDepois(restantes, movido, acharAncora(restantes, depoisDe));
+  const ancora = acharAncora(restantes, depoisDe);
+  costurar(restantes, movido, { pai: ancora, cauda: primeiroNext(ancora) }, movido);
   restantes.push(movido);
   return { doc: out, mudancas: [`step ${stepId} movido para depois de ${depoisDe}`] };
 }

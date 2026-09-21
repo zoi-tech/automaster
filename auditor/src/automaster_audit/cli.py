@@ -187,7 +187,7 @@ def run_workflow_editar(args: argparse.Namespace) -> int:
     from . import mcp_server
 
     campos = ("loc", "acao", "id", "nome", "pasta", "de", "para", "step", "caminho", "valor",
-              "trigger_acao", "trigger_id", "trigger_corpo", "corpo", "depois_de",
+              "trigger_acao", "trigger_id", "trigger_corpo", "corpo", "depois_de", "ramos",
               "com_subarvore", "confirmo", "publicado", "snapshot")
     try:
         r = mcp_server.workflow_editar(**{c: getattr(args, c) for c in campos})
@@ -270,7 +270,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_we.add_argument("--trigger-id", help="id do trigger (remover/substituir)")
     p_we.add_argument("--trigger-corpo", help="JSON do trigger novo (adicionar/substituir)")
     p_we.add_argument("--corpo", help="JSON do step novo (step-criar)")
-    p_we.add_argument("--depois-de", help="id do step que fica logo antes (step-criar/step-mover)")
+    p_we.add_argument("--depois-de", help="id do step que fica logo antes; sem ele step-criar põe no início")
+    p_we.add_argument("--ramos", help="lista JSON de ramos: o step nasce container (step-criar)")
     p_we.add_argument("--com-subarvore", action="store_true",
                       help="step-remover: container sai levando ramos e tudo que pende deles")
     p_we.add_argument("--confirmo", action="store_true",

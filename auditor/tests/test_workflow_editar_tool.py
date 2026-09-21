@@ -459,3 +459,16 @@ def test_gravacao_que_falha_ainda_manda_conferir_o_estado(monkeypatch):
     with pytest.raises(mcp_server.ToolError) as e:
         mcp_server.workflow_editar(loc="L1", acao="apagar", id="W1", confirmo=True)
     assert "parcialmente aplicada" in str(e.value)
+
+
+def test_ramos_vira_json_e_depois_de_pode_faltar(monkeypatch):
+    """Primeiro step de um workflow do zero: sem `depois_de`, e com ramos como lista."""
+    vistos = []
+    monkeypatch.setattr(mcp_server, "_run_extractor", lambda *a: vistos.append(a) or {"aplicado": False})
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    mcp_server.workflow_editar(loc="L1", acao="step-criar", id="W1",
+                               corpo={"type": "if_else"},
+                               ramos=[{"name": "Sim"}, {"else": True}])
+    args = vistos[0]
+    assert json.loads(args[args.index("--ramos") + 1]) == [{"name": "Sim"}, {"else": True}]
+    assert "--depois-de" not in args
