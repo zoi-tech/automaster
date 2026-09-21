@@ -1388,3 +1388,74 @@ nem `FuKXZth8OYvPJuzwr7u9` aparecendo na listagem) — é a mesma checagem de to
 conferência nova inventada aqui. Fora do escopo de formulário/survey, o contato de teste
 `ZlkU3kiMDr0xiIGLiMC5` (ver seção de submissão pública acima) continua na subconta, por
 decisão — não é resíduo esquecido.
+
+## Notas, tarefas e tags da subconta
+
+Tudo em `services.leadconnectorhq.com`, com os dois tokens da sessão. Mapeado a partir do
+mirror offline dos docs v3 (skill `ghl-api-docs`) e provado ao vivo na Instaltech em
+2026-09-21.
+
+### Notas do contato
+
+| O que | Rota | Corpo | Prova |
+|---|---|---|---|
+| Listar | `GET /contacts/<contactId>/notes` | — | |
+| Ler uma | `GET /contacts/<contactId>/notes/<noteId>` | — | |
+| Criar | `POST /contacts/<contactId>/notes` | `{body}` obrigatório; `userId`, `title`, `color`, `pinned` opcionais | responde **201** |
+| Editar | `PUT /contacts/<contactId>/notes/<noteId>` | qualquer subconjunto de `{body, title, color, pinned, userId}` | |
+| Apagar | `DELETE /contacts/<contactId>/notes/<noteId>` | — | devolve `succeeded`, com alias legado `succeded` |
+
+**Não confundir com nota de compromisso** (`/calendars/appointments/<id>/notes`, seção
+`## Agenda`): o pai ali é o compromisso, não o contato.
+
+`title`, `color` e `pinned` aparecem no schema de create/update mas não no exemplo de
+resposta — trate como possivelmente ausentes na leitura.
+
+### Tarefas do contato
+
+| O que | Rota | Corpo |
+|---|---|---|
+| Listar | `GET /contacts/<contactId>/tasks` | — |
+| Ler uma | `GET /contacts/<contactId>/tasks/<taskId>` | — |
+| Criar | `POST /contacts/<contactId>/tasks` | **`title`, `dueDate` e `completed` obrigatórios**; `body` e `assignedTo` opcionais |
+| Editar | `PUT /contacts/<contactId>/tasks/<taskId>` | tudo opcional (é patch, apesar do verbo) |
+| Concluir | `PUT /contacts/<contactId>/tasks/<taskId>/completed` | `{completed: true}` |
+| Apagar | `DELETE /contacts/<contactId>/tasks/<taskId>` | — |
+| Buscar na subconta | `POST /locations/<loc>/tasks/search` | `{contactId[], completed, assignedTo[], query, limit, skip}`; `limit` padrão 25 |
+
+**`completed` é obrigatório na criação** — sem ele o POST recusa. A CLI manda `false` por
+padrão.
+
+**`dueDate` é texto ISO 8601** (`2026-10-25T11:00:00Z`). É o inverso da armadilha da agenda,
+onde `/calendars/events` só aceita epoch em milissegundos e texto ISO devolve lista vazia sem
+erro.
+
+### Tags da subconta
+
+| O que | Rota | Corpo |
+|---|---|---|
+| Listar | `GET /locations/<loc>/tags/search?skip=0&limit=10000&query=&getCount=true` | — (já usado por `fetchTags`) |
+| Criar | `POST /locations/<loc>/tags` | `{name}`; responde **200**, não 201 |
+| Renomear | `PUT /locations/<loc>/tags/<tagId>` | `{name}` |
+| Apagar | `DELETE /locations/<loc>/tags/<tagId>` | — |
+
+**Renomear propaga para os workflows, inclusive no trigger.** Provado ao vivo em 2026-09-21
+(`docs/superpowers/provas/2026-09-21-prova-tag-rename.ts`): tag descartável citada por um step
+`add_contact_tag` e por um trigger `contact_tag`, renomeada pelo `PUT`; ao reler, os dois
+campos já traziam o nome novo. Isso importa porque **workflow guarda o NOME da tag, nunca o
+id** — em step, em trigger e em condição de `if_else`, medido em 34 de 34 valores do dump da
+Instaltech. Se o servidor não propagasse, renomear quebraria em silêncio todo workflow que
+cita a tag.
+
+O `POST` devolve campos que a doc não lista: `categoryId`, `description`, `color`, todos
+`null`. O `DELETE` devolve **as duas grafias**: `{"succeded":true,"succeeded":true}`.
+
+**Apagar é a operação perigosa, não renomear.** A tag sai de todos os contatos que a têm, com
+restauração por 60 dias segundo o help oficial (artigo hoje 404, só o resumo indexado
+sobreviveu). Se isso dispara os workflows com trigger de "tag removida" **não tem prova**: o
+rename tinha esse defeito até a HighLevel corrigi-lo em 15/05/2024, e provar no apagar
+exigiria disparar automação na base real de um cliente. Por isso a guarda `--apagar-citada`.
+
+**Não existe contagem de contatos por tag** em lugar nenhum do GHL: o payload da tag tem só
+`name`, `locationId` e `id`, e o pedido de mostrar a contagem na tela de Tags está com status
+"planned" (129 votos). A prévia do apagar declara que não sabe esse número em vez de estimá-lo.
