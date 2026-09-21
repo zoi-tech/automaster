@@ -48,11 +48,20 @@ export function salvarWorkflow(client: GhlClient, loc: string, wid: string, corp
 }
 
 /**
- * Rota usada pelo app quando SÓ triggers mudaram. O corpo é o mesmo do save
- * inteiro — não é operação mais leve nem mais segura, só outra URL.
+ * Lista AUTORITATIVA de triggers. É a mesma rota da leitura: o documento do
+ * workflow não traz os triggers, só `triggersFilePath`.
  */
-export function salvarSomenteTriggers(client: GhlClient, loc: string, wid: string, corpo: Record<string, unknown>): Promise<unknown> {
-  return client.putJson(`${WF_WRITE}/${loc}/only-triggers/${wid}`, corpo);
+export function listarTriggers(client: GhlClient, loc: string, wid: string): Promise<any[]> {
+  return client.getJson<any[]>(`${WF_WRITE}/${loc}/trigger?workflowId=${encodeURIComponent(wid)}`);
+}
+
+/**
+ * Única rota de ESCRITA de trigger provada ao vivo: apaga um trigger. Responde `{}`.
+ * Criar e trocar trigger não têm rota conhecida — `only-triggers` responde 200,
+ * incrementa `version` e NÃO cria nada (prova ao vivo, Task 8).
+ */
+export function apagarTrigger(client: GhlClient, loc: string, wid: string, triggerId: string): Promise<unknown> {
+  return client.deleteJson(`${WF_WRITE}/${loc}/trigger/${triggerId}?workflowId=${encodeURIComponent(wid)}`);
 }
 
 export function historicoVersoes(client: GhlClient, loc: string, wid: string): Promise<unknown> {

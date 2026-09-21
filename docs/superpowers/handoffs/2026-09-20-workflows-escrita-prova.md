@@ -306,3 +306,28 @@ própria cópia, e ela terminou.
 
 Uma inscrição `finished` (`01M3225QZ7NP4TEYW11377Z2WM`) referente a um workflow que já não
 existe é o único rastro no histórico, e sumiu junto com o workflow apagado.
+
+---
+
+## 5. O que a Task 9 fez com cada achado (2026-09-21, versão 0.15.0)
+
+| achado | o que mudou no código |
+|---|---|
+| §2.1 sem `triggersData` | `adicionar`/`substituir` trigger RECUSAM com mensagem explícita (parte B); `remover` usa o `DELETE .../trigger/<tid>?workflowId=<wid>`; `editarTriggers` e `salvarSomenteTriggers` saíram do código |
+| §2.2 `parentKey` | `alcancaveis()`/`removerStepsInalcancaveis()` leem `parentKey`; fixtures dos testes corrigidas (passavam por usarem o campo errado dos dois lados) |
+| §2.1e validação cega a trigger | `validar_edicao(..., triggers=None)`: com lista, usa a autoritativa; sem ela, mantém a do dump e marca `triggers_do_dump` — nunca mais lista vazia |
+| §2.3 `ValueError` crua | a tool MCP lê o dump ANTES da prévia (que abre o Chrome) e devolve `validacao.rodou: false` com o motivo; `ValueError` residual também vira `rodou: false` |
+| §2.5 aviso de `apagar` | texto próprio: "Apagar tira todos eles do fluxo agora, no passo em que estiverem, e não há desfazer" |
+| §2.5 registro de `duplicar` | `criar` e `duplicar` arquivam sob o id NOVO (o da resposta), com `origem` dentro do registro |
+| §2.5 PUT sem `workflowData` | comentado no código e documentado; o comando relê e devolve `versaoDepois` |
+
+### Limitações conhecidas, deixadas de propósito
+
+- **`trocar-ref` deixa o `title` velho** (§2.4). Não há de onde tirar o rótulo novo sem
+  resolver o id contra a entidade, e o id é quem manda. O comando passou a **avisar**
+  (`avisos` na saída, também impresso) quando o objeto alterado tem `title`.
+- **`renomear` e `mover` não passam pela guarda de publicado.** Nenhuma das duas altera o que
+  o contato vive; exigir `--publicado` para renomear seria atrito sem risco correspondente. A
+  guarda cobre `apagar`, as ações de corpo e a remoção de trigger.
+- **`only-triggers` não é mais usado**, e a função foi removida em vez de ficar disponível
+  para alguém reencontrar e acreditar que funciona.

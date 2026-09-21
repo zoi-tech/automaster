@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
-  salvarWorkflow, salvarSomenteTriggers, historicoVersoes, versaoPorNumero,
+  salvarWorkflow, listarTriggers, apagarTrigger, historicoVersoes, versaoPorNumero,
 } from "../src/api/workflows-write.js";
 
 type Chamada = { metodo: string; url: string; corpo?: unknown };
@@ -35,11 +35,20 @@ test("salvarWorkflow faz PUT no workflow, prefixo singular", async () => {
   });
 });
 
-test("salvarSomenteTriggers usa a rota only-triggers com o mesmo corpo", async () => {
+// A lista de triggers NÃO vem no documento do workflow, e o `only-triggers` responde 200
+// sem criar nada: a única escrita de trigger que funciona é este DELETE (prova ao vivo).
+test("listarTriggers lê a lista autoritativa pela rota de trigger", async () => {
   const { client, chamadas } = clienteFalso();
-  await salvarSomenteTriggers(client, LOC, WID, { name: "x" });
-  assert.equal(chamadas[0].url, "https://backend.leadconnectorhq.com/workflow/LOC1/only-triggers/WF1");
-  assert.deepEqual(chamadas[0].corpo, { name: "x" });
+  await listarTriggers(client, LOC, WID);
+  assert.equal(chamadas[0].metodo, "get");
+  assert.equal(chamadas[0].url, "https://backend.leadconnectorhq.com/workflow/LOC1/trigger?workflowId=WF1");
+});
+
+test("apagarTrigger faz DELETE no trigger com o workflowId na query", async () => {
+  const { client, chamadas } = clienteFalso();
+  await apagarTrigger(client, LOC, WID, "T1");
+  assert.equal(chamadas[0].metodo, "delete");
+  assert.equal(chamadas[0].url, "https://backend.leadconnectorhq.com/workflow/LOC1/trigger/T1?workflowId=WF1");
 });
 
 test("criarWorkflow faz POST na subconta com location_id no corpo", async () => {

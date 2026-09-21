@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, modelos_email) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, workflow_editar, modelos_email) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -134,7 +134,7 @@ devolve `aplicado` — cada uma tem sua própria forma de resposta:
   `paleta-ver` devolvem `{resultado}`; `previa-visual` devolve `{url, arquivo}` — nenhuma
   das três tem `aplicado`.
 
-## Workflows ao vivo (`workflows_ao_vivo`, `workflow_acao`)
+## Workflows ao vivo (`workflows_ao_vivo`, `workflow_acao`, `workflow_editar`)
 
 `workflow` lê o dump — o estado pode estar velho, com a idade que `_snapshot.idade_dias`
 declara. `workflows_ao_vivo` abre o Chrome e pergunta ao servidor agora. Não é redundância:
@@ -160,6 +160,25 @@ contato ainda, sem que a escrita tenha falhado — reler depois de alguns segund
 concluir que não funcionou. **Inscrever num workflow que não está `published` devolve
 sucesso e não cria inscrição nenhuma** — a resposta do servidor é idêntica ao caso que
 funciona; o comando lê o status antes de escrever e avisa quando ele não é `published`.
+
+`workflow_editar` muda a ESTRUTURA do workflow (cria, renomeia, move, duplica, apaga; troca uma
+referência ou uma tag, limpa steps inalcançáveis, altera um atributo de step, remove trigger).
+Como ler a resposta:
+
+- **`aplicado: false` com `diff` preenchido é PRÉVIA, não falha.** Sem `confirmo` a tool sempre
+  roda a prévia: ela mostra o diff e o documento editado e não grava nada. Para gravar, repita
+  com `confirmo=true`. `aplicado: false` com `motivo` começando em "nada a mudar" quer dizer que
+  a operação não achou alvo — também não é falha.
+- **`validacao.rodou: false` quer dizer que as 18 regras NÃO foram checadas**, por falta de dump
+  desta subconta em disco ou porque o workflow é mais novo que o último snapshot (recém-criado ou
+  duplicado). A escrita não fica travada por isso, mas ninguém conferiu se a edição quebra
+  alguma referência — extraia a subconta de novo se quiser a rede de proteção.
+- `validacao.pode_gravar: false` é recusa de verdade: a edição introduziria um ERROR novo, e
+  nada foi gravado. `erros_resolvidos` é o contrário: achados que a edição conserta.
+- **Trigger: só dá para REMOVER.** Criar e trocar trigger não têm rota conhecida e a tool recusa
+  — antes ela devolvia sucesso sem fazer nada.
+- `trocar-ref` troca o id, não o rótulo: o `title` humano do step continua o antigo e o comando
+  avisa em `avisos`. Quem for abrir o editor do GHL vai ver o nome velho ao lado do id novo.
 
 
 ## Templates de e-mail (modelos_email, stale_email_template, unused_email_template)

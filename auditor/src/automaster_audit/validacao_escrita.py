@@ -23,6 +23,10 @@ class ResultadoValidacao:
     erros_resolvidos: list[str] = field(default_factory=list)
     total_erros_antes: int = 0
     total_erros_depois: int = 0
+    #: True quando o chamador não passou a lista autoritativa de triggers e a
+    #: validação usou a do dump. Regra de trigger então vale para o estado do
+    #: snapshot, não para o de agora — e quem lê a saída precisa saber disso.
+    triggers_do_dump: bool = False
 
 
 def _normalizar_detalhe(detail: str) -> str:
@@ -40,8 +44,22 @@ def _chaves_erro(ctx: DumpContext, workflow_id: str) -> list[str]:
     )
 
 
-def validar_edicao(ctx: DumpContext, workflow_id: str, doc_editado: dict) -> ResultadoValidacao:
-    """`doc_editado` é o documento do GHL (com `workflowData.templates` e `triggersData`)."""
+def validar_edicao(
+    ctx: DumpContext,
+    workflow_id: str,
+    doc_editado: dict,
+    triggers: list | None = None,
+) -> ResultadoValidacao:
+    """Valida o documento editado; `triggers` é a lista AUTORITATIVA do workflow.
+
+    `doc_editado` é o documento do GHL (`workflowData.templates`). Ele **não** traz
+    trigger nenhum: o `GET /workflow/<loc>/<wid>` só devolve `triggersFilePath`. Por
+    isso os triggers do "depois" têm de vir de fora, de
+    `GET /workflow/<loc>/trigger?workflowId=<wid>`. Sem eles a validação mantém os
+    triggers do dump (o save de corpo não os altera — provado ao vivo) e marca
+    `triggers_do_dump`; ela nunca finge que a lista é vazia, senão todo ERROR de
+    trigger sairia como "resolvido".
+    """
     alvo = next((w for w in ctx.workflows if w.id == workflow_id), None)
     if alvo is None:
         raise ValueError(f"workflow {workflow_id} não está neste dump — extraia a subconta de novo")
@@ -51,7 +69,9 @@ def validar_edicao(ctx: DumpContext, workflow_id: str, doc_editado: dict) -> Res
     # cópia do contexto com o workflow trocado; o ctx do chamador não é tocado
     novo_raw = copy.deepcopy(alvo.raw)
     novo_raw["steps"] = {"templates": (doc_editado.get("workflowData") or {}).get("templates") or []}
-    novo_raw["triggers"] = doc_editado.get("triggersData") or []
+    triggers_do_dump = triggers is None
+    if triggers is not None:
+        novo_raw["triggers"] = triggers
     editado = Workflow(
         id=alvo.id,
         name=doc_editado.get("name") or alvo.name,
@@ -70,4 +90,5 @@ def validar_edicao(ctx: DumpContext, workflow_id: str, doc_editado: dict) -> Res
         erros_resolvidos=resolvidos,
         total_erros_antes=len(antes),
         total_erros_depois=len(depois),
+        triggers_do_dump=triggers_do_dump,
     )

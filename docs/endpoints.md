@@ -168,6 +168,67 @@ inscrição genuinamente pausada, despublicar com gente de verdade congelando, r
 contato parado no meio de um workflow, e o efeito da remoção por contato sobre inscrição
 dupla (`allowMultiple`). Ver o handoff citado acima.
 
+### Escrita de estrutura
+
+Provada ao vivo em 2026-09-21 na Instaltech, em dois workflows descartáveis criados e
+apagados na hora. Detalhe e respostas verbatim em
+`docs/superpowers/handoffs/2026-09-20-workflows-escrita-prova.md`.
+
+| O que | Rota | Corpo | Ao vivo |
+|---|---|---|---|
+| Ler o documento (steps completos) | `GET .../workflow/<loc>/<wid>` | — | ✓ |
+| Criar workflow | `POST .../workflow/<loc>` | `{name, parentId, location_id}` | ✓ (`{"id":"…","assetWarnings":[]}`) |
+| Duplicar workflow | `POST .../workflow/<loc>` | `{new_workflow_name, workflow_id, parentId, location_id}` | ✓ (`{"id":"…"}`) |
+| Renomear | `PUT .../workflow/<loc>/rename-workflow/<wid>` | `{name}` | ✓ (`version` +1) |
+| Mover de pasta | `PUT .../workflow/<loc>/move-directory/<wid>` | `{parentId}` | ✓ (`{"msg":"Updated successfully","error":false}`) |
+| Apagar | `DELETE .../workflow/<loc>/<wid>?userId=<uid>` | — | ✓ (`{"success":true}`) |
+| Salvar o corpo | `PUT .../workflow/<loc>/<wid>` | documento lido + `createdSteps`/`modifiedSteps`/`deletedSteps`/`updatedBy` | ✓ |
+| Histórico de versões | `GET .../workflow/<loc>/<wid>/history` | — | ✓ (`_id` = `<wid>-<n>`) |
+| Uma versão do histórico | `GET .../workflow/<loc>/<wid>/history-by-number/<n>` | — | ✗ |
+| Lista de triggers (autoritativa) | `GET .../workflow/<loc>/trigger?workflowId=<wid>` | — | ✓ |
+| Apagar trigger | `DELETE .../workflow/<loc>/trigger/<tid>?workflowId=<wid>` | — | ✓ (`{}`, apagou de verdade) |
+| Só triggers (`only-triggers`) | `PUT .../workflow/<loc>/only-triggers/<wid>` | o corpo INTEIRO do save | ✓ — **e não serve para nada** (ver abaixo) |
+
+**O documento não tem `triggersData`.** As chaves de raiz do `GET` são `filePath`, `fileUrl`,
+`triggersFilePath`, `workflowData`, `version`, `status`, `name`… — trigger nenhum. A lista
+autoritativa vem da rota de trigger, a mesma que a leitura já usava. Consequência medida: o
+`only-triggers` responde 200, incrementa `version` e muda `triggersFilePath`, **sem criar o
+trigger**. É falso positivo de escrita, como `inscrever` em `draft`. Por isso criar e trocar
+trigger **recusam** no comando; só `remover` existe, pelo DELETE acima.
+
+**Salvar o corpo não apaga trigger.** Três saves mandaram o documento sem lista de triggers e
+os dois triggers do workflow continuaram lá. O risco de wipe não existe.
+
+**O save não perde campo.** Reler depois de gravar deu `SUMIRAM: []` nas três rodadas: o
+servidor só acrescenta (`meta`, `senderAddress`, `updatedBy`). Mandar o documento lido de
+volta, com o alvo trocado, é suficiente — a pergunta aberta da spec fecha em SIM.
+
+**A resposta do PUT de save traz só a meta, nunca `workflowData`.** Conferir o resultado exige
+reler o workflow; o comando relê e devolve `versaoDepois`.
+
+**`version` não é trava do servidor**: ele aceita o PUT com o `version` que for. O contador
+sobe +1 a cada escrita, inclusive no `rename-workflow`, que é meta-only, e o `version` da meta
+é o mesmo do documento. É por isso que a guarda de concorrência do comando compara a meta
+relida com a versão lida: a trava é local, não do servidor.
+
+**O detalhe da API já traz os steps completos.** Medido em 1.041 workflows: `workflowData` do
+`GET` bate com o arquivo do Firebase, zero divergência. O extrator continua baixando o
+Firebase (`fileUrl`) por causa do formato do dump; a escrita lê os steps direto do detalhe.
+
+**O encadeamento de step é `parentKey`.** Não existe campo `parent` em step nenhum — quem ler
+`parent` conclui que todo step é raiz e que nada é inalcançável.
+
+**Duplicar é o POST de criação com `workflow_id`**, e copia steps **e** triggers, com ids
+novos. **Não existe rota de restaurar versão**: o histórico lê, não escreve.
+
+**O servidor recusa publicar workflow com referência quebrada:**
+
+    PUT .../workflow/<loc>/change-status/<wid>
+    → HTTP 400 {"message":"Referenced asset(s) missing from this location: Form 'bblZYCoXk6rf3xl7ehyO'."}
+
+O `broken_form_ref` do auditor tem eco no servidor: workflow com asset morto não publica. Só
+publicou depois que a trigger do formulário apagado foi removida pelo DELETE de trigger.
+
 ### Correção: descoberta de bundle
 
 A nota antiga (seção "Como o bundle foi lido") está desatualizada para o editor de workflow:

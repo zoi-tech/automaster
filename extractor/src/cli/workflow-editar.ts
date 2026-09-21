@@ -6,11 +6,11 @@ import type { GhlClient } from "../api/client.js";
 import { getWorkflowMeta, contarNaoTerminados } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
-  salvarWorkflow, salvarSomenteTriggers, historicoVersoes, WF_WRITE,
+  salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE,
 } from "../api/workflows-write.js";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
-  editarTriggers, renomear, montarCorpo, checarPublicavel, diffWorkflow,
+  renomear, montarCorpo, checarPublicavel, diffWorkflow,
   type Documento,
 } from "../api/workflow-edit.js";
 
@@ -22,7 +22,7 @@ export const WF_EDITAR_ACOES = [
 interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
   de?: string; para?: string; step?: string; caminho?: string; valor?: string;
-  trigger?: string; triggerAcao?: string; triggerId?: string;
+  triggerAcao?: string; triggerId?: string;
   usuario?: string; confirmo?: boolean; publicado?: boolean; json?: boolean;
 }
 
@@ -47,31 +47,32 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       return imprimir(saida, o, log);
     }
 
+    if (o.acao === "trigger") {
+      return await acaoTrigger(client, o, saida, log);
+    }
+
     if (SEM_CORPO.has(o.acao)) {
       if (!o.confirmo) throw new Error(exigeConfirmo(o.acao));
       if (o.acao === "apagar") {
         const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string };
-        if (meta?.status === "published") {
-          const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
-          const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado);
-          saida.aviso = aviso;
-          log(aviso);
-          if (!o.publicado) {
-            throw new Error(`${aviso} Para apagar mesmo assim, repita com --publicado junto de --confirmo.`);
-          }
-        }
+        if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "apagar");
       }
-      const registro = registroEscrita(o.location, "_workflows", o.id ?? "novo", { acao: o.acao, opts: semSegredo(o) });
       const resposta = await escritaSemCorpo(client, o, usuarioId);
-      fs.writeFileSync(registro, JSON.stringify({ em: new Date().toISOString(), acao: o.acao, aplicado: true, resposta }, null, 2));
-      Object.assign(saida, { aplicado: true, resposta, registro });
+      // `criar` e `duplicar` arquivam sob o id NOVO: o registro de uma cópia sob o id
+      // de origem some no meio do histórico do original (nit da prova ao vivo).
+      const chave = String((resposta as { id?: string } | null)?.id ?? o.id ?? "novo");
+      const registro = registroEscrita(o.location, "_workflows", chave, {
+        acao: o.acao, opts: semSegredo(o), aplicado: true, origem: o.id, resposta,
+      });
+      Object.assign(saida, { aplicado: true, resposta, registro, id: chave });
       return imprimir(saida, o, log);
     }
 
     // ---- ações que mexem no corpo ----
     const doc = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
     const versaoLida = doc.version;
-    const { doc: editado, mudancas } = aplicarOperacao(doc, o);
+    const { doc: editado, mudancas, avisos } = aplicarOperacao(doc, o);
+    if (avisos?.length) { saida.avisos = avisos; avisos.forEach(log); }
     if (!mudancas.length) {
       Object.assign(saida, { aplicado: false, motivo: "nada a mudar: a operação não encontrou alvo neste workflow" });
       return imprimir(saida, o, log);
@@ -94,18 +95,15 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
         aplicado: false,
         motivo: "prévia: rode de novo com --confirmo para gravar",
         documento: editado,
+        // lista AUTORITATIVA de triggers: o documento não a traz. Quem valida contra
+        // as 18 regras precisa dela, senão conclui que o workflow não tem trigger.
+        triggers: await listarTriggers(client, o.location, o.id!),
       });
       return imprimir(saida, o, log);
     }
 
     if (doc.status === "published") {
-      const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
-      const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado);
-      saida.aviso = aviso;
-      log(aviso);
-      if (!o.publicado) {
-        throw new Error(`${aviso} Para gravar mesmo assim, repita com --publicado junto de --confirmo.`);
-      }
+      await guardaPublicado(client, o, saida, log, "gravar");
     }
 
     const metaAgora = (await getWorkflowMeta(client, o.location, o.id!)) as { version?: number };
@@ -120,16 +118,15 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       acao: o.acao, versao: versaoLida, antes: doc, diff, mudancas,
     });
     const corpo = montarCorpo(doc, editado, usuarioId);
-    const soTriggers = o.acao === "trigger";
-    const resposta = soTriggers
-      ? await salvarSomenteTriggers(client, o.location, o.id!, corpo)
-      : await salvarWorkflow(client, o.location, o.id!, corpo);
-    const depois = await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`);
+    // A resposta do PUT traz só a meta — nada de `workflowData`. Conferir o resultado
+    // exige reler, e é por isso que `depois` existe.
+    const resposta = await salvarWorkflow(client, o.location, o.id!, corpo);
+    const depois = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
     fs.writeFileSync(registro, JSON.stringify(
       { em: new Date().toISOString(), acao: o.acao, aplicado: true, versao: versaoLida, antes: doc, depois, diff, mudancas, resposta },
       null, 2,
     ));
-    Object.assign(saida, { aplicado: true, resposta, registro });
+    Object.assign(saida, { aplicado: true, resposta, registro, versaoDepois: depois.version });
     imprimir(saida, o, log);
   });
 }
@@ -149,21 +146,6 @@ function aplicarOperacao(doc: Documento, o: Opts) {
         throw new Error("--acao atributo exige --step, --caminho e --valor");
       }
       return alterarAtributo(doc, o.step, o.caminho, parseValor(o.valor));
-    case "trigger": {
-      const acao = o.triggerAcao ?? "";
-      if (acao === "remover") {
-        if (!o.triggerId) throw new Error("--trigger-acao remover exige --trigger-id");
-        return editarTriggers(doc, { acao: "remover", id: o.triggerId });
-      }
-      if (!o.trigger) throw new Error(`--trigger-acao ${acao || "(vazio)"} exige --trigger com o JSON do trigger`);
-      const trigger = JSON.parse(o.trigger) as Record<string, unknown>;
-      if (acao === "adicionar") return editarTriggers(doc, { acao: "adicionar", trigger });
-      if (acao === "substituir") {
-        if (!o.triggerId) throw new Error("--trigger-acao substituir exige --trigger-id");
-        return editarTriggers(doc, { acao: "substituir", id: o.triggerId, trigger });
-      }
-      throw new Error("--trigger-acao deve ser adicionar | remover | substituir");
-    }
     default:
       throw new Error(`ação sem corpo tratada no caminho errado: ${o.acao}`);
   }
@@ -195,15 +177,88 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
 }
 
 /**
- * Mensagem da guarda de publicado, usada tanto para editar o corpo quanto para apagar.
- * `aoMenos` vem de `cortou || estrangulado` de `todosOsInscritos`: quando a paginação
- * corta ou o servidor estrangula, `n` é um piso, nunca o total — a mensagem tem que
- * dizer "pelo menos N", nunca apresentar o número cortado como se fosse total.
+ * Mensagem da guarda de publicado. `aoMenos` vem de `cortou || estrangulado` de
+ * `todosOsInscritos`: quando a paginação corta ou o servidor estrangula, `n` é um piso,
+ * nunca o total — a mensagem tem que dizer "pelo menos N", nunca apresentar o número
+ * cortado como se fosse total. O efeito é diferente em cada ação: gravar troca a versão
+ * debaixo de quem está andando; apagar tira todo mundo do fluxo.
  */
-function avisoPublicado(n: number, aoMenos: boolean): string {
+function avisoPublicado(n: number, aoMenos: boolean, modo: "gravar" | "apagar"): string {
   const quantos = aoMenos ? `pelo menos ${n}` : `${n}`;
-  return `workflow PUBLICADO com ${quantos} contato(s) dentro agora. Quem está no meio termina o passo ` +
-    `atual na versão antiga e segue pela nova daí em diante.`;
+  const efeito = modo === "apagar"
+    ? "Apagar tira todos eles do fluxo agora, no passo em que estiverem, e não há desfazer."
+    : "Quem está no meio termina o passo atual na versão antiga e segue pela nova daí em diante.";
+  return `workflow PUBLICADO com ${quantos} contato(s) dentro agora. ${efeito}`;
+}
+
+/**
+ * Guarda de workflow publicado. Vale para `apagar` e para as ações que mexem no corpo
+ * ou nos triggers — tudo que muda o que o contato vive. `renomear` e `mover` ficam de
+ * fora de propósito: não alteram execução nenhuma (limite declarado, ver CHANGELOG).
+ */
+async function guardaPublicado(
+  client: GhlClient, o: Opts, saida: Record<string, unknown>,
+  log: (m: string) => void, modo: "gravar" | "apagar",
+): Promise<void> {
+  const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
+  const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado, modo);
+  saida.aviso = aviso;
+  log(aviso);
+  if (!o.publicado) {
+    const verbo = modo === "apagar" ? "apagar" : "gravar";
+    throw new Error(`${aviso} Para ${verbo} mesmo assim, repita com --publicado junto de --confirmo.`);
+  }
+}
+
+/**
+ * Trigger: só `remover`, e pelo DELETE dedicado. O documento do workflow NÃO traz a
+ * lista (só `triggersFilePath`) e o `only-triggers` responde 200 sem criar nada — então
+ * `adicionar` e `substituir` recusam em vez de devolver sucesso falso.
+ */
+async function acaoTrigger(
+  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void,
+): Promise<void> {
+  const acao = o.triggerAcao ?? "";
+  if (acao === "adicionar" || acao === "substituir") {
+    throw new Error(
+      `--trigger-acao ${acao} não existe: não há rota conhecida para criar nem para trocar trigger. ` +
+      "O documento do workflow não traz a lista de triggers e o `only-triggers` responde 200 sem gravar " +
+      "nada (provado ao vivo). Criar e trocar trigger ficaram para a parte B. Só `remover` funciona.",
+    );
+  }
+  if (acao !== "remover") throw new Error("--trigger-acao deve ser remover (adicionar e substituir ficaram para a parte B)");
+  if (!o.triggerId) throw new Error("--trigger-acao remover exige --trigger-id");
+
+  const triggers = await listarTriggers(client, o.location, o.id!);
+  const alvo = triggers.find((t) => t?.id === o.triggerId);
+  if (!alvo) {
+    throw new Error(
+      `trigger ${o.triggerId} não existe neste workflow (${triggers.length} trigger(s) na lista: ` +
+      `${triggers.map((t) => t?.id).join(", ") || "nenhum"})`,
+    );
+  }
+  const vazio = { workflowData: { templates: [] } } as unknown as Documento;
+  const diff = diffWorkflow(
+    { ...vazio, triggersData: triggers },
+    { ...vazio, triggersData: triggers.filter((t) => t?.id !== o.triggerId) },
+  );
+  Object.assign(saida, { diff, mudancas: [`trigger ${o.triggerId} removido`], triggers });
+
+  if (!o.confirmo) {
+    Object.assign(saida, { aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar" });
+    return imprimir(saida, o, log);
+  }
+
+  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string };
+  if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
+
+  const resposta = await apagarTrigger(client, o.location, o.id!, o.triggerId);
+  const depois = await listarTriggers(client, o.location, o.id!);
+  const registro = registroEscrita(o.location, "_workflows", o.id!, {
+    acao: "trigger", triggerAcao: "remover", aplicado: true, antes: triggers, depois, resposta,
+  });
+  Object.assign(saida, { aplicado: true, resposta, registro });
+  imprimir(saida, o, log);
 }
 
 const exigeConfirmo = (acao: string) =>
@@ -230,9 +285,8 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--step <id>", "id do step (atributo)")
     .option("--caminho <c>", "campo dentro de attributes, aninhado com ponto (atributo)")
     .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
-    .option("--trigger <json>", "JSON do trigger (trigger: adicionar, substituir)")
-    .option("--trigger-acao <a>", "adicionar | remover | substituir")
-    .option("--trigger-id <id>", "id do trigger (trigger: remover, substituir)")
+    .option("--trigger-acao <a>", "remover (só; criar e trocar não têm rota conhecida)")
+    .option("--trigger-id <id>", "id do trigger a remover")
     .option("--usuario <id>", "autor da edição; sem ele, sai do token")
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")
     .option("--publicado", "obrigatório junto de --confirmo quando o workflow está publicado")

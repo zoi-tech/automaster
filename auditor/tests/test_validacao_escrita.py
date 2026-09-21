@@ -65,3 +65,38 @@ def test_validacao_nao_altera_o_contexto_carregado(make_dump):
     antes = [s["attributes"]["tags"] for s in ctx.workflows[0].steps]
     validar_edicao(ctx, "w1", {"workflowData": {"templates": [_passo_tag("s1", ["outra"])]}, "triggersData": []})
     assert [s["attributes"]["tags"] for s in ctx.workflows[0].steps] == antes
+
+
+def _trigger_form_morto():
+    return {"id": "tr1", "type": "form_submission", "name": "Formulário Enviado",
+            "active": True, "deleted": False, "workflow_id": "w1",
+            "actions": [{"workflow_id": "w1", "type": "add_to_workflow"}],
+            "conditions": [{"field": "form.id", "value": "formQueSumiu"}]}
+
+
+def _dump_com_trigger_quebrado(make_dump):
+    return make_dump(
+        workflows=[wf(id="w1", steps=[_passo_tag("s1", ["tag-boa"])],
+                      triggers=[_trigger_form_morto()])],
+        tags=["tag-boa"],
+        forms=[{"id": "formVivo", "name": "Vivo"}],
+    )
+
+
+def test_erro_de_trigger_nao_sai_como_resolvido_quando_a_edicao_e_so_de_corpo(make_dump):
+    """O documento do GHL não traz trigger. Tratar a lista como vazia fazia todo ERROR
+    de trigger pré-existente sair como 'resolvido' — e nenhum novo ser detectável."""
+    ctx = load_dump(_dump_com_trigger_quebrado(make_dump))
+    editado = {"workflowData": {"templates": [_passo_tag("s1", ["tag-boa"])]}}
+    r = validar_edicao(ctx, "w1", editado)
+    assert r.erros_resolvidos == []
+    assert r.triggers_do_dump is True
+    assert r.pode_gravar is True
+
+
+def test_triggers_passados_pelo_chamador_mandam(make_dump):
+    ctx = load_dump(_dump_com_trigger_quebrado(make_dump))
+    editado = {"workflowData": {"templates": [_passo_tag("s1", ["tag-boa"])]}}
+    r = validar_edicao(ctx, "w1", editado, triggers=[])  # trigger removido de verdade
+    assert r.triggers_do_dump is False
+    assert any("formQueSumiu" in e for e in r.erros_resolvidos)

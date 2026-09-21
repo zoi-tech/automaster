@@ -1009,7 +1009,7 @@ _WF_EDITAR_COM_CORPO = {"trocar-ref", "trocar-tag", "limpar-orfaos", "atributo",
 def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None = None,
                     pasta: str | None = None, de: str | None = None, para: str | None = None,
                     step: str | None = None, caminho: str | None = None, valor: str | None = None,
-                    trigger: str | None = None, trigger_acao: str | None = None,
+                    trigger_acao: str | None = None,
                     trigger_id: str | None = None, confirmo: bool = False,
                     publicado: bool = False, snapshot: str | None = None) -> dict:
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
@@ -1027,7 +1027,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         a = ["workflow-editar", "-l", loc, "--acao", acao]
         for flag, valor_opcional in (
             ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
-            ("--step", step), ("--caminho", caminho), ("--valor", valor), ("--trigger", trigger),
+            ("--step", step), ("--caminho", caminho), ("--valor", valor),
             ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
         ):
             if valor_opcional is not None:
@@ -1042,16 +1042,28 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
     if acao not in _WF_EDITAR_COM_CORPO:
         return _run_extractor(*_args(confirmo))
 
-    # ação que mexe no corpo: roda a prévia primeiro, sempre, para validar antes de gravar
-    previa = _run_extractor(*_args(False))
-
+    # O dump é checado ANTES da prévia: a prévia abre o Chrome inteiro, e workflow
+    # recém-criado ou duplicado não está em dump nenhum — não pode virar exceção crua
+    # depois de todo esse trabalho.
+    ctx = meta = None
+    sem_validacao = None
     try:
         ctx, meta = _load(loc, snapshot)
     except ToolError:
-        previa["validacao"] = {
-            "rodou": False,
-            "motivo": "sem dump desta subconta em disco: as 18 regras não foram rodadas",
-        }
+        sem_validacao = "sem dump desta subconta em disco: as 18 regras não foram rodadas"
+    if ctx is not None and not any(
+        getattr(w, "id", None) == id for w in getattr(ctx, "workflows", [])
+    ):
+        sem_validacao = (
+            f"workflow {id} não está no dump {meta['snapshot']} (criado ou duplicado depois da "
+            "última extração): as 18 regras não foram rodadas. Extraia a subconta de novo para validar."
+        )
+        ctx = None
+
+    previa = _run_extractor(*_args(False))
+
+    if ctx is None:
+        previa["validacao"] = {"rodou": False, "motivo": sem_validacao}
         if not confirmo:
             return previa
         # a falta de dump não pode travar a escrita
@@ -1066,7 +1078,16 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
             return previa
         return _run_extractor(*_args(True))
 
-    resultado_validacao = validar_edicao(ctx, id, documento)
+    try:
+        resultado_validacao = validar_edicao(ctx, id, documento, previa.get("triggers"))
+    except ValueError as e:
+        previa["validacao"] = {"rodou": False, "motivo": str(e)}
+        if not confirmo:
+            return previa
+        resultado = _run_extractor(*_args(True))
+        resultado["validacao"] = previa["validacao"]
+        return resultado
+
     validacao = {
         "rodou": True,
         "snapshot": meta["snapshot"],
@@ -1075,6 +1096,11 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         "erros_resolvidos": resultado_validacao.erros_resolvidos,
         "aviso": f"as regras rodaram contra o dump {meta['snapshot']}; ele pode estar velho",
     }
+    if getattr(resultado_validacao, "triggers_do_dump", False):
+        validacao["aviso"] += (
+            "; a lista de triggers veio do dump (o comando não a devolveu), então achado de "
+            "trigger vale para o snapshot, não para agora"
+        )
     previa["validacao"] = validacao
 
     if not confirmo:
@@ -1426,7 +1452,7 @@ TOOLS = {
                         "ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
                         "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
                         "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
-                        "atributo de step (`atributo`) e mexe em trigger (`trigger`). Sem `confirmo` devolve "
+                        "atributo de step (`atributo`) e REMOVE um trigger (`trigger`). Sem `confirmo` devolve "
                         "a PRÉVIA com o diff e não grava nada. Workflow publicado exige `publicado=true` "
                         "junto. Não reordena fluxo nem cria step do zero — isso é a parte B.",
                         {"loc": _LOC,
@@ -1439,9 +1465,9 @@ TOOLS = {
                          "step": {"type": "string", "description": "id do step (atributo)"},
                          "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
                          "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
-                         "trigger": {"type": "string", "description": "JSON do trigger"},
-                         "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
-                         "trigger_id": {"type": "string"},
+                         "trigger_acao": {"type": "string", "enum": ["remover"],
+                                          "description": "só remover: criar e trocar trigger não têm rota conhecida"},
+                         "trigger_id": {"type": "string", "description": "id do trigger a remover"},
                          "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
                          "publicado": {"type": "boolean", "description": "obrigatório junto de confirmo se o workflow está publicado"},
                          "snapshot": _SNAP},

@@ -4,6 +4,40 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.15.0 — 2026-09-21
+
+Escrita de ESTRUTURA de workflow. Uma tool nova (`workflow_editar`), 31 no total, módulo
+`extractor/src/api/workflow-edit.ts`, rotas em `extractor/src/api/workflows-write.ts` e o
+comando `npm run workflow-editar`. Continuam 18 regras de auditoria.
+
+- **Cinco operações cirúrgicas** sobre o corpo: `trocar-ref` (um id em qualquer profundidade),
+  `trocar-tag` (pelo nome, só onde tag mora — nunca em texto de mensagem), `limpar-orfaos`
+  (steps que nunca executam), `atributo` (um campo de um step) e `trigger` (remover).
+  Mais `criar`, `renomear`, `mover`, `duplicar`, `apagar` e `historico`.
+- **Guardas, todas provadas ao vivo:** snapshot do antes em `<dumps>/_workflows/`; prévia com
+  diff que não grava nada sem `--confirmo`; validação do documento editado contra as 18 regras,
+  que RECUSA a gravação se a edição introduzir um ERROR novo; releitura da `version` antes de
+  gravar (alguém salvou pelo app → aborta); `--publicado` obrigatório junto de `--confirmo` em
+  workflow publicado, com a contagem de quem está dentro agora.
+- **Achado do servidor:** publicar workflow com referência quebrada dá
+  `400 {"message":"Referenced asset(s) missing from this location: Form '…'."}`. O
+  `broken_form_ref` do auditor tem eco no próprio GHL.
+- **Correções da prova ao vivo** (nove premissas testadas, quatro caíram):
+  `adicionar` e `substituir` trigger agora RECUSAM em vez de devolver sucesso falso — não há
+  rota para criar nem para trocar trigger, e o `only-triggers` responde 200 sem gravar nada;
+  `remover` trigger passou a usar o `DELETE .../trigger/<tid>?workflowId=<wid>`; `limpar-orfaos`
+  passou a ler `parentKey` (com `parent` nada era órfão e a operação era no-op); a validação
+  pelas regras recebe a lista autoritativa de triggers e, sem ela, usa a do dump e diz isso
+  (antes tratava a lista como vazia e dava todo ERROR de trigger como "resolvido"); a tool MCP
+  checa o dump ANTES de abrir o Chrome e devolve `validacao.rodou: false` para workflow fora do
+  dump, em vez de estourar `ValueError`.
+- **Fora, declarado:** remover step vivo e recosturar ponteiros, criar step do zero, reordenar
+  fluxo, restaurar versão do histórico (não há rota) e criar/trocar trigger — tudo parte B.
+- **Limitações conhecidas** (deixadas de propósito, com motivo): `trocar-ref` troca o id e o
+  rótulo humano (`title`) do step continua o antigo, porque não há de onde tirar o rótulo novo —
+  o comando passou a AVISAR quando isso acontece; `renomear` e `mover` não passam pela guarda de
+  publicado, porque não alteram execução nenhuma.
+
 ## 0.14.0 — 2026-09-20
 
 Templates de e-mail. Uma tool nova (`modelos_email`), 30 no total, módulo

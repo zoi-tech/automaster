@@ -3,7 +3,8 @@ export interface Step {
   id: string;
   type?: string;
   name?: string;
-  parent?: string;
+  /** Pai no encadeamento. O servidor grava `parentKey`; `parent` nunca aparece. */
+  parentKey?: string;
   next?: string | string[] | null;
   attributes?: Record<string, any>;
   [k: string]: unknown;
@@ -16,6 +17,11 @@ export interface Documento {
   status?: string;
   version?: number;
   workflowData: { templates: Step[] };
+  /**
+   * NÃO vem do `GET /workflow/<loc>/<wid>` — a resposta só traz `triggersFilePath`.
+   * Quem quiser diff de trigger preenche esta chave com a lista autoritativa de
+   * `GET /workflow/<loc>/trigger?workflowId=<wid>`.
+   */
   triggersData?: any[];
   [k: string]: unknown;
 }
@@ -24,6 +30,8 @@ export interface Resultado {
   doc: Documento;
   /** Descrição de cada mudança aplicada; vazio = nada mudou. */
   mudancas: string[];
+  /** Avisos sobre o que a operação NÃO fez; não impedem gravar. */
+  avisos?: string[];
 }
 
 const clonar = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -36,6 +44,7 @@ const clonar = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 export function trocarReferencia(doc: Documento, de: string, para: string): Resultado {
   const out = clonar(doc);
   const mudancas: string[] = [];
+  const avisos: string[] = [];
   const anda = (no: any, caminho: string): any => {
     if (typeof no === "string") {
       if (no === de) { mudancas.push(caminho); return para; }
@@ -44,13 +53,19 @@ export function trocarReferencia(doc: Documento, de: string, para: string): Resu
     }
     if (Array.isArray(no)) return no.map((v, i) => anda(v, `${caminho}[${i}]`));
     if (no && typeof no === "object") {
+      const antes = JSON.stringify(no);
       for (const k of Object.keys(no)) no[k] = anda(no[k], `${caminho}.${k}`);
+      // O id manda, mas o app mostra `title`: trocado o id, o rótulo humano fica
+      // velho e confunde quem abrir o editor. Não dá para adivinhar o rótulo novo.
+      if (JSON.stringify(no) !== antes && typeof no.title === "string" && no.title) {
+        avisos.push(`${caminho}: o rótulo continua "${no.title}" — o id mudou, o texto não`);
+      }
     }
     return no;
   };
   anda(out.workflowData?.templates, "steps");
   anda(out.triggersData, "triggers");
-  return { doc: out, mudancas };
+  return { doc: out, mudancas, avisos };
 }
 
 const mesmaTag = (a: unknown, b: string) =>
@@ -96,7 +111,7 @@ export function trocarTag(doc: Documento, de: string, para: string): Resultado {
 /** Ids alcançáveis a partir das entradas, seguindo `next` e `goto`. */
 function alcancaveis(steps: Step[]): Set<string> {
   const porId = new Map(steps.filter((s) => s.id).map((s) => [s.id, s]));
-  const raizes = steps.filter((s) => s.id && !s.parent).map((s) => s.id);
+  const raizes = steps.filter((s) => s.id && !s.parentKey).map((s) => s.id);
   const vistos = new Set<string>();
   const fila = [...raizes];
   while (fila.length) {
@@ -126,7 +141,7 @@ function alcancaveis(steps: Step[]): Set<string> {
 export function removerStepsInalcancaveis(doc: Documento): Resultado {
   const out = clonar(doc);
   const steps = out.workflowData?.templates ?? [];
-  const temRaiz = steps.some((s) => s.id && !s.parent);
+  const temRaiz = steps.some((s) => s.id && !s.parentKey);
   if (!steps.length || !temRaiz) return { doc: out, mudancas: [] };
   const vivos = alcancaveis(steps);
   const removidos = steps.filter((s) => s.id && !vivos.has(s.id)).map((s) => s.id);
@@ -150,28 +165,12 @@ export function alterarAtributo(doc: Documento, stepId: string, caminho: string,
   return { doc: out, mudancas: [`step ${stepId}: ${caminho}`] };
 }
 
-export type OpTrigger =
-  | { acao: "adicionar"; trigger: Record<string, unknown> }
-  | { acao: "remover"; id: string }
-  | { acao: "substituir"; id: string; trigger: Record<string, unknown> };
-
-export function editarTriggers(doc: Documento, op: OpTrigger): Resultado {
-  const out = clonar(doc);
-  const lista: any[] = out.triggersData ?? (out.triggersData = []);
-  if (op.acao === "adicionar") {
-    lista.push(op.trigger);
-    return { doc: out, mudancas: ["trigger adicionado"] };
-  }
-  const i = lista.findIndex((t) => t?.id === op.id);
-  if (i < 0) throw new Error(`trigger ${op.id} não existe neste workflow`);
-  if (op.acao === "remover") {
-    lista.splice(i, 1);
-    return { doc: out, mudancas: [`trigger ${op.id} removido`] };
-  }
-  lista[i] = op.trigger;
-  return { doc: out, mudancas: [`trigger ${op.id} substituído`] };
-}
-
+/**
+ * Trigger NÃO se edita pelo documento: o `GET` do workflow não traz a lista (só
+ * `triggersFilePath`), e o `only-triggers` responde 200 sem criar nada — prova ao
+ * vivo em `docs/superpowers/handoffs/2026-09-20-workflows-escrita-prova.md`. A única
+ * rota de escrita conhecida é o DELETE de trigger, em `workflows-write.ts`.
+ */
 export function renomear(doc: Documento, nome: string): Resultado {
   const limpo = nome.trim();
   if (!limpo) throw new Error("nome vazio: o workflow precisa de um nome");

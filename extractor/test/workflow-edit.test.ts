@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
-  editarTriggers, renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
+  renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -39,6 +39,16 @@ test("trocarReferencia devolve zero mudanças quando o id não aparece", () => {
   assert.equal(trocarReferencia(d, ID_VELHO, ID_NOVO).mudancas.length, 0);
 });
 
+test("trocarReferencia avisa que o rótulo humano continua o antigo", () => {
+  const d = doc([
+    { id: "s1", type: "update_contact_field", attributes: {
+      fields: [{ field: ID_VELHO, value: "Olá", title: "Mensagem recente " }] } },
+  ]);
+  const r = trocarReferencia(d, ID_VELHO, ID_NOVO);
+  assert.equal(r.avisos?.length, 1);
+  assert.match(r.avisos![0], /Mensagem recente/);
+});
+
 test("trocarTag só mexe nos campos onde tag mora, nunca no texto de mensagem", () => {
   const d = doc([
     { id: "s1", type: "add_contact_tag", attributes: { tags: ["quente", "frio"] } },
@@ -61,28 +71,40 @@ test("trocarTag compara ignorando caixa e espaço nas pontas, como a auditoria",
   assert.deepEqual(trocarTag(d, "quente", "morno").doc.workflowData.templates[0].attributes.tags, ["morno"]);
 });
 
+// O campo real do documento do GHL é `parentKey`; `parent` NÃO existe em step nenhum.
+// Com `parent` todo step virava raiz e a limpeza nunca removia nada (prova ao vivo, Task 8).
 test("removerStepsInalcancaveis tira o bloco órfão e preserva o fluxo vivo", () => {
   const d = doc([
-    { id: "a", type: "wait", next: "b" },            // entrada (sem parent)
-    { id: "b", type: "sms", parent: "a", next: null },
-    { id: "orf1", type: "sms", parent: "x", next: "orf2" },
-    { id: "orf2", type: "sms", parent: "orf1" },
+    { id: "a", type: "wait", next: "b" },            // entrada (sem parentKey)
+    { id: "b", type: "sms", parentKey: "a", next: null },
+    { id: "orf1", type: "sms", parentKey: "x", next: "orf2" },
+    { id: "orf2", type: "sms", parentKey: "orf1" },
   ]);
   const r = removerStepsInalcancaveis(d);
   assert.deepEqual(r.mudancas.sort(), ["orf1", "orf2"]);
   assert.deepEqual(r.doc.workflowData.templates.map((s) => s.id), ["a", "b"]);
 });
 
+test("removerStepsInalcancaveis usa parentKey: com `parent` (campo que não existe) tudo vira raiz", () => {
+  const comCampoErrado = doc([
+    { id: "a", type: "wait", next: "b" },
+    { id: "b", type: "sms", parent: "a" },
+    { id: "orf", type: "sms", parent: "x" },   // órfão SÓ se o campo lido fosse `parent`
+  ]);
+  // sem `parentKey` nenhum step tem pai: todos são entrada, nada é inalcançável
+  assert.deepEqual(removerStepsInalcancaveis(comCampoErrado).mudancas, []);
+});
+
 test("removerStepsInalcancaveis segue goto ao decidir o que é alcançável", () => {
   const d = doc([
     { id: "a", type: "goto", next: null, attributes: { targetNodeId: "z" } },
-    { id: "z", type: "sms", parent: "q" },
+    { id: "z", type: "sms", parentKey: "q" },
   ]);
   assert.deepEqual(removerStepsInalcancaveis(d).mudancas, []);
 });
 
 test("removerStepsInalcancaveis não faz nada em workflow sem entrada identificável", () => {
-  const d = doc([{ id: "a", type: "sms", parent: "sumiu" }]);
+  const d = doc([{ id: "a", type: "sms", parentKey: "sumiu" }]);
   assert.deepEqual(removerStepsInalcancaveis(d).mudancas, []);
 });
 
@@ -97,15 +119,6 @@ test("alterarAtributo escreve no caminho e recusa step inexistente", () => {
 test("alterarAtributo aceita caminho aninhado com ponto", () => {
   const d = doc([{ id: "s1", type: "x", attributes: { alvo: { interno: 1 } } }]);
   assert.equal(alterarAtributo(d, "s1", "alvo.interno", 9).doc.workflowData.templates[0].attributes.alvo.interno, 9);
-});
-
-test("editarTriggers adiciona, remove e substitui", () => {
-  const d = doc([], [{ id: "t1", name: "Form" }, { id: "t2", name: "Tag" }]);
-  assert.equal(editarTriggers(d, { acao: "remover", id: "t1" }).doc.triggersData.length, 1);
-  assert.equal(editarTriggers(d, { acao: "adicionar", trigger: { id: "t3" } }).doc.triggersData.length, 3);
-  const sub = editarTriggers(d, { acao: "substituir", id: "t2", trigger: { id: "t2", name: "Outro" } });
-  assert.equal(sub.doc.triggersData[1].name, "Outro");
-  assert.throws(() => editarTriggers(d, { acao: "remover", id: "nao" }), /nao/);
 });
 
 test("renomear apara espaço nas pontas e recusa nome vazio", () => {
