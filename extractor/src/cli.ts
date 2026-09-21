@@ -73,6 +73,7 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
+import { registrarWorkflowEditar } from "./cli/workflow-editar.js";
 
 const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
 
@@ -2367,5 +2368,7 @@ program
   .option("--confirmo", "obrigatório: muda dado real e não tem desfazer")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runWorkflowAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+registrarWorkflowEditar(program);
 
 program.parseAsync(process.argv);
