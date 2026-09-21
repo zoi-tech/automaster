@@ -4,6 +4,8 @@ import pytest
 from automaster_audit import mcp_server
 from automaster_audit.mcp import base as mcp_base
 from automaster_audit.mcp import workflows as mcp_workflows
+import pathlib
+import tempfile
 
 
 class _ResultadoFalso:
@@ -440,6 +442,12 @@ def _extractor_que_falha(monkeypatch):
         returncode = 1
         stdout = ""
         stderr = "o step s1 é um ramo (transition) de um container"
+    # O `tsx` do extractor não existe em máquina limpa (o CI provou): sem este dublê a
+    # guarda de "extractor não provisionado" responde antes de o comando falhar.
+    falso = pathlib.Path(tempfile.mkdtemp()) / "extractor"
+    (falso / "node_modules" / ".bin").mkdir(parents=True)
+    (falso / "node_modules" / ".bin" / "tsx").write_text("")
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", falso)
     monkeypatch.setattr(mcp_base.subprocess, "run", lambda *a, **k: _R())
     monkeypatch.setattr(mcp_base, "_load",
                         lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
