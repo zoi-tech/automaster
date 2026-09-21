@@ -61,31 +61,80 @@ molde do `--apagar-com-cards` do pipeline. Renomear mostra na prévia a lista de
 afetados.
 
 Cada escrita deixa rastro em `<dumps>/_anotacoes/<loc>/<contactId>/<ts>.json` e
-`<dumps>/_tags/<loc>/<ts>.json`, como as áreas anteriores.
+`<dumps>/_tags/<loc>/<tagId>/<ts>.json`, como as áreas anteriores.
 
-## A pergunta que a pesquisa tem que responder
+## O que a pesquisa e a prova ao vivo fecharam
 
-**O step `add_contact_tag` guarda o nome da tag ou o id?**
+**Tag em workflow é sempre o nome, nunca o id** — em step, em trigger e em condição de
+`if_else`. Medido em 34 de 34 valores do dump da Instaltech.
 
-Se guarda o id, renomear é seguro e a prévia é informativa.
+**Renomear pela API propaga**, e é o achado que definiu o desenho. A prova ao vivo de
+2026-09-21 (`docs/superpowers/provas/2026-09-21-prova-tag-rename.ts`) criou tag e workflow
+descartáveis, renomeou por `PUT /locations/<loc>/tags/<tagId>` e releu: o servidor reescreveu
+o nome no step **e no trigger**. Logo `renomear` é escrita comum, com prévia informativa, e
+não precisa propagar nada por conta própria.
 
-Se guarda o nome, renomear pela subconta quebra em silêncio todo workflow que cita a tag, e
-`renomear` deixa de ser uma escrita comum: passa a exigir flag explícita de consentimento
-e a apontar `workflow-editar --acao trocar-tag` como o passo seguinte. O desenho final de
-`renomear` depende dessa resposta.
+**Apagar é o perigoso**, não o renomear: a tag sai de todos os contatos que a têm, e não há
+prova de que isso não dispare os workflows com trigger de "tag removida" — o rename tinha
+esse defeito antes de ser corrigido em 2024. Provar exigiria disparar automação na base real
+do cliente, então fica sem prova por decisão.
 
-Pontos quentes secundários para a fase 2:
+### Rotas (API pública, host `services.leadconnectorhq.com`)
 
-1. Rotas reais de nota e tarefa do contato na API interna (`GET/POST/PUT/DELETE
-   contacts/<id>/notes` e `.../tasks` são a hipótese, não o fato). Atenção: nota de
-   *compromisso* já está mapeada (`/calendars/appointments/<id>/notes`) e é outra coisa.
-2. Rotas de escrita de tag da subconta. A leitura existe e é no host `services`
-   (`GET services.../locations/<loc>/tags/search`); POST/PUT/DELETE a confirmar, inclusive
-   qual host e qual esquema de auth.
-3. Se apagar tag da subconta remove a tag dos contatos que a têm, e se isso dispara
-   automação de `TAG_REMOVED` em massa — o mesmo perigo já visto ao remover estágio de
-   pipeline.
-4. Se tarefa tem campo de dono obrigatório e o que o servidor faz sem ele.
+Nota do contato: `GET|POST /contacts/<id>/notes`, `PUT|DELETE /contacts/<id>/notes/<noteId>`.
+Criar exige só `body`; `title`, `color` e `pinned` são opcionais e podem não voltar na
+resposta.
+
+Tarefa do contato: `GET|POST /contacts/<id>/tasks`, `PUT|DELETE
+/contacts/<id>/tasks/<taskId>`, mais `PUT /contacts/<id>/tasks/<taskId>/completed`. **Criar
+exige `title`, `dueDate` e `completed`** — o `completed` é obrigatório na criação, então a CLI
+manda `false` sozinha quando o usuário não disser nada. `dueDate` é texto ISO, ao contrário da
+agenda, onde ISO devolve lista vazia em silêncio. O que o servidor faz sem `assignedTo` não
+está documentado: descobrir ao vivo.
+
+Busca de tarefa por subconta: `POST /locations/<loc>/tasks/search`, com `contactId[]`,
+`completed`, `assignedTo[]`, `query`, `limit` (25 por padrão) e `skip`.
+
+Tag da subconta: `POST /locations/<loc>/tags` (responde **200**, não 201),
+`PUT /locations/<loc>/tags/<tagId>`, `DELETE /locations/<loc>/tags/<tagId>`. O `DELETE`
+devolve as duas grafias (`succeded` e `succeeded`); ler `succeeded` com fallback. O `POST`
+devolve `categoryId`, `description` e `color`, que a documentação não lista — esta entrega não
+os expõe.
+
+## Decisões do grill
+
+- **A4** — `renomear` é escrita comum, sem flag extra e sem propagação própria. Motivo: a
+  prova ao vivo mostrou o servidor reescrevendo a referência no step e no trigger.
+- **A1** — mantido o desenho original de `renomear`, que a spec tinha deixado em suspenso.
+  Motivo: o modelo por nome só seria fatal se o servidor não propagasse, e ele propaga.
+- **A3** — consertar o `trocar-tag` (que não toca trigger nem `customTags`) **fica fora** da
+  0.20.0, como dívida declarada. Motivo: `renomear` não depende mais dele, e ampliar a
+  escrita de workflow no meio de uma entrega de tag mistura dois riscos.
+- **A5** — apagar tag exige `--apagar-citada` quando algum workflow cita a tag, no molde do
+  `--apagar-com-cards` do pipeline. A prévia avisa que a tag sai de todos os contatos e que
+  isso **pode** acordar automação de "tag removida", sem afirmar que acorda. Motivo: o risco
+  é real e não provável de medir; guarda é mais barata que uma onda de mensagens.
+- **A6** — a prévia **não** tenta contar os contatos afetados, e diz que não sabe contar.
+  Motivo: o GHL não expõe esse número em lugar nenhum (pedido "planned", 129 votos), e
+  mapear a busca de contatos só para enfeitar a prévia é escopo novo. Prévia que inventa
+  número tranquiliza errado.
+- **A2** — o furo do `customTags` (step que escolhe a tag em tempo de execução por um merge
+  field) é **declarado na resposta**, não fechado. A tool `tags` avisa quando a subconta tem
+  algum step assim, porque ali a contagem de citações é incompleta por natureza. Motivo:
+  fechar exigiria resolver merge field, que nenhuma parte do projeto faz.
+- **A14** — a tool `tags` **degrada** sem dump: lista as tags ao vivo e omite a coluna de
+  impacto, com aviso. Não chama o carregador de dump, seguindo o precedente de
+  `workflows_ao_vivo`. Motivo: a tag é ao vivo; exigir dump para listá-la seria arbitrário.
+- **A11** — entra a busca de tarefa por subconta, como uma opção de leitura a mais na mesma
+  tool. Motivo: "que tarefas estão atrasadas nesta subconta" é a pergunta útil, e custa uma
+  rota que já está documentada.
+- **A15** — não há bug: o carregador já guarda os nomes de tag em minúsculas
+  (`auditor/src/automaster_audit/loader.py:147`), então não existe a assimetria que o dossiê
+  suspeitou. Consequência para esta entrega: a tool `tags` lê a tag ao vivo no caso original
+  e tem que normalizar para minúsculas antes de cruzar com o índice.
+- **A13** — o rastro de escrita de tag fica em `_tags/<loc>/<tagId>/<ts>.json`, não
+  `_tags/<loc>/<ts>.json` como a spec dizia. Motivo: é a forma que o helper existente produz,
+  e mudar o helper mexeria nas áreas já entregues.
 
 ## Validação
 
