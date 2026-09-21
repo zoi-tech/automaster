@@ -1016,7 +1016,8 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
                     pasta: str | None = None, de: str | None = None, para: str | None = None,
                     step: str | None = None, caminho: str | None = None, valor: str | None = None,
                     trigger_acao: str | None = None,
-                    trigger_id: str | None = None, confirmo: bool = False,
+                    trigger_id: str | None = None, trigger_corpo: dict | str | None = None,
+                    confirmo: bool = False,
                     publicado: bool = False, snapshot: str | None = None) -> dict:
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
 
@@ -1032,6 +1033,15 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         raise ToolError(f"acao inválida: {acao!r}. Use uma de: {', '.join(WF_EDITAR_ACOES)}")
     if acao != "criar" and not id:
         raise ToolError(f"acao {acao!r} exige `id` (id do workflow)")
+    # Workflow fora de pasta some da lista da interface (a raiz mostra PASTA, não workflow)
+    # e o editor abre em branco. O erro sai aqui, antes de abrir o Chrome à toa.
+    if acao in ("criar", "duplicar") and not pasta:
+        raise ToolError(
+            f"acao {acao!r} exige `pasta`: workflow fora de pasta não aparece na lista do app e o "
+            "editor abre em branco. Os ids de pasta saem da tool `inventario` ou do dump."
+        )
+    if trigger_corpo is not None and not isinstance(trigger_corpo, str):
+        trigger_corpo = json.dumps(trigger_corpo, ensure_ascii=False)
 
     def _args(com_confirmo: bool, versao: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
@@ -1044,6 +1054,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
             ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
             ("--step", step), ("--caminho", caminho), ("--valor", valor),
             ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
+            ("--trigger-corpo", trigger_corpo),
         ):
             if valor_opcional is not None:
                 a += [flag, str(valor_opcional)]
@@ -1478,22 +1489,31 @@ TOOLS = {
                         "ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
                         "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
                         "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
-                        "atributo de step (`atributo`) e REMOVE um trigger (`trigger`). Sem `confirmo` devolve "
-                        "a PRÉVIA com o diff e não grava nada. Workflow publicado exige `publicado=true` "
-                        "junto. Não reordena fluxo nem cria step do zero — isso é a parte B.",
+                        "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
+                        "(`trigger`). Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
+                        "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
+                        "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
+                        "`url`, o link do editor. Não reordena fluxo nem cria step do zero.",
                         {"loc": _LOC,
                          "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
                          "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},
                          "nome": {"type": "string", "description": "criar, renomear, duplicar"},
-                         "pasta": {"type": "string", "description": "id da pasta; ausente = raiz"},
+                         "pasta": {"type": "string",
+                                   "description": "id da pasta; OBRIGATÓRIO em criar e duplicar "
+                                                  "(fora de pasta o app não mostra o workflow)"},
                          "de": {"type": "string", "description": "id (trocar-ref) ou nome de tag (trocar-tag) a substituir"},
                          "para": {"type": "string", "description": "id ou nome de tag novo"},
                          "step": {"type": "string", "description": "id do step (atributo)"},
                          "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
                          "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
-                         "trigger_acao": {"type": "string", "enum": ["remover"],
-                                          "description": "só remover: criar e trocar trigger não têm rota conhecida"},
-                         "trigger_id": {"type": "string", "description": "id do trigger a remover"},
+                         "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
+                         "trigger_id": {"type": "string", "description": "id do trigger que SAI (remover, substituir)"},
+                         "trigger_corpo": {"type": "object",
+                                           "description": "trigger que ENTRA (adicionar, substituir): "
+                                                          "`type` obrigatório (appointment, contact_tag, "
+                                                          "form_submission…), mais `name`, `conditions` e "
+                                                          "`masterType: \"highlevel\"`. O `workflowId` é "
+                                                          "preenchido pela tool"},
                          "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
                          "publicado": {"type": "boolean", "description": "obrigatório junto de confirmo se o workflow está publicado"},
                          "snapshot": _SNAP},

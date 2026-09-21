@@ -180,16 +180,34 @@ Como ler a resposta:
   alguma referência — extraia a subconta de novo se quiser a rede de proteção.
 - `validacao.pode_gravar: false` é recusa de verdade: a edição introduziria um ERROR novo, e
   nada foi gravado. `erros_resolvidos` é o contrário: achados que a edição conserta.
-- **Trigger: só dá para REMOVER.** Criar e trocar trigger não têm rota conhecida e a tool recusa
-  — antes ela devolvia sucesso sem fazer nada. A remoção **passa pela mesma validação** das
-  ações de corpo: é justo ela que pode deixar o workflow sem entrada (`workflow_unreachable`).
-  Na saída de `trigger`, `triggers` é a lista de DEPOIS da remoção; a de antes está no `diff`.
+- **Trigger: `adicionar`, `remover` e `substituir`.** O que entra vai em `trigger_corpo`
+  (precisa de `type`; o `workflowId` a tool preenche sozinha, em camelCase — com `workflow_id`,
+  que é como a LEITURA devolve o campo, o servidor responde 200 com id e o trigger nasce órfão,
+  sem disparar nada). A tool confere relendo a lista autoritativa, e recusa se o trigger novo
+  não aparecer. Toda ação de trigger **passa pela mesma validação** das ações de corpo: é justo
+  a remoção que pode deixar o workflow sem entrada (`workflow_unreachable`). Na saída,
+  `triggers` é a lista de DEPOIS; a de antes está no `diff`.
+- **`criar` e `duplicar` exigem `pasta`.** A lista da interface mostra PASTA na raiz, não
+  workflow: workflow fora de pasta não aparece para ninguém e o editor abre em branco. A tool
+  ainda conserta o que a API deixa pela metade — workflow recém-criado nasce sem `status` — e
+  devolve o resultado em `visivel`.
+- **`url` na resposta é o link do editor**, com `workflow` no SINGULAR. Não monte o link à mão:
+  com `workflows` (que é a rota da LISTA) o app devolve 404 e a página fica branca, inclusive
+  em workflow publicado e íntegro. Ao dar o link ao usuário, copie o campo `url`.
+- **`400 "action has a corrupted type"` é o servidor validando o corpo**, não a tool falhando.
+  Step de mensagem exige `cat`, `convertToMultipath`, `transitions` e `workflowsActionType`
+  junto dos campos óbvios. Nada foi gravado quando esse erro aparece.
 - `trocar-ref` troca o id, não o rótulo: o `title` humano do step continua o antigo e o comando
   avisa em `avisos`. Quem for abrir o editor do GHL vai ver o nome velho ao lado do id novo.
 - **`trocar-ref` só aceita id em `de`.** Ela substitui em qualquer profundidade, inclusive DENTRO
   do texto de SMS, e-mail e WhatsApp: `de="Olá"` reescreveria o que o cliente fala com a base
   dele, e nenhuma das 18 regras acharia isso estranho. Texto que não tem cara de id é recusado.
   Para tag pelo nome use `trocar-tag`; para um campo de um step, `atributo`.
+- **Escrita ao vivo é serial, e navegar no app pelo Playwright derruba a sessão.** O perfil
+  persistente do Chrome é único: dois comandos de escrita ao mesmo tempo travam no
+  `SingletonLock`. E abrir o app do GHL com Playwright para inspecionar tela já deslogou o
+  perfil — o comando seguinte pediu login manual. Para conferir o efeito de uma escrita, releia
+  pela API (é o que as tools já fazem), não pela interface.
 - **`apagar` não tem desfazer** e é a única escrita daqui sem volta: guarda cópia do documento e
   dos triggers no registro antes do DELETE, e é só isso que sobra. Não prometa restauração.
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
   salvarWorkflow, listarTriggers, apagarTrigger, historicoVersoes, versaoPorNumero,
+  criarTrigger, nascerVisivel, urlEditor, listarPastas,
 } from "../src/api/workflows-write.js";
 
 type Chamada = { metodo: string; url: string; corpo?: unknown };
@@ -100,4 +101,87 @@ test("histórico de versões: lista e por número", async () => {
   await versaoPorNumero(client, LOC, WID, 7);
   assert.equal(chamadas[0].url, "https://backend.leadconnectorhq.com/workflow/LOC1/WF1/history");
   assert.equal(chamadas[1].url, "https://backend.leadconnectorhq.com/workflow/LOC1/WF1/history-by-number/7");
+});
+
+// --- os cinco aprendizados da montagem ao vivo de 2026-09-21 ---
+
+// O falso positivo mais caro desta API: com `workflow_id` (snake, que é como a LEITURA
+// devolve o campo) o POST responde 200 com id e o trigger nasce órfão, invisível para
+// sempre. `workflowId` camelCase é o que grava.
+test("criarTrigger manda workflowId em camelCase e nunca workflow_id na raiz", async () => {
+  const { client, chamadas } = clienteFalso();
+  await criarTrigger(client, LOC, WID, {
+    id: "velho", workflow_id: "OUTRO", location_id: "OUTRA", type: "appointment", conditions: [],
+  });
+  const c = chamadas[0];
+  assert.equal(c.metodo, "post");
+  assert.equal(c.url, "https://backend.leadconnectorhq.com/workflow/LOC1/trigger");
+  const corpo = c.corpo as Record<string, unknown>;
+  assert.equal(corpo.workflowId, WID);
+  assert.ok(!("workflow_id" in corpo), "workflow_id na raiz faz o trigger nascer órfão");
+  assert.ok(!("id" in corpo), "id de outro trigger não pode vazar para a criação");
+  assert.equal(corpo.location_id, LOC, "location_id vem da subconta, não do corpo recebido");
+  assert.deepEqual(corpo.actions, [{ workflow_id: WID, type: "add_to_workflow" }]);
+});
+
+test("criarTrigger reaponta as actions recebidas para o workflow certo", async () => {
+  const { client, chamadas } = clienteFalso();
+  await criarTrigger(client, LOC, WID, {
+    type: "appointment", actions: [{ workflow_id: "OUTRO", type: "add_to_workflow" }],
+  });
+  assert.deepEqual((chamadas[0].corpo as any).actions, [{ workflow_id: WID, type: "add_to_workflow" }]);
+});
+
+// A URL do editor é `workflow` no SINGULAR; com o plural (rota da lista) o app devolve 404
+// e a página fica branca, inclusive em workflow publicado e íntegro.
+test("urlEditor usa workflow no singular", () => {
+  assert.equal(urlEditor(LOC, WID), "https://app.gohighlevel.com/v2/location/LOC1/automation/workflow/WF1");
+});
+
+test("listarPastas devolve só os diretórios da raiz", async () => {
+  const chamadas: Chamada[] = [];
+  const client = {
+    getJson: (url: string) => {
+      chamadas.push({ metodo: "get", url });
+      return Promise.resolve({ rows: [
+        { id: "d1", name: "Vendas", type: "directory" },
+        { id: "w1", name: "um workflow", type: "workflow" },
+      ] });
+    },
+  } as never;
+  assert.deepEqual(await listarPastas(client, LOC), [{ id: "d1", name: "Vendas" }]);
+  assert.ok(chamadas[0].url.includes("/list?parentId=root"));
+});
+
+// Workflow recém-criado nasce sem `status` e fora de pasta: a API o lista e a interface
+// não o mostra, com o editor em branco.
+test("nascerVisivel move para a pasta e grava status draft", async () => {
+  const chamadas: Chamada[] = [];
+  let doc: Record<string, unknown> = { id: WID, parentId: "", name: "novo" };
+  const client = {
+    getJson: (url: string) => { chamadas.push({ metodo: "get", url }); return Promise.resolve({ ...doc }); },
+    putJson: (url: string, corpo?: unknown) => {
+      chamadas.push({ metodo: "put", url, corpo });
+      if (url.includes("move-directory")) doc = { ...doc, parentId: (corpo as any).parentId };
+      else doc = { ...doc, status: (corpo as any).status };
+      return Promise.resolve({ ok: true });
+    },
+  } as never;
+  const fim = await nascerVisivel(client, LOC, WID, "PASTA1", "U1");
+  assert.deepEqual(fim, { parentId: "PASTA1", status: "draft" });
+  assert.ok(chamadas.some((c) => c.url.includes("move-directory")));
+  const save = chamadas.find((c) => c.metodo === "put" && !c.url.includes("move-directory"));
+  assert.equal((save!.corpo as any).status, "draft");
+  assert.equal((save!.corpo as any).updatedBy, "U1");
+});
+
+test("nascerVisivel não mexe no que já está inteiro", async () => {
+  const chamadas: Chamada[] = [];
+  const client = {
+    getJson: (url: string) => { chamadas.push({ metodo: "get", url }); return Promise.resolve({ parentId: "PASTA1", status: "published" }); },
+    putJson: (url: string) => { chamadas.push({ metodo: "put", url }); return Promise.resolve({}); },
+  } as never;
+  const fim = await nascerVisivel(client, LOC, WID, "PASTA1", "U1");
+  assert.deepEqual(fim, { parentId: "PASTA1", status: "published" });
+  assert.equal(chamadas.filter((c) => c.metodo === "put").length, 0);
 });

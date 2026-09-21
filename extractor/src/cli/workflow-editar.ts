@@ -7,6 +7,7 @@ import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
   salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE,
+  criarTrigger, nascerVisivel, urlEditor, listarPastas,
 } from "../api/workflows-write.js";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
@@ -22,7 +23,7 @@ export const WF_EDITAR_ACOES = [
 export interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
   de?: string; para?: string; step?: string; caminho?: string; valor?: string;
-  triggerAcao?: string; triggerId?: string; versaoEsperada?: string;
+  triggerAcao?: string; triggerId?: string; triggerCorpo?: string; versaoEsperada?: string;
   usuario?: string; confirmo?: boolean; publicado?: boolean; json?: boolean;
 }
 
@@ -39,7 +40,10 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
   await withClient(o.location, log, async (client, _page, tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
-    const saida: Record<string, unknown> = { aplicado: false, acao: o.acao, id: o.id };
+    const saida: Record<string, unknown> = {
+      aplicado: false, acao: o.acao, id: o.id,
+      ...(o.id ? { url: urlEditor(o.location, o.id) } : {}),
+    };
 
     if (o.acao === "historico") {
       saida.historico = await historicoVersoes(client, o.location, o.id!);
@@ -81,7 +85,13 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
           acao: o.acao, opts: semSegredo(o), aplicado: true, origem: o.id, resposta,
         });
       }
-      Object.assign(saida, { aplicado: true, resposta, registro, id: chave });
+      // Workflow recém-criado nasce sem `status` e fora de pasta: a API o lista e a
+      // interface não o mostra, com o editor em branco. Consertar aqui é o que impede
+      // entregar um workflow que só existe para a API.
+      if ((o.acao === "criar" || o.acao === "duplicar") && chave !== "novo") {
+        saida.visivel = await nascerVisivel(client, o.location, chave, o.pasta!, usuarioId);
+      }
+      Object.assign(saida, { aplicado: true, resposta, registro, id: chave, url: urlEditor(o.location, chave) });
       return imprimir(saida, o, log);
     }
 
@@ -185,11 +195,27 @@ function parseValor(v: string): unknown {
   try { return JSON.parse(v); } catch { return v; }
 }
 
+/**
+ * Workflow fora de pasta não aparece na interface: a lista da raiz mostra PASTA, não
+ * workflow. Por isso `criar` e `duplicar` exigem `--pasta`, e o erro traz as que existem.
+ */
+async function exigePasta(client: GhlClient, o: Opts): Promise<void> {
+  if (o.pasta) return;
+  const pastas = await listarPastas(client, o.location).catch(() => []);
+  throw new Error(
+    `--acao ${o.acao} exige --pasta: workflow fora de pasta some da lista do app e o editor abre em branco.\n` +
+    (pastas.length
+      ? "Pastas desta subconta:\n  - " + pastas.map((p) => `${p.id}  ${p.name}`).join("\n  - ")
+      : "Não consegui listar as pastas desta subconta."),
+  );
+}
+
 async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
   switch (o.acao) {
     case "criar":
       if (!o.nome) throw new Error("--acao criar exige --nome");
-      return criarWorkflow(client, o.location, { name: o.nome, parentId: o.pasta ?? null });
+      await exigePasta(client, o);
+      return criarWorkflow(client, o.location, { name: o.nome, parentId: o.pasta });
     case "renomear":
       if (!o.nome) throw new Error("--acao renomear exige --nome");
       return renomearWorkflow(client, o.location, o.id!, renomear({ workflowData: { templates: [] } } as Documento, o.nome).doc.name!);
@@ -197,6 +223,7 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
       return moverWorkflow(client, o.location, o.id!, o.pasta ?? null);
     case "duplicar":
       if (!o.nome) throw new Error("--acao duplicar exige --nome (nome da cópia)");
+      await exigePasta(client, o);
       return duplicarWorkflow(client, o.location, { workflowId: o.id!, novoNome: o.nome, parentId: o.pasta });
     case "apagar":
       return apagarWorkflow(client, o.location, o.id!, usuarioId);
@@ -206,22 +233,20 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
 }
 
 /**
- * Trigger: só `remover`, e pelo DELETE dedicado. O documento do workflow NÃO traz a
- * lista (só `triggersFilePath`) e o `only-triggers` responde 200 sem criar nada — então
- * `adicionar` e `substituir` recusam em vez de devolver sucesso falso.
+ * Trigger: `adicionar` pelo POST dedicado, `remover` pelo DELETE dedicado, `substituir` =
+ * os dois em sequência. O documento do workflow NÃO traz a lista (só `triggersFilePath`) e
+ * o `only-triggers` responde 200 sem gravar nada — nenhum dos dois serve aqui.
  */
 async function acaoTrigger(
   client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void,
 ): Promise<void> {
   const acao = o.triggerAcao ?? "";
-  if (acao === "adicionar" || acao === "substituir") {
-    throw new Error(
-      `--trigger-acao ${acao} não existe: não há rota conhecida para criar nem para trocar trigger. ` +
-      "O documento do workflow não traz a lista de triggers e o `only-triggers` responde 200 sem gravar " +
-      "nada (provado ao vivo). Criar e trocar trigger ficaram para a parte B. Só `remover` funciona.",
-    );
+  if (!TRIGGER_ACOES.includes(acao as never)) {
+    throw new Error(`--trigger-acao deve ser um de: ${TRIGGER_ACOES.join(" | ")}`);
   }
-  if (acao !== "remover") throw new Error("--trigger-acao deve ser remover (adicionar e substituir ficaram para a parte B)");
+  if (acao === "adicionar" || acao === "substituir") {
+    return await adicionarTrigger(client, o, saida, log, acao === "substituir");
+  }
   if (!o.triggerId) throw new Error("--trigger-acao remover exige --trigger-id");
 
   const triggers = await listarTriggers(client, o.location, o.id!);
@@ -284,6 +309,80 @@ async function acaoTrigger(
   imprimir(saida, o, log);
 }
 
+export const TRIGGER_ACOES = ["adicionar", "remover", "substituir"] as const;
+
+/**
+ * Cria o trigger pelo `POST .../trigger`. A guarda que importa está em `criarTrigger`: o
+ * `workflowId` vai em CAMELCASE, senão o servidor responde 200 com id e o trigger nasce
+ * órfão — o falso positivo de escrita que fez esta rota passar anos por inexistente. Por
+ * isso aqui 200 não encerra nada: a prova é o id aparecer na lista autoritativa relida.
+ */
+async function adicionarTrigger(
+  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void, substituir: boolean,
+): Promise<void> {
+  if (!o.triggerCorpo) throw new Error(`--trigger-acao ${o.triggerAcao} exige --trigger-corpo (JSON do trigger)`);
+  if (substituir && !o.triggerId) throw new Error("--trigger-acao substituir exige --trigger-id (o trigger que sai)");
+  let corpo: Record<string, unknown>;
+  try { corpo = JSON.parse(o.triggerCorpo); } catch (e) { throw new Error(`--trigger-corpo não é JSON válido: ${e}`); }
+  if (!corpo?.type) throw new Error("--trigger-corpo precisa de `type` (ex.: appointment, contact_tag, form_submission)");
+
+  const antes = await listarTriggers(client, o.location, o.id!);
+  if (substituir && !antes.some((t) => t?.id === o.triggerId)) {
+    throw new Error(`trigger ${o.triggerId} não existe neste workflow (ids: ${antes.map((t) => t?.id).join(", ") || "nenhum"})`);
+  }
+  const previsto = [...(substituir ? antes.filter((t) => t?.id !== o.triggerId) : antes), { ...corpo, id: "(novo)" }];
+  const vazio = { workflowData: { templates: [] } } as unknown as Documento;
+  Object.assign(saida, {
+    diff: diffWorkflow({ ...vazio, triggersData: antes }, { ...vazio, triggersData: previsto }),
+    mudancas: [substituir ? `trigger ${o.triggerId} trocado` : "trigger adicionado"],
+    triggers: previsto,
+  });
+
+  if (!o.confirmo) {
+    const documento = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+    Object.assign(saida, {
+      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
+      documento, versao: documento.version,
+    });
+    return imprimir(saida, o, log);
+  }
+
+  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
+  conferirVersaoEsperada(o, meta?.version);
+  if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
+
+  const registro = registroEscrita(o.location, "_workflows", o.id!, {
+    acao: "trigger", triggerAcao: o.triggerAcao, aplicado: false, antes,
+  });
+  const resposta = await criarTrigger(client, o.location, o.id!, corpo);
+  let depois = await listarTriggers(client, o.location, o.id!);
+  const criado = depois.find((t) => t?.id === resposta?.id);
+  const fechar = (aplicado: boolean | string) => fs.writeFileSync(registro, JSON.stringify(
+    { em: new Date().toISOString(), acao: "trigger", triggerAcao: o.triggerAcao, aplicado, antes, depois, resposta }, null, 2,
+  ));
+  if (!criado) {
+    fechar(false);
+    throw new Error(
+      `o servidor respondeu sucesso (id ${resposta?.id}) mas o trigger NÃO aparece na lista do workflow: ` +
+      `ele nasceu órfão e não dispara nada. Nada foi trocado (registro em ${registro}).`,
+    );
+  }
+  if (substituir) {
+    await apagarTrigger(client, o.location, o.id!, o.triggerId!);
+    depois = await listarTriggers(client, o.location, o.id!);
+    if (depois.some((t) => t?.id === o.triggerId)) {
+      fechar("duvidoso");
+      throw new Error(
+        `o trigger novo ${resposta?.id} foi criado, mas o antigo ${o.triggerId} CONTINUA na lista: ` +
+        `o workflow tem os dois disparando agora (registro em ${registro}).`,
+      );
+    }
+  }
+  fechar(true);
+  Object.assign(saida, { aplicado: true, resposta, registro, triggers: depois, triggerId: resposta?.id });
+  imprimir(saida, o, log);
+}
+
 const exigeConfirmo = (acao: string) =>
   `--acao ${acao} muda dado real na subconta e não tem desfazer. Repita com --confirmo.`;
 
@@ -312,14 +411,15 @@ export function registrarWorkflowEditar(program: Command): void {
     .requiredOption("--acao <a>", WF_EDITAR_ACOES.join(" | "))
     .option("-i, --id <id>", "id do workflow (tudo menos criar)")
     .option("--nome <n>", "nome (criar, renomear, duplicar)")
-    .option("--pasta <id>", "id da pasta (criar, mover, duplicar); vazio = raiz")
+    .option("--pasta <id>", "id da pasta; obrigatório em criar e duplicar (fora de pasta o app não mostra)")
     .option("--de <v>", "id ou nome de tag a substituir (trocar-ref, trocar-tag)")
     .option("--para <v>", "id ou nome de tag novo (trocar-ref, trocar-tag)")
     .option("--step <id>", "id do step (atributo)")
     .option("--caminho <c>", "campo dentro de attributes, aninhado com ponto (atributo)")
     .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
-    .option("--trigger-acao <a>", "remover (só; criar e trocar não têm rota conhecida)")
-    .option("--trigger-id <id>", "id do trigger a remover")
+    .option("--trigger-acao <a>", TRIGGER_ACOES.join(" | "))
+    .option("--trigger-id <id>", "id do trigger que sai (remover, substituir)")
+    .option("--trigger-corpo <json>", "JSON do trigger que entra (adicionar, substituir)")
     .option("--versao-esperada <n>", "version que a prévia viu; aborta se o workflow mudou desde então")
     .option("--usuario <id>", "autor da edição; sem ele, sai do token")
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")

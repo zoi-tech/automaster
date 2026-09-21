@@ -4,6 +4,29 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.16.0 — 2026-09-21
+
+Os cinco aprendizados da primeira montagem de automação de ponta a ponta viram guarda no
+código. Continuam 31 tools e 18 regras; 158 testes no extractor, 299 no auditor.
+
+- **Criar trigger existe.** `POST .../workflow/<loc>/trigger` grava quando o corpo leva
+  `workflowId` em **camelCase**; com `workflow_id` — que é como a LEITURA devolve o campo — o
+  servidor responde 200 com id e o trigger nasce órfão, sem disparar nada. Era esse falso
+  positivo que fazia a rota passar por inexistente. `trigger_acao` agora aceita `adicionar`,
+  `remover` e `substituir`, com o trigger novo em `trigger_corpo`; `criarTrigger` força o
+  `workflowId` e reaponta as `actions`, e a gravação só é dada por feita quando o id aparece
+  na lista autoritativa relida.
+- **`criar` e `duplicar` exigem `pasta`.** Workflow fora de pasta não aparece na lista do app
+  (a raiz mostra pasta, não workflow) e o editor abre em branco. A recusa vem antes de abrir o
+  Chrome e o erro da CLI lista as pastas da subconta.
+- **Workflow recém-criado nasce pela metade** — sem `status` e com `parentId` vazio.
+  `nascerVisivel` move para a pasta e grava `status: "draft"` depois de criar ou duplicar;
+  é idempotente e devolve o estado final em `visivel`.
+- **A resposta traz `url`, o link do editor**, com `workflow` no SINGULAR. Com `workflows` (a
+  rota da lista) o app devolve 404 e a página fica branca, mesmo em workflow publicado.
+- **Documentado como armadilha**: `400 "action has a corrupted type"` é o servidor validando o
+  corpo do step, e navegar no app pelo Playwright desloga o perfil persistente do Chrome.
+
 ## 0.15.0 — 2026-09-21
 
 Escrita de ESTRUTURA de workflow. Uma tool nova (`workflow_editar`), 31 no total, módulo

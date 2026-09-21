@@ -7,6 +7,61 @@ import type { GhlClient } from "./client.js";
  */
 export const WF_WRITE = "https://backend.leadconnectorhq.com/workflow";
 
+/** URL do editor no app. `workflow` no SINGULAR: com o plural (rota da lista) o app dá 404. */
+export function urlEditor(loc: string, wid: string): string {
+  return `https://app.gohighlevel.com/v2/location/${loc}/automation/workflow/${wid}`;
+}
+
+/**
+ * Pastas da raiz, pela mesma rota que a interface usa. A lista do app mostra PASTA na raiz,
+ * não workflow: workflow fora de pasta não aparece para ninguém.
+ */
+export async function listarPastas(client: GhlClient, loc: string): Promise<{ id: string; name: string }[]> {
+  const r = await client.getJson<{ rows?: any[] }>(
+    `${WF_WRITE}/${loc}/list?parentId=root&limit=100&offset=0&sortBy=name&sortOrder=asc`,
+  );
+  return (r?.rows ?? []).filter((x) => x?.type === "directory").map((x) => ({ id: x.id, name: x.name }));
+}
+
+/**
+ * Cria o trigger. A chave é `workflowId` em CAMELCASE: com `workflow_id` (que é como a
+ * leitura devolve o campo) o servidor responde 200 com id e o trigger nasce órfão, invisível
+ * para sempre. Medido ao vivo em 2026-09-21.
+ */
+export function criarTrigger(
+  client: GhlClient, loc: string, wid: string, corpo: Record<string, unknown>,
+): Promise<{ id?: string }> {
+  const { id: _i, _id: _u, workflow_id: _w, workflowId: _c, location_id: _l, ...resto } = corpo as any;
+  return client.postJson(`${WF_WRITE}/${loc}/trigger`, {
+    ...resto,
+    workflowId: wid,
+    location_id: loc,
+    actions: (corpo.actions as unknown[] | undefined)?.length
+      ? (corpo.actions as any[]).map((a) => ({ ...a, workflow_id: wid }))
+      : [{ workflow_id: wid, type: "add_to_workflow" }],
+  });
+}
+
+/**
+ * Workflow recém-criado nasce SEM `status` e, sem pasta, com `parentId` vazio: a API o lista
+ * normalmente e a interface não o mostra, com o editor em branco. Move para a pasta e grava
+ * `status: "draft"`. Idempotente: não faz nada no que já está inteiro.
+ */
+export async function nascerVisivel(
+  client: GhlClient, loc: string, wid: string, pasta: string, usuarioId: string,
+): Promise<{ parentId?: string; status?: string }> {
+  const doc = await client.getJson<any>(`${WF_WRITE}/${loc}/${wid}`);
+  if (doc?.parentId !== pasta) await moverWorkflow(client, loc, wid, pasta);
+  if (!doc?.status) {
+    const atual = await client.getJson<any>(`${WF_WRITE}/${loc}/${wid}`);
+    await salvarWorkflow(client, loc, wid, {
+      ...atual, status: "draft", createdSteps: [], modifiedSteps: [], deletedSteps: [], updatedBy: usuarioId,
+    });
+  }
+  const fim = await client.getJson<any>(`${WF_WRITE}/${loc}/${wid}`);
+  return { parentId: fim?.parentId, status: fim?.status };
+}
+
 /** POST de criação. `location_id` só existe no POST — o PUT nunca o leva. */
 export function criarWorkflow(client: GhlClient, loc: string, corpo: Record<string, unknown>): Promise<unknown> {
   return client.postJson(`${WF_WRITE}/${loc}`, { ...corpo, location_id: loc });

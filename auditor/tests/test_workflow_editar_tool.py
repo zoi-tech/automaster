@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from automaster_audit import mcp_server
@@ -193,10 +194,35 @@ def test_validacao_sem_triggers_ao_vivo_diz_que_usou_o_dump(monkeypatch):
     assert "veio do dump" in r["validacao"]["aviso"]
 
 
-def test_schema_nao_oferece_mais_adicionar_nem_substituir_trigger():
+def test_schema_oferece_as_tres_acoes_de_trigger():
+    """A nota antiga dizia que criar trigger não tinha rota. Tem: o `POST .../trigger` com
+    `workflowId` em camelCase. Com `workflow_id` o trigger nasce órfão — e era isso que
+    fazia a rota passar por inexistente."""
     _, _, schema, _ = mcp_server.TOOLS["workflow_editar"]
-    assert schema["trigger_acao"]["enum"] == ["remover"]
-    assert "trigger" not in schema
+    assert schema["trigger_acao"]["enum"] == ["adicionar", "remover", "substituir"]
+    assert "trigger_corpo" in schema
+
+
+def test_criar_e_duplicar_exigem_pasta(monkeypatch):
+    """Workflow fora de pasta não aparece na lista do app e o editor abre em branco. A
+    recusa vem antes de abrir o Chrome."""
+    chamou = []
+    monkeypatch.setattr(mcp_server, "_run_extractor", lambda *a: chamou.append(a) or {})
+    for acao in ("criar", "duplicar"):
+        with pytest.raises(mcp_server.ToolError, match="pasta"):
+            mcp_server.workflow_editar(loc="L1", acao=acao, id="W1", nome="x")
+    assert chamou == [], "não pode abrir o Chrome para uma chamada que já se sabe errada"
+
+
+def test_trigger_corpo_vira_json_na_linha_de_comando(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(mcp_server, "_run_extractor", lambda *a: vistos.append(a) or {"aplicado": False})
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    mcp_server.workflow_editar(loc="L1", acao="trigger", id="W1", trigger_acao="adicionar",
+                               trigger_corpo={"type": "appointment", "name": "Marcou"})
+    args = vistos[0]
+    corpo = args[args.index("--trigger-corpo") + 1]
+    assert json.loads(corpo) == {"type": "appointment", "name": "Marcou"}
 
 
 def _previa_trigger():
