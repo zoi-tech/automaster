@@ -148,3 +148,35 @@ Ordenada por dependência.
 8. A11 — entra a busca de tarefa por subconta?
 9. A15 — confirmar se a tag com maiúscula aparece órfã antes de construir a coluna de
    impacto.
+
+## Prova ao vivo — A4 respondido (2026-09-21, Instaltech)
+
+Script: `docs/superpowers/provas/2026-09-21-prova-tag-rename.ts` (descartável, guardado como
+registro).
+
+Roteiro: tag `zz-prova-rename-automaster` criada; workflow `ZZ PROVA RENAME TAG` criado em
+pasta, em `draft`, com um step `add_contact_tag` citando a tag e um trigger `contact_tag`
+disparando por ela; tag renomeada por `PUT /locations/<loc>/tags/<tagId>`; workflow e
+trigger relidos 3s depois; workflow e tag apagados. Zero resíduo.
+
+**Veredito: o `PUT` propaga, nos dois lugares.**
+
+```
+step.attributes.tags : ["zz-prova-rename-automaster-2"]
+trigger conditions   : [{"field":"tagsAdded","value":"zz-prova-rename-automaster-2",...}]
+```
+
+Três fatos que caem daí:
+
+- **A4 resolvido**: renomear tag pela API é seguro. O servidor reescreve a referência nos
+  workflows, inclusive no trigger — que é justamente o lugar que o `trocar-tag` do projeto
+  não cobre. Renomear pelo plugin não precisa de propagação própria.
+- **A3 esvazia**: a lacuna do `trocar-tag` (não tocar trigger) continua sendo uma lacuna,
+  mas deixa de ser um bloqueio para esta entrega — `renomear` não depende dele.
+- `DELETE` de tag devolve **as duas grafias**: `{"succeded":true,"succeeded":true}`. A doc
+  que só mostrava a errada está incompleta; ler `succeeded` com fallback resolve.
+- `POST` de tag devolve a tag inteira com campos que a doc não lista: `categoryId`,
+  `description`, `color`, todos `null`. Há mais superfície de tag do que só o nome.
+
+Segue **sem prova**: se o rename dispara os workflows de "tag removida" (o workflow da prova
+estava em `draft`, de propósito), e o que o `DELETE` faz com contatos que têm a tag.
