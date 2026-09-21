@@ -4,6 +4,25 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.21.0 — consolidação: CI, smoke da API e dois monolitos quebrados
+
+Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. O que muda é a sustentação.
+
+- **CI** (`.github/workflows/ci.yml`): typecheck do TypeScript e as duas suítes (212 no
+  extractor, 347 no auditor) rodam em todo push e PR. Antes só rodavam à mão. O `pytest`
+  passou a ser declarado como extra `dev` do auditor e o extractor declara Node ≥ 22.
+- **`npm run smoke -- -l <loc>`**: chama, uma vez cada, as mesmas funções de `src/api/*` que
+  as tools usam, e confere a forma da resposta. É o aviso de que a API interna do GHL mudou,
+  antes de o cliente avisar. Só leitura; falha sai com código 1. Não roda em CI — o extractor
+  abre Chrome com perfil persistente e login manual. Ao vivo na Instaltech: 23 de 23 ok.
+- **`extractor/src/cli.ts`**: 2.604 linhas viram 35, mais um módulo por domínio em `src/cli/`.
+- **`auditor/.../mcp_server.py`**: 1.853 linhas viram 114, mais o pacote `mcp/` com um módulo
+  por domínio. O `tools/list` do servidor continua byte a byte igual ao da 0.20.0.
+
+Os dois refactors são movimentação de código: nenhuma assinatura, nenhum texto de `--help` e
+nenhum schema de tool mudou. A única edição nos testes do auditor foi o alvo do monkeypatch,
+que acompanhou a função para o novo módulo.
+
 ## 0.20.0 — notas e tarefas do contato, tags da subconta
 
 Quatro tools novas (35 no total): `anotacoes`, `anotacao_acao`, `tags`, `tag_acao`. 18 regras

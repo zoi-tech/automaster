@@ -1,20 +1,19 @@
 import type { Command } from "commander";
 import fs from "node:fs";
-import { withClient, registroEscrita } from "../cli.js";
+import { withClient, registroEscrita } from "./shared.js";
 import { decodeUserId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
 import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
-  salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE,
-  criarTrigger, nascerVisivel, urlEditor, listarPastas, lerDocumento, listarTriggersPrevia,
+  salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE, criarTrigger,
+  nascerVisivel, urlEditor, listarPastas, lerDocumento, listarTriggersPrevia
 } from "../api/workflows-write.js";
 import {
-  trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
-  renomear, montarCorpo, checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
-  conferirTriggersEsperados, conferirCamadaCrua,
-  criarStep, removerStep, moverStep,
-  type Documento,
+  trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo, renomear, montarCorpo,
+  checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
+  conferirTriggersEsperados, conferirCamadaCrua, criarStep, removerStep, moverStep,
+  type Documento
 } from "../api/workflow-edit.js";
 
 export const WF_EDITAR_ACOES = [

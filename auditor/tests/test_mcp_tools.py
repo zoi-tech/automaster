@@ -7,17 +7,19 @@ import pytest
 
 from automaster_audit import mcp_server as srv
 from conftest import tag_cond, trig, wf
+from automaster_audit.mcp import base as mcp_base
+from automaster_audit.mcp import conversas as mcp_conversas
 
 
 def test_run_extractor_builds_cmd_and_parses_last_line(monkeypatch, tmp_path):
     tsx = tmp_path / "node_modules" / ".bin" / "tsx"
     tsx.parent.mkdir(parents=True); tsx.write_text("")
-    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
     seen = {}
     def fake_run(cmd, **kw):
         seen["cmd"] = cmd; seen["env"] = kw["env"]
         return subprocess.CompletedProcess(cmd, 0, stdout='ruído\n{"ok": 1}\n', stderr="")
-    monkeypatch.setattr(srv.subprocess, "run", fake_run)
+    monkeypatch.setattr(mcp_base.subprocess, "run", fake_run)
     assert srv._run_extractor("contato-editar", "-l", "L", "--json") == {"ok": 1}
     assert seen["cmd"][1:] == ["src/cli.ts", "contato-editar", "-l", "L", "--json"]
     assert seen["env"]["AUTOMASTER_DUMPS"]
@@ -26,8 +28,8 @@ def test_run_extractor_builds_cmd_and_parses_last_line(monkeypatch, tmp_path):
 def test_run_extractor_failure_carries_stderr(monkeypatch, tmp_path):
     tsx = tmp_path / "node_modules" / ".bin" / "tsx"
     tsx.parent.mkdir(parents=True); tsx.write_text("")
-    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
-    monkeypatch.setattr(srv.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="snapshot: /x/y.json\nHTTP 403"))
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(mcp_base.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="snapshot: /x/y.json\nHTTP 403"))
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json"):
         srv._run_extractor("contato-editar")
 
@@ -36,11 +38,11 @@ def test_run_extractor_failure_keeps_snapshot_head_despite_long_stderr(monkeypat
     """O `snapshot:` sai ANTES das escritas: não pode sumir na cauda de um stack trace longo."""
     tsx = tmp_path / "node_modules" / ".bin" / "tsx"
     tsx.parent.mkdir(parents=True); tsx.write_text("")
-    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
     err = ("Capturando tokens (faça login na janela do Chrome, se pedido)...\n"
            "401 — recapturando tokens...\n401 — recapturando tokens...\nsnapshot: /x/y.json\n"
            + "\n".join(f"    at frame{i} ................................" for i in range(200)))
-    monkeypatch.setattr(srv.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr=err))
+    monkeypatch.setattr(mcp_base.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr=err))
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
         srv._run_extractor("contato-editar")
     assert "frame199" in str(e.value) and "tool `contato`" in str(e.value)
@@ -49,10 +51,10 @@ def test_run_extractor_failure_keeps_snapshot_head_despite_long_stderr(monkeypat
 def test_run_extractor_timeout_becomes_tool_error(monkeypatch, tmp_path):
     tsx = tmp_path / "node_modules" / ".bin" / "tsx"
     tsx.parent.mkdir(parents=True); tsx.write_text("")
-    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
     def boom(cmd, **kw):
         raise subprocess.TimeoutExpired(cmd, 600, stderr="snapshot: /x/y.json\n")
-    monkeypatch.setattr(srv.subprocess, "run", boom)
+    monkeypatch.setattr(mcp_base.subprocess, "run", boom)
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
         srv._run_extractor("contato-editar")
     assert "tool `contato`" in str(e.value)
@@ -132,7 +134,7 @@ def test_workflow_paths_have_ceiling(root, monkeypatch):
             {"id": f"y{i}", "name": "Sim"}, {"id": f"n{i}", "name": "Não"}]}}
         steps.append(b)
     root(workflows=[wf(steps=steps)])
-    monkeypatch.setattr(srv, "PATHS_MAX_CHARS", 200)
+    monkeypatch.setattr(mcp_base, "PATHS_MAX_CHARS", 200)
     out = srv.workflow(LOC, "wf1")
     assert out["caminhos_truncado"] is True
     assert len(out["caminhos"]) <= 260
@@ -203,7 +205,7 @@ def _ev(i):
 
 def test_contato_returns_events_and_snapshot(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [_ev(0), _ev(1)]})
+    monkeypatch.setattr(mcp_base, "_run_timeline", lambda loc, id, days: {"events": [_ev(0), _ev(1)]})
     out = srv.contato(LOC, "c1")
     assert [e["id"] for e in out["eventos"]] == ["e0", "e1"]
     assert out["truncado"] is False and "_snapshot" in out
@@ -213,15 +215,15 @@ def test_contato_drops_noise_keys(root, monkeypatch):
     root(workflows=[wf()])
     ev = {**_ev(0), "traceId": "t", "commonPrimaryId": "c", "_id": "c", "shardId": "s", "secondaryId": "x",
           "apiVersion": "v", "chPublished": True, "externalChange": True}
-    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [ev]})
+    monkeypatch.setattr(mcp_base, "_run_timeline", lambda loc, id, days: {"events": [ev]})
     got = srv.contato(LOC, "c1")["eventos"][0]
     assert set(got) == set(_ev(0))
 
 
 def test_contato_ceiling_pages_by_time(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_timeline", lambda loc, id, days: {"events": [_ev(i) for i in range(9)]})
-    monkeypatch.setattr(srv, "CONTATO_MAX_CHARS", 400)
+    monkeypatch.setattr(mcp_base, "_run_timeline", lambda loc, id, days: {"events": [_ev(i) for i in range(9)]})
+    monkeypatch.setattr(mcp_base, "CONTATO_MAX_CHARS", 400)
     out = srv.contato(LOC, "c1")
     assert out["truncado"] is True and len(out["eventos"]) < 9
     assert out["proximo_ate"] == out["eventos"][-1]["createdAt"]
@@ -231,7 +233,7 @@ def test_contato_ceiling_pages_by_time(root, monkeypatch):
 
 def test_contato_without_setup_teaches(root, monkeypatch, tmp_path):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "EXTRACTOR_DIR", tmp_path / "nao-existe")
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path / "nao-existe")
     with pytest.raises(srv.ToolError, match="automaster-extract"):
         srv.contato(LOC, "c1")
 
@@ -241,17 +243,17 @@ def test_editar_calls_extractor_and_lists_triggered_workflows(root, monkeypatch)
                     wf(id="b", name="Campo mudou", triggers=[trig("contact_changed", "b")])],
          tags=["quente"])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.setdefault("args", a) and {"id": "c1", "snapshot": "/s.json", "antes": {}, "depois": {}, "mudancas": {}})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.setdefault("args", a) and {"id": "c1", "snapshot": "/mcp_base.json", "antes": {}, "depois": {}, "mudancas": {}})
     out = srv.editar(LOC, "c1", set={"phone": "+55"}, tags_adicionar=["quente"])
     assert seen["args"][:5] == ("contato-editar", "-l", LOC, "-i", "c1")
     assert "--set" in seen["args"] and "phone=+55" in seen["args"] and "+quente" in seen["args"]
     assert {d["workflow"] for d in out["dispara"]} == {"a", "b"}
-    assert out["snapshot"] == "/s.json" and "_snapshot" in out
+    assert out["snapshot"] == "/mcp_base.json" and "_snapshot" in out
 
 
 def _fake_extractor(monkeypatch):
-    monkeypatch.setattr(srv, "_run_extractor",
-                        lambda *a: {"id": "c1", "snapshot": "/s.json", "antes": {}, "depois": {}, "mudancas": {}})
+    monkeypatch.setattr(mcp_base, "_run_extractor",
+                        lambda *a: {"id": "c1", "snapshot": "/mcp_base.json", "antes": {}, "depois": {}, "mudancas": {}})
 
 
 def test_editar_tags_remover_dispara(root, monkeypatch):
@@ -283,14 +285,14 @@ def test_editar_requires_something_to_change(root):
 
 def test_conversas_trunca_corpo_e_marca_truncado(root, monkeypatch):
     root(workflows=[wf()])
-    longo = "x" * (srv.CONVERSAS_CORPO + 50)
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: {
+    longo = "x" * (mcp_conversas.CONVERSAS_CORPO + 50)
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {
         "contactId": "c1", "conversationId": "k1", "maisPaginas": True,
         "mensagens": [{"id": "m1", "tipo": "EMAIL", "direcao": "outbound",
                        "origem": "workflow", "corpo": longo}]})
     out = srv.conversas(LOC, "c1")
     m = out["mensagens"][0]
-    assert len(m["corpo"]) == srv.CONVERSAS_CORPO and m["corpo_truncado"]
+    assert len(m["corpo"]) == mcp_conversas.CONVERSAS_CORPO and m["corpo_truncado"]
     assert m["origem"] == "workflow"
     assert out["truncado"] is True  # maisPaginas
 
@@ -298,7 +300,7 @@ def test_conversas_trunca_corpo_e_marca_truncado(root, monkeypatch):
 def test_conversas_passa_atividades_ao_extractor(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.setdefault("args", a) and {} or {"mensagens": []})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.setdefault("args", a) and {} or {"mensagens": []})
     srv.conversas(LOC, "c1", max=5, atividades=True)
     assert seen["args"][:6] == ("conversas", "-l", LOC, "-i", "c1", "--max")
     assert "--atividades" in seen["args"]
@@ -306,7 +308,7 @@ def test_conversas_passa_atividades_ao_extractor(root, monkeypatch):
 
 def test_enviar_externo_sem_confirmo_e_recusado(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.enviar(LOC, "c1", "SMS", "oi")
     assert "confirmo=true" in str(e.value)
@@ -315,7 +317,7 @@ def test_enviar_externo_sem_confirmo_e_recusado(root, monkeypatch):
 def test_enviar_interno_dispensa_confirmo(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor",
+    monkeypatch.setattr(mcp_base, "_run_extractor",
                         lambda *a: seen.update(args=a) or {"enviado": True, "messageId": "m1"})
     out = srv.enviar(LOC, "c1", "internalcomment", "nota")
     assert out["enviado"] and "--tipo" in seen["args"]
@@ -330,7 +332,7 @@ def test_enviar_email_exige_assunto(root):
 
 def test_conversa_acao_apagar_exige_confirmo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.conversa_acao(LOC, "apagar", id="c1")
     assert "conversa INTEIRA" in str(e.value)
@@ -338,7 +340,7 @@ def test_conversa_acao_apagar_exige_confirmo(root, monkeypatch):
 
 def test_conversa_acao_mensagem_exige_messageid(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError):
         srv.conversa_acao(LOC, "reenviar")
 
@@ -346,7 +348,7 @@ def test_conversa_acao_mensagem_exige_messageid(root, monkeypatch):
 def test_conversa_acao_marca_lida(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {"ok": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or {"ok": True})
     srv.conversa_acao(LOC, "lida", id="c1")
     assert seen["args"][:3] == ("conversas-marcar", "-l", LOC)
     assert "--confirmo" not in seen["args"]
@@ -354,14 +356,14 @@ def test_conversa_acao_marca_lida(root, monkeypatch):
 
 def test_rascunho_apagar_exige_id(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError):
         srv.rascunho(LOC, "c1", acao="apagar")
 
 
 def test_enviar_agendado_recusa_nota_interna(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.enviar(LOC, "c1", "InternalComment", "nota", quando="2026-12-01T10:00:00Z")
     assert "sai na hora" in str(e.value)
@@ -370,7 +372,7 @@ def test_enviar_agendado_recusa_nota_interna(root, monkeypatch):
 def test_conversas_repassa_filtros(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {"mensagens": []})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or {"mensagens": []})
     srv.conversas(LOC, "c1", tipo="TYPE_EMAIL", busca="oi", email="e1")
     for flag, valor in (("--tipo", "TYPE_EMAIL"), ("--busca", "oi"), ("--email", "e1")):
         assert seen["args"][seen["args"].index(flag) + 1] == valor
@@ -378,7 +380,7 @@ def test_conversas_repassa_filtros(root, monkeypatch):
 
 def test_anexar_recusa_caminho_invalido(root, tmp_path, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError):
         srv.anexar(LOC, "c1", [])
     with pytest.raises(srv.ToolError) as e:
@@ -391,8 +393,8 @@ def test_anexar_recusa_caminho_invalido(root, tmp_path, monkeypatch):
 
 def test_anexar_recusa_arquivo_grande(root, tmp_path, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
-    monkeypatch.setattr(srv, "MAX_ANEXO_BYTES", 10)
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_conversas, "MAX_ANEXO_BYTES", 10)
     f = tmp_path / "grande.bin"
     f.write_bytes(b"x" * 11)
     with pytest.raises(srv.ToolError) as e:
@@ -405,7 +407,7 @@ def test_anexar_passa_argumentos_ao_extractor(root, tmp_path, monkeypatch):
     f = tmp_path / "a.png"
     f.write_bytes(b"png")
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor",
+    monkeypatch.setattr(mcp_base, "_run_extractor",
                         lambda *a: seen.update(args=a) or {"subido": True, "urls": ["http://x/a.png"]})
     out = srv.anexar(LOC, "c1", [str(f)], conversa="k1", grupo=True)
     assert out["urls"] == ["http://x/a.png"]
@@ -418,7 +420,7 @@ def test_anexar_passa_argumentos_ao_extractor(root, tmp_path, monkeypatch):
 
 def test_whatsapp_enviar_exige_confirmo_e_um_modo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.whatsapp_enviar(LOC, "c1", template="t1")
     assert "confirmo=true" in str(e.value)
@@ -434,7 +436,7 @@ def test_whatsapp_enviar_exige_confirmo_e_um_modo(root, monkeypatch):
 def test_whatsapp_leitura_passa_operacao(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or [{"id": "t1"}])
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or [{"id": "t1"}])
     out = srv.whatsapp(LOC, "templates", template="t1")
     assert out["resultado"] == [{"id": "t1"}]
     assert seen["args"][:5] == ("whatsapp", "-l", LOC, "-o", "templates")
@@ -446,7 +448,7 @@ def test_whatsapp_leitura_passa_operacao(root, monkeypatch):
 def test_config_escrita_exige_confirmo(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or {})
     with pytest.raises(srv.ToolError) as e:
         srv.config(LOC, "sla-gravar", corpo={"x": 1})
     assert "confirmo=true" in str(e.value)
@@ -460,7 +462,7 @@ def test_config_escrita_exige_confirmo(root, monkeypatch):
 def test_grupo_escrita_exige_confirmo_leitura_nao(root, monkeypatch):
     root(workflows=[wf()])
     seen = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: seen.update(args=a) or {})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or {})
     with pytest.raises(srv.ToolError):
         srv.grupo(LOC, "mensagem", corpo={"a": 1})
     srv.grupo(LOC, "interno-participantes", conversa="k1", usuarios=["u1", "u2"], desde="-1")
@@ -474,7 +476,7 @@ def test_grupo_escrita_exige_confirmo_leitura_nao(root, monkeypatch):
 
 def test_oportunidades_recusa_operacao_invalida(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.oportunidades(LOC, o="inventar")
     assert "inventar" in str(e.value)
@@ -482,7 +484,7 @@ def test_oportunidades_recusa_operacao_invalida(root, monkeypatch):
 
 def test_oportunidades_ver_exige_id(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.oportunidades(LOC, o="ver")
     assert "id" in str(e.value)
@@ -491,7 +493,7 @@ def test_oportunidades_ver_exige_id(root, monkeypatch):
 def test_oportunidades_buscar_passa_termo_ao_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
     r = srv.oportunidades(LOC, o="buscar", termo="teto solar")
     assert r["resultado"] == {"ok": True}
     assert "--termo" in visto["args"] and "teto solar" in visto["args"]
@@ -499,7 +501,7 @@ def test_oportunidades_buscar_passa_termo_ao_extractor(root, monkeypatch):
 
 def test_oportunidade_acao_exige_confirmo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.oportunidade_acao(LOC, acao="apagar", id="o1")
     assert "confirmo=true" in str(e.value)
@@ -507,7 +509,7 @@ def test_oportunidade_acao_exige_confirmo(root, monkeypatch):
 
 def test_oportunidade_acao_recusa_trocar_contato(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.oportunidade_acao(LOC, acao="editar", id="o1", contato="c9", confirmo=True)
     assert "contato" in str(e.value)
@@ -515,7 +517,7 @@ def test_oportunidade_acao_recusa_trocar_contato(root, monkeypatch):
 
 def test_oportunidade_acao_criar_exige_os_tres_campos(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.oportunidade_acao(LOC, acao="criar", nome="Teto solar", confirmo=True)
     assert "pipeline" in str(e.value)
@@ -524,7 +526,7 @@ def test_oportunidade_acao_criar_exige_os_tres_campos(root, monkeypatch):
 def test_oportunidade_acao_mover_chama_o_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     r = srv.oportunidade_acao(LOC, acao="mover", id="o1", estagio="s2", confirmo=True)
     assert r["aplicado"] is True
     assert "--estagio" in visto["args"] and "s2" in visto["args"]
@@ -532,7 +534,7 @@ def test_oportunidade_acao_mover_chama_o_extractor(root, monkeypatch):
 
 def test_pipeline_exige_confirmo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.pipeline(LOC, acao="apagar", id="p1")
     assert "confirmo=true" in str(e.value)
@@ -540,7 +542,7 @@ def test_pipeline_exige_confirmo(root, monkeypatch):
 
 def test_pipeline_editar_exige_lista_de_estagios(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError) as e:
         srv.pipeline(LOC, acao="editar", id="p1", confirmo=True)
     assert "estagios" in str(e.value)
@@ -549,7 +551,7 @@ def test_pipeline_editar_exige_lista_de_estagios(root, monkeypatch):
 def test_pipeline_serializa_estagios_como_json(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     srv.pipeline(LOC, acao="criar", nome="zz", estagios=[{"name": "Novo"}], confirmo=True)
     assert '[{"name": "Novo"}]' in visto["args"]
 
@@ -557,7 +559,7 @@ def test_pipeline_serializa_estagios_como_json(root, monkeypatch):
 def test_pipeline_passa_apagar_com_cards(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     srv.pipeline(LOC, acao="editar", id="p1", estagios=[{"id": "s1", "name": "A"}],
                  confirmo=True, apagar_com_cards=True)
     assert "--apagar-com-cards" in visto["args"]
@@ -566,7 +568,7 @@ def test_pipeline_passa_apagar_com_cards(root, monkeypatch):
 def test_oportunidades_passa_pagina(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"ok": True})
     srv.oportunidades(LOC, o="listar", pagina=3)
     assert "--pagina" in visto["args"] and "3" in visto["args"]
 
@@ -574,7 +576,7 @@ def test_oportunidades_passa_pagina(root, monkeypatch):
 def test_oportunidade_acao_serializa_campos_e_previsao(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     srv.oportunidade_acao(LOC, acao="editar", id="o1", fechamento="2026-12-01", probabilidade=40,
                           campos=[{"id": "f1", "fieldValue": "x"}], confirmo=True)
     assert "2026-12-01" in visto["args"]
@@ -583,14 +585,14 @@ def test_oportunidade_acao_serializa_campos_e_previsao(root, monkeypatch):
 
 def test_agenda_recusa_operacao_invalida(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inválido"):
         srv.agenda(LOC, o="inventar")
 
 
 def test_agenda_eventos_exige_periodo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inicio"):
         srv.agenda(LOC, o="eventos", calendario="c1")
 
@@ -598,7 +600,7 @@ def test_agenda_eventos_exige_periodo(root, monkeypatch):
 def test_agenda_eventos_passa_periodo_ao_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"events": []})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"events": []})
     r = srv.agenda(LOC, o="eventos", calendario="c1",
                    inicio="2026-10-01T00:00:00-03:00", fim="2026-10-08T00:00:00-03:00")
     assert r["resultado"] == {"events": []}
@@ -608,14 +610,14 @@ def test_agenda_eventos_passa_periodo_ao_extractor(root, monkeypatch):
 
 def test_agenda_acao_recusa_sem_confirmo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="confirmo=true"):
         srv.agenda_acao(LOC, acao="cancelar", id="e1")
 
 
 def test_agenda_acao_marcar_exige_situacao(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="situacao"):
         srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
                         inicio="2026-10-02T14:00:00-03:00", confirmo=True)
@@ -623,7 +625,7 @@ def test_agenda_acao_marcar_exige_situacao(root, monkeypatch):
 
 def test_agenda_acao_recusa_situacao_fora_do_enum(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="remarcado"):
         srv.agenda_acao(LOC, acao="situacao", id="e1", situacao="remarcado", confirmo=True)
 
@@ -631,7 +633,7 @@ def test_agenda_acao_recusa_situacao_fora_do_enum(root, monkeypatch):
 def test_agenda_acao_repeticao_exige_dono(root, monkeypatch):
     """422 ao vivo: "A team member needs to be selected. assignedUserId is missing"."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="dono"):
         srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
                         inicio="2026-10-02T14:00:00-03:00", situacao="confirmed",
@@ -640,14 +642,14 @@ def test_agenda_acao_repeticao_exige_dono(root, monkeypatch):
 
 def test_agenda_acao_remarcar_exige_inicio(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inicio"):
         srv.agenda_acao(LOC, acao="remarcar", id="e1", alvo="instancia", confirmo=True)
 
 
 def test_agenda_acao_situacao_exige_situacao(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="situacao"):
         srv.agenda_acao(LOC, acao="situacao", id="e1", confirmo=True)
 
@@ -655,7 +657,7 @@ def test_agenda_acao_situacao_exige_situacao(root, monkeypatch):
 def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     r = srv.agenda_acao(LOC, acao="remarcar", id="e1", alvo="instancia",
                         inicio="2026-10-03T15:00:00-03:00", confirmo=True)
     assert r["aplicado"] is True
@@ -665,7 +667,7 @@ def test_agenda_acao_remarcar_chama_o_extractor(root, monkeypatch):
 
 def test_agenda_acao_bloquear_exige_periodo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inicio e fim"):
         srv.agenda_acao(LOC, acao="bloquear", dono="u1",
                         inicio="2026-10-02T14:00:00-03:00", confirmo=True)
@@ -674,7 +676,7 @@ def test_agenda_acao_bloquear_exige_periodo(root, monkeypatch):
 def test_agenda_acao_bloquear_recusa_contato_e_situacao(root, monkeypatch):
     """A rota de block-slots não aceita contactId nem appointmentStatus."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="contato nem situação"):
         srv.agenda_acao(LOC, acao="bloquear", dono="u1", contato="k1",
                         inicio="2026-10-02T14:00:00-03:00",
@@ -684,7 +686,7 @@ def test_agenda_acao_bloquear_recusa_contato_e_situacao(root, monkeypatch):
 def test_agenda_acao_bloquear_chama_o_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"aplicado": True})
     r = srv.agenda_acao(LOC, acao="bloquear", dono="u1",
                         inicio="2026-10-02T14:00:00-03:00",
                         fim="2026-10-02T15:00:00-03:00", titulo="fora", confirmo=True)
@@ -695,7 +697,7 @@ def test_agenda_acao_bloquear_chama_o_extractor(root, monkeypatch):
 
 def test_agenda_acao_bloqueio_editar_exige_id(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="id"):
         srv.agenda_acao(LOC, acao="bloqueio-editar",
                         inicio="2026-10-02T14:00:00-03:00", confirmo=True)
@@ -704,7 +706,7 @@ def test_agenda_acao_bloqueio_editar_exige_id(root, monkeypatch):
 def test_agenda_acao_bloqueio_editar_exige_campos(root, monkeypatch):
     """bloqueio-editar monta o mesmo corpo de bloquear: campo ausente vira remoção no PUT."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inicio, fim e dono"):
         srv.agenda_acao(LOC, acao="bloqueio-editar", id="bs1", titulo="novo", confirmo=True)
 
@@ -712,7 +714,7 @@ def test_agenda_acao_bloqueio_editar_exige_campos(root, monkeypatch):
 def test_agenda_acao_bloqueio_recusa_calendario(root, monkeypatch):
     """400 ao vivo: "The calendar is not an event calendar."."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="calendario"):
         srv.agenda_acao(LOC, acao="bloquear", dono="u1", calendario="c1",
                         inicio="2026-10-02T14:00:00-03:00",
@@ -722,7 +724,7 @@ def test_agenda_acao_bloqueio_recusa_calendario(root, monkeypatch):
 def test_agenda_bloqueios_recusa_contato(root, monkeypatch):
     """listBlockedSlots não filtra por contato: bloqueio não tem contato."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="contato"):
         srv.agenda(LOC, o="bloqueios", calendario="c1", contato="k1",
                   inicio="2026-10-02T14:00:00-03:00", fim="2026-10-02T15:00:00-03:00")
@@ -730,7 +732,7 @@ def test_agenda_bloqueios_recusa_contato(root, monkeypatch):
 
 def test_agenda_bloqueios_exige_periodo(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inicio"):
         srv.agenda(LOC, o="bloqueios", calendario="c1")
 
@@ -738,7 +740,7 @@ def test_agenda_bloqueios_exige_periodo(root, monkeypatch):
 def test_agenda_acao_bloquear_exige_dono(root, monkeypatch):
     """400 ao vivo com calendário comum: "The calendar is not an event calendar."."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="dono"):
         srv.agenda_acao(LOC, acao="bloquear", calendario="c1",
                         inicio="2026-10-02T14:00:00-03:00",
@@ -748,7 +750,7 @@ def test_agenda_acao_bloquear_exige_dono(root, monkeypatch):
 def test_agenda_acao_forcar_exige_dono(root, monkeypatch):
     """422 ao vivo: "A team member needs to be selected. assignedUserId is missing"."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="dono"):
         srv.agenda_acao(LOC, acao="marcar", calendario="c1", contato="k1",
                         inicio="2026-10-02T14:00:00-03:00", situacao="confirmed",
@@ -758,7 +760,7 @@ def test_agenda_acao_forcar_exige_dono(root, monkeypatch):
 def test_agenda_acao_remarcar_forcar_exige_dono(root, monkeypatch):
     """remarcar também liga ignoreFreeSlotValidation com --forcar, mesmo 422 em potencial."""
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="dono"):
         srv.agenda_acao(LOC, acao="remarcar", id="ap1",
                         inicio="2026-10-02T14:00:00-03:00",
@@ -767,21 +769,21 @@ def test_agenda_acao_remarcar_forcar_exige_dono(root, monkeypatch):
 
 def test_formularios_recusa_operacao_invalida(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="inválido"):
         srv.formularios(LOC, o="inventar")
 
 
 def test_formularios_recusa_tipo_invalido(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="tipo"):
         srv.formularios(LOC, tipo="planilha")
 
 
 def test_formularios_detalhe_exige_id(root, monkeypatch):
     root(workflows=[wf()])
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="id"):
         srv.formularios(LOC, o="detalhe")
 
@@ -789,7 +791,7 @@ def test_formularios_detalhe_exige_id(root, monkeypatch):
 def test_formularios_passa_filtros_ao_extractor(root, monkeypatch):
     root(workflows=[wf()])
     visto = {}
-    monkeypatch.setattr(srv, "_run_extractor", lambda *a: visto.update(args=a) or {"submissions": []})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: visto.update(args=a) or {"submissions": []})
     r = srv.formularios(LOC, o="submissoes", tipo="survey", formulario="S1",
                         inicio="2026-09-01", limite=5)
     assert r["resultado"] == {"submissions": []}

@@ -1,5 +1,6 @@
 import pytest
 from automaster_audit import mcp_server as srv
+from automaster_audit.mcp import base as mcp_base
 
 
 @pytest.fixture
@@ -10,8 +11,8 @@ def espiao(monkeypatch):
         chamadas.append(args)
         return {"aplicado": True}
 
-    monkeypatch.setattr(srv, "_run_extractor", falso)
-    monkeypatch.setattr(srv, "_load", lambda loc, snap=None: (None, {"loc": loc}))
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap=None: (None, {"loc": loc}))
     return chamadas
 
 
