@@ -674,6 +674,61 @@ def formulario_estilo(loc: str, acao: str, tipo: str = "formulario", id: str | N
     return _run_extractor(*args, "--json") | {"_snapshot": meta}
 
 
+ANOTACAO_LEITURA = ("lista", "detalhe", "buscar")
+ANOTACAO_ACOES = ("criar", "editar", "apagar", "concluir", "reabrir")
+ANOTACAO_TIPOS = ("nota", "tarefa")
+
+
+def anotacoes(loc: str, o: str = "lista", tipo: str = "nota", contato: str | None = None,
+              id: str | None = None, dono: str | None = None, concluidas: bool | None = None,
+              termo: str | None = None, limite: int | None = None) -> dict:
+    """Leitura ao vivo de notas e tarefas do contato. Não usa o dump."""
+    if o not in ANOTACAO_LEITURA:
+        raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(ANOTACAO_LEITURA)}")
+    if tipo not in ANOTACAO_TIPOS:
+        raise ToolError(f"tipo inválido: {tipo}. Aceitos: {', '.join(ANOTACAO_TIPOS)}")
+    if o == "buscar" and tipo != "tarefa":
+        raise ToolError("o=buscar só existe para tarefa: não há busca de nota por subconta")
+    if o != "buscar" and not contato:
+        raise ToolError(f"o={o} exige contato")
+    if o == "detalhe" and not id:
+        raise ToolError("o=detalhe exige id da nota ou tarefa")
+    args = ["anotacoes", "-l", loc, "-o", o, "--tipo", tipo]
+    for flag, val in (("--contato", contato), ("-i", id), ("--dono", dono),
+                      ("--termo", termo),
+                      ("--concluidas", None if concluidas is None else str(concluidas).lower()),
+                      ("--limite", str(limite) if limite else None)):
+        if val:
+            args += [flag, val]
+    return {"resultado": _run_extractor(*args, "--json")}
+
+
+def anotacao_acao(loc: str, acao: str, contato: str, tipo: str = "nota", id: str | None = None,
+                  texto: str | None = None, titulo: str | None = None, prazo: str | None = None,
+                  dono: str | None = None, confirmo: bool = False) -> dict:
+    """ESCREVE: nota e tarefa do contato. Sem confirmo, devolve a prévia."""
+    if acao not in ANOTACAO_ACOES:
+        raise ToolError(f"acao inválida: {acao}. Aceitas: {', '.join(ANOTACAO_ACOES)}")
+    if tipo not in ANOTACAO_TIPOS:
+        raise ToolError(f"tipo inválido: {tipo}. Aceitos: {', '.join(ANOTACAO_TIPOS)}")
+    if acao != "criar" and not id:
+        raise ToolError(f"acao={acao} exige id da nota ou tarefa")
+    if acao in ("concluir", "reabrir") and tipo != "tarefa":
+        raise ToolError("concluir e reabrir só existem para tarefa")
+    if acao == "criar" and tipo == "nota" and not texto:
+        raise ToolError("criar nota exige texto")
+    if acao == "criar" and tipo == "tarefa" and not (titulo and prazo):
+        raise ToolError("criar tarefa exige titulo e prazo (ISO, ex. 2026-10-01T10:00:00Z)")
+    args = ["anotacao-acao", "-l", loc, "--acao", acao, "--tipo", tipo, "--contato", contato]
+    for flag, val in (("-i", id), ("--texto", texto), ("--titulo", titulo),
+                      ("--prazo", prazo), ("--dono", dono)):
+        if val:
+            args += [flag, val]
+    if confirmo:
+        args.append("--confirmo")
+    return {"resultado": _run_extractor(*args, "--json")}
+
+
 def oportunidades(loc: str, o: str = "pipelines", id: str | None = None,
                   pipeline: str | None = None, estagio: str | None = None,
                   status: str | None = None, contato: str | None = None,
@@ -1358,6 +1413,36 @@ TOOLS = {
                          "confirmo": {"type": "boolean", "default": False},
                          "snapshot": _SNAP},
                         ["loc", "acao"]),
+    "anotacoes": (anotacoes, "Leitura ao vivo de notas e tarefas do contato (abre Chrome, não usa o "
+                  "dump): `lista` e `detalhe` precisam de contato; `buscar` varre as tarefas de TODA "
+                  "a subconta e só existe para tarefa — é a forma de responder o que está atrasado. "
+                  "Nota de compromisso é outra coisa, e sai pela tool `agenda`.",
+                  {"loc": _LOC,
+                   "o": {"type": "string", "enum": list(ANOTACAO_LEITURA), "default": "lista"},
+                   "tipo": {"type": "string", "enum": list(ANOTACAO_TIPOS), "default": "nota"},
+                   "contato": {"type": "string", "description": "contactId; obrigatório fora de o=buscar"},
+                   "id": {"type": "string", "description": "id da nota ou tarefa (com o=detalhe)"},
+                   "dono": {"type": "string", "description": "filtra tarefas por responsável (o=buscar)"},
+                   "concluidas": {"type": "boolean", "description": "filtra tarefas concluídas (o=buscar)"},
+                   "termo": {"type": "string", "description": "busca no texto das tarefas (o=buscar)"},
+                   "limite": {"type": "integer", "description": "quantas tarefas; o servidor usa 25"}},
+                  ["loc"]),
+    "anotacao_acao": (anotacao_acao,
+                      "ESCREVE EM PRODUÇÃO: cria, edita ou apaga nota e tarefa do contato, e conclui "
+                      "ou reabre tarefa. Sem confirmo=true devolve a prévia com o corpo que iria para "
+                      "o servidor, sem gravar. Criar tarefa exige titulo e prazo (ISO); a tarefa nasce "
+                      "não concluída. Apagar não tem desfazer.",
+                      {"loc": _LOC,
+                       "acao": {"type": "string", "enum": list(ANOTACAO_ACOES)},
+                       "contato": {"type": "string", "description": "contactId"},
+                       "tipo": {"type": "string", "enum": list(ANOTACAO_TIPOS), "default": "nota"},
+                       "id": {"type": "string", "description": "id da nota ou tarefa; tudo menos criar"},
+                       "texto": {"type": "string", "description": "corpo da nota, ou descrição da tarefa"},
+                       "titulo": {"type": "string", "description": "título da tarefa"},
+                       "prazo": {"type": "string", "description": "vencimento em ISO, ex. 2026-10-01T10:00:00Z"},
+                       "dono": {"type": "string", "description": "responsável pela tarefa"},
+                       "confirmo": {"type": "boolean", "description": "true grava de verdade", "default": False}},
+                      ["loc", "acao", "contato"]),
     "formulario_estilo": (formulario_estilo,
                           "ESCREVE EM PRODUÇÃO: aplica a identidade visual a um formulário ou "
                           "survey (acao='aplicar'), mostra a prévia ('previa'), tira screenshot "
