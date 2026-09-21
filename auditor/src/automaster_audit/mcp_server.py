@@ -24,6 +24,7 @@ from .journey import TriggerIndex, build_journey
 from .loader import DumpContext, DumpError, load_dump
 from .path_report import workflow_paths_lines
 from .rules._helpers import email_template_id, steps_of_type
+from .validacao_escrita import validar_edicao
 
 PROTOCOL = "2025-06-18"
 PATHS_MAX_CHARS = 6000  # ~1.500 tokens; a mediana do paths.md é 173 tok, o maior 18.665
@@ -1011,44 +1012,84 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
                     trigger: str | None = None, trigger_acao: str | None = None,
                     trigger_id: str | None = None, confirmo: bool = False,
                     publicado: bool = False, snapshot: str | None = None) -> dict:
-    """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff."""
+    """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
+
+    Para ação que mexe no corpo, roda SEMPRE a prévia primeiro e valida o documento
+    editado contra as 18 regras (`validar_edicao`) antes de decidir se grava. Sem dump em
+    disco a validação não roda, mas isso não trava a gravação.
+    """
     if acao not in WF_EDITAR_ACOES:
         raise ToolError(f"acao inválida: {acao!r}. Use uma de: {', '.join(WF_EDITAR_ACOES)}")
     if acao != "criar" and not id:
         raise ToolError(f"acao {acao!r} exige `id` (id do workflow)")
 
-    args = ["workflow-editar", "-l", loc, "--acao", acao]
-    for flag, valor_opcional in (
-        ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
-        ("--step", step), ("--caminho", caminho), ("--valor", valor), ("--trigger", trigger),
-        ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
-    ):
-        if valor_opcional is not None:
-            args += [flag, str(valor_opcional)]
-    if confirmo:
-        args.append("--confirmo")
-    if publicado:
-        args.append("--publicado")
-    args.append("--json")
+    def _args(com_confirmo: bool) -> list[str]:
+        a = ["workflow-editar", "-l", loc, "--acao", acao]
+        for flag, valor_opcional in (
+            ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
+            ("--step", step), ("--caminho", caminho), ("--valor", valor), ("--trigger", trigger),
+            ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
+        ):
+            if valor_opcional is not None:
+                a += [flag, str(valor_opcional)]
+        if com_confirmo:
+            a.append("--confirmo")
+        if publicado:
+            a.append("--publicado")
+        a.append("--json")
+        return a
 
-    resultado = _run_extractor(*args)
+    if acao not in _WF_EDITAR_COM_CORPO:
+        return _run_extractor(*_args(confirmo))
 
-    # validação contra as 18 regras: só faz sentido para ação que mexe no corpo,
-    # e só quando o dump da subconta existe em disco
-    if acao in _WF_EDITAR_COM_CORPO and resultado.get("diff"):
-        try:
-            ctx, meta = _load(loc, snapshot)
-        except ToolError:
-            resultado["validacao"] = {
-                "rodou": False,
-                "motivo": "sem dump desta subconta em disco: as 18 regras não foram rodadas",
-            }
-        else:
-            resultado["validacao"] = {
-                "rodou": True,
-                "snapshot": meta["snapshot"],
-                "aviso": f"as regras rodaram contra o dump {meta['snapshot']}; ele pode estar velho",
-            }
+    # ação que mexe no corpo: roda a prévia primeiro, sempre, para validar antes de gravar
+    previa = _run_extractor(*_args(False))
+
+    try:
+        ctx, meta = _load(loc, snapshot)
+    except ToolError:
+        previa["validacao"] = {
+            "rodou": False,
+            "motivo": "sem dump desta subconta em disco: as 18 regras não foram rodadas",
+        }
+        if not confirmo:
+            return previa
+        # a falta de dump não pode travar a escrita
+        resultado = _run_extractor(*_args(True))
+        resultado["validacao"] = previa["validacao"]
+        return resultado
+
+    documento = previa.get("documento")
+    if documento is None:
+        # nada a validar (ex: "nada a mudar: a operação não encontrou alvo")
+        if not confirmo:
+            return previa
+        return _run_extractor(*_args(True))
+
+    resultado_validacao = validar_edicao(ctx, id, documento)
+    validacao = {
+        "rodou": True,
+        "snapshot": meta["snapshot"],
+        "pode_gravar": resultado_validacao.pode_gravar,
+        "erros_novos": resultado_validacao.erros_novos,
+        "erros_resolvidos": resultado_validacao.erros_resolvidos,
+        "aviso": f"as regras rodaram contra o dump {meta['snapshot']}; ele pode estar velho",
+    }
+    previa["validacao"] = validacao
+
+    if not confirmo:
+        return previa
+
+    if not resultado_validacao.pode_gravar:
+        previa["aplicado"] = False
+        previa["motivo"] = (
+            "gravação recusada: a validação contra as 18 regras encontrou erro novo — "
+            + "; ".join(resultado_validacao.erros_novos)
+        )
+        return previa
+
+    resultado = _run_extractor(*_args(True))
+    resultado["validacao"] = validacao
     return resultado
 
 

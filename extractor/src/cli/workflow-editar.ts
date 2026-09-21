@@ -90,7 +90,11 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     saida.mudancas = mudancas;
 
     if (!o.confirmo) {
-      Object.assign(saida, { aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar" });
+      Object.assign(saida, {
+        aplicado: false,
+        motivo: "prévia: rode de novo com --confirmo para gravar",
+        documento: editado,
+      });
       return imprimir(saida, o, log);
     }
 
