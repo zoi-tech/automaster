@@ -102,7 +102,7 @@ function latestDumpEntity(locationId: string, name: string): unknown {
 }
 
 /** Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. */
-async function withClient(
+export async function withClient(
   locationId: string,
   log: (msg: string) => void,
   // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
@@ -547,7 +547,7 @@ const MIME: Record<string, string> = {
 };
 
 /** Grava o rastro de uma escrita que não tem desfazer. */
-function registroEscrita(loc: string, pasta: string, chave: string, dados: unknown): string {
+export function registroEscrita(loc: string, pasta: string, chave: string, dados: unknown): string {
   const dir = path.join(DUMPS_DIR, pasta, loc, chave);
   fs.mkdirSync(dir, { recursive: true });
   const now = new Date();
