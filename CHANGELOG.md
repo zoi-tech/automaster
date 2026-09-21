@@ -24,6 +24,11 @@ código. Continuam 31 tools e 18 regras; 158 testes no extractor, 299 no auditor
   é idempotente e devolve o estado final em `visivel`.
 - **A resposta traz `url`, o link do editor**, com `workflow` no SINGULAR. Com `workflows` (a
   rota da lista) o app devolve 404 e a página fica branca, mesmo em workflow publicado.
+- **Ciclo provado ao vivo na Instaltech** (workflow descartável criado e apagado, sem resíduo):
+  `criar` sem pasta recusa listando as pastas; `criar` com pasta devolve `visivel` com
+  `parentId` e `status: "draft"`; `trigger adicionar` mostra a prévia e depois grava
+  (`fsB5qsEsiksivnnqwE7b`); `substituir` troca o trigger e confere que o antigo saiu;
+  `remover` esvazia a lista; `apagar` fecha. Sete de sete.
 - **Documentado como armadilha**: `400 "action has a corrupted type"` é o servidor validando o
   corpo do step, e navegar no app pelo Playwright desloga o perfil persistente do Chrome.
 
