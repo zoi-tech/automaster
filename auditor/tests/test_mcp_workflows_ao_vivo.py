@@ -1,5 +1,6 @@
 import pytest
 from automaster_audit import mcp_server as srv
+from automaster_audit.mcp import base as mcp_base
 
 
 @pytest.fixture
@@ -10,9 +11,9 @@ def espiao(monkeypatch):
         chamadas.append(args)
         return {"aplicado": True}
 
-    monkeypatch.setattr(srv, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
     # nenhum _load aqui de propósito: estas tools não podem depender de dump
-    monkeypatch.setattr(srv, "_load", lambda loc, snap=None: pytest.fail(
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap=None: pytest.fail(
         "tool ao vivo de workflow não pode chamar o loader"))
     return chamadas
 
