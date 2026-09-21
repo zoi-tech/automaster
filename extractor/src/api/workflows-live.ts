@@ -426,3 +426,65 @@ export function nomeContato(c: {
   if (junto) return junto;
   return c.email ?? "";
 }
+
+export const WF_TETO_PADRAO = 500;
+
+/**
+ * Busca páginas até o teto. O cursor vem da última linha de cada página, e é INCLUSIVO:
+ * a página seguinte repete essa linha na frente. `juntarPaginas` descarta a repetição
+ * (achado ao vivo). `cortou` e `estrangulado` dizem que o número é PISO, não total.
+ */
+export async function todosOsInscritos(
+  client: GhlClient, loc: string, wid: string, teto: number,
+): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
+  // um número só: o tamanho pedido e a condição de "veio página cheia" têm que concordar,
+  // e separá-los em dois literais quebra o laço em silêncio quando alguém mexe num deles
+  const TAMANHO_PAGINA = 100;
+  let cruas: InscricaoCrua[] = [];
+  let cursor: Cursor | undefined;
+  let estrangulado = false;
+  // teto + 1 para saber que havia mais; `cortar` apara depois
+  while (cruas.length <= teto) {
+    const p = await paginaDeInscritos(client, loc, wid, TAMANHO_PAGINA, cursor);
+    estrangulado = estrangulado || p.estrangulado;
+    cruas = juntarPaginas(cruas, p.linhas);
+    if (p.linhas.length < TAMANHO_PAGINA || !p.cursor) break;
+    cursor = p.cursor;
+  }
+  const c = cortar(cruas, teto);
+  return { cruas: c.linhas, cortou: c.cortou, estrangulado };
+}
+
+/**
+ * Mensagem da guarda de publicado. `aoMenos` vem de `cortou || estrangulado` de
+ * `todosOsInscritos`: quando a paginação corta ou o servidor estrangula, `n` é um piso,
+ * nunca o total — a mensagem tem que dizer "pelo menos N", nunca apresentar o número
+ * cortado como se fosse total. O efeito é diferente em cada ação: gravar troca a versão
+ * debaixo de quem está andando; apagar tira todo mundo do fluxo.
+ */
+export function avisoPublicado(n: number, aoMenos: boolean, modo: "gravar" | "apagar"): string {
+  const quantos = aoMenos ? `pelo menos ${n}` : `${n}`;
+  const efeito = modo === "apagar"
+    ? "Apagar tira todos eles do fluxo agora, no passo em que estiverem, e não há desfazer."
+    : "Quem está no meio termina o passo atual na versão antiga e segue pela nova daí em diante.";
+  return `workflow PUBLICADO com ${quantos} contato(s) dentro agora. ${efeito}`;
+}
+
+/**
+ * Guarda de workflow publicado. Vale para `apagar` e para as ações que mexem no corpo
+ * ou nos triggers — tudo que muda o que o contato vive. `renomear` e `mover` ficam de
+ * fora de propósito: não alteram execução nenhuma (limite declarado, ver CHANGELOG).
+ */
+export async function guardaPublicado(
+  client: GhlClient, o: { location: string; id?: string; publicado?: boolean },
+  saida: Record<string, unknown>, log: (m: string) => void, modo: "gravar" | "apagar",
+): Promise<void> {
+  const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
+  const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado, modo);
+  saida.aviso = aviso;
+  log(aviso);
+  if (!o.publicado) {
+    const verbo = modo === "apagar" ? "apagar" : "gravar";
+    throw new Error(`${aviso} Para ${verbo} mesmo assim, repita com --publicado junto de --confirmo.`);
+  }
+}

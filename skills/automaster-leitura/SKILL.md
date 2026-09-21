@@ -166,9 +166,14 @@ referência ou uma tag, limpa steps inalcançáveis, altera um atributo de step,
 Como ler a resposta:
 
 - **`aplicado: false` com `diff` preenchido é PRÉVIA, não falha.** Sem `confirmo` a tool sempre
-  roda a prévia: ela mostra o diff e o documento editado e não grava nada. Para gravar, repita
-  com `confirmo=true`. `aplicado: false` com `motivo` começando em "nada a mudar" quer dizer que
-  a operação não achou alvo — também não é falha.
+  roda a prévia: ela mostra o diff e não grava nada. Para gravar, repita com `confirmo=true`.
+  `aplicado: false` com `motivo` começando em "nada a mudar" quer dizer que a operação não achou
+  alvo — também não é falha. O documento inteiro do workflow **não** volta na resposta: ele é
+  lido para a validação local e descartado. Para ver o desenho, use `workflow(loc, id)`.
+- **`aplicado: "duvidoso"` não é sucesso.** O servidor respondeu 200 mas a releitura não bate com
+  o que foi pedido — e nesta API 200 e bump de `version` não provam gravação (a rota irmã
+  `only-triggers` faz os dois sem gravar). O diff residual vem em `residual`: confira o workflow
+  antes de dizer ao usuário que a edição foi feita.
 - **`validacao.rodou: false` quer dizer que as 18 regras NÃO foram checadas**, por falta de dump
   desta subconta em disco ou porque o workflow é mais novo que o último snapshot (recém-criado ou
   duplicado). A escrita não fica travada por isso, mas ninguém conferiu se a edição quebra
@@ -181,6 +186,12 @@ Como ler a resposta:
   Na saída de `trigger`, `triggers` é a lista de DEPOIS da remoção; a de antes está no `diff`.
 - `trocar-ref` troca o id, não o rótulo: o `title` humano do step continua o antigo e o comando
   avisa em `avisos`. Quem for abrir o editor do GHL vai ver o nome velho ao lado do id novo.
+- **`trocar-ref` só aceita id em `de`.** Ela substitui em qualquer profundidade, inclusive DENTRO
+  do texto de SMS, e-mail e WhatsApp: `de="Olá"` reescreveria o que o cliente fala com a base
+  dele, e nenhuma das 18 regras acharia isso estranho. Texto que não tem cara de id é recusado.
+  Para tag pelo nome use `trocar-tag`; para um campo de um step, `atributo`.
+- **`apagar` não tem desfazer** e é a única escrita daqui sem volta: guarda cópia do documento e
+  dos triggers no registro antes do DELETE, e é só isso que sobra. Não prometa restauração.
 
 
 ## Templates de e-mail (modelos_email, stale_email_template, unused_email_template)

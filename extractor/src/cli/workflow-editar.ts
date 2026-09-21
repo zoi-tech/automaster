@@ -1,16 +1,16 @@
 import type { Command } from "commander";
 import fs from "node:fs";
-import { withClient, registroEscrita, todosOsInscritos, WF_TETO_PADRAO } from "../cli.js";
+import { withClient, registroEscrita } from "../cli.js";
 import { decodeUserId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
-import { getWorkflowMeta, contarNaoTerminados } from "../api/workflows-live.js";
+import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
   salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE,
 } from "../api/workflows-write.js";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
-  renomear, montarCorpo, checarPublicavel, diffWorkflow,
+  renomear, montarCorpo, checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
   type Documento,
 } from "../api/workflow-edit.js";
 
@@ -19,10 +19,10 @@ export const WF_EDITAR_ACOES = [
   "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
 ] as const;
 
-interface Opts {
+export interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
   de?: string; para?: string; step?: string; caminho?: string; valor?: string;
-  triggerAcao?: string; triggerId?: string;
+  triggerAcao?: string; triggerId?: string; versaoEsperada?: string;
   usuario?: string; confirmo?: boolean; publicado?: boolean; json?: boolean;
 }
 
@@ -53,17 +53,34 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
     if (SEM_CORPO.has(o.acao)) {
       if (!o.confirmo) throw new Error(exigeConfirmo(o.acao));
+      // `apagar` é a ÚNICA escrita irreversível daqui (não há rota provada de recover) e
+      // por isso é a única que guarda cópia do que apagou. O documento inteiro vem antes
+      // do DELETE, e o registro vai para o disco ANTES da escrita: processo morto no meio
+      // deixaria produção alterada sem rastro nenhum, justo na ação destrutiva.
+      let registroPre: string | null = null;
+      let antes: Documento | undefined;
       if (o.acao === "apagar") {
-        const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string };
-        if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "apagar");
+        antes = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+        if (antes?.status === "published") await guardaPublicado(client, o, saida, log, "apagar");
+        registroPre = registroEscrita(o.location, "_workflows", o.id!, {
+          acao: o.acao, opts: semSegredo(o), aplicado: false, antes,
+          triggers: await listarTriggers(client, o.location, o.id!),
+        });
       }
       const resposta = await escritaSemCorpo(client, o, usuarioId);
       // `criar` e `duplicar` arquivam sob o id NOVO: o registro de uma cópia sob o id
       // de origem some no meio do histórico do original (nit da prova ao vivo).
       const chave = String((resposta as { id?: string } | null)?.id ?? o.id ?? "novo");
-      const registro = registroEscrita(o.location, "_workflows", chave, {
-        acao: o.acao, opts: semSegredo(o), aplicado: true, origem: o.id, resposta,
-      });
+      let registro: string;
+      if (registroPre) {
+        const gravado = JSON.parse(fs.readFileSync(registroPre, "utf8"));
+        fs.writeFileSync(registroPre, JSON.stringify({ ...gravado, aplicado: true, resposta }, null, 2));
+        registro = registroPre;
+      } else {
+        registro = registroEscrita(o.location, "_workflows", chave, {
+          acao: o.acao, opts: semSegredo(o), aplicado: true, origem: o.id, resposta,
+        });
+      }
       Object.assign(saida, { aplicado: true, resposta, registro, id: chave });
       return imprimir(saida, o, log);
     }
@@ -71,6 +88,8 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     // ---- ações que mexem no corpo ----
     const doc = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
     const versaoLida = doc.version;
+    conferirVersaoEsperada(o, versaoLida);
+    saida.versao = versaoLida;
     const { doc: editado, mudancas, avisos } = aplicarOperacao(doc, o);
     if (avisos?.length) { saida.avisos = avisos; avisos.forEach(log); }
     if (!mudancas.length) {
@@ -122,11 +141,21 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     // exige reler, e é por isso que `depois` existe.
     const resposta = await salvarWorkflow(client, o.location, o.id!, corpo);
     const depois = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+    // 200 não é prova e bump de `version` não é prova: a rota irmã `only-triggers` faz os
+    // dois e não grava nada. Quem decide é a comparação entre o que se pediu e o que ficou.
+    const { ok, residual } = conferirEscrita(editado, depois);
+    const aplicado = ok ? true : "duvidoso";
     fs.writeFileSync(registro, JSON.stringify(
-      { em: new Date().toISOString(), acao: o.acao, aplicado: true, versao: versaoLida, antes: doc, depois, diff, mudancas, resposta },
+      { em: new Date().toISOString(), acao: o.acao, aplicado, versao: versaoLida, antes: doc, depois, diff, mudancas, resposta, residual: ok ? undefined : residual },
       null, 2,
     ));
-    Object.assign(saida, { aplicado: true, resposta, registro, versaoDepois: depois.version });
+    Object.assign(saida, { aplicado, resposta, registro, versaoDepois: depois.version });
+    if (!ok) {
+      saida.residual = residual;
+      saida.motivo = "o servidor respondeu 200 mas a releitura NÃO bate com o que foi pedido: " +
+        "confira o workflow antes de considerar a edição feita (diff residual em `residual`).";
+      log(saida.motivo as string);
+    }
     imprimir(saida, o, log);
   });
 }
@@ -177,40 +206,6 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
 }
 
 /**
- * Mensagem da guarda de publicado. `aoMenos` vem de `cortou || estrangulado` de
- * `todosOsInscritos`: quando a paginação corta ou o servidor estrangula, `n` é um piso,
- * nunca o total — a mensagem tem que dizer "pelo menos N", nunca apresentar o número
- * cortado como se fosse total. O efeito é diferente em cada ação: gravar troca a versão
- * debaixo de quem está andando; apagar tira todo mundo do fluxo.
- */
-function avisoPublicado(n: number, aoMenos: boolean, modo: "gravar" | "apagar"): string {
-  const quantos = aoMenos ? `pelo menos ${n}` : `${n}`;
-  const efeito = modo === "apagar"
-    ? "Apagar tira todos eles do fluxo agora, no passo em que estiverem, e não há desfazer."
-    : "Quem está no meio termina o passo atual na versão antiga e segue pela nova daí em diante.";
-  return `workflow PUBLICADO com ${quantos} contato(s) dentro agora. ${efeito}`;
-}
-
-/**
- * Guarda de workflow publicado. Vale para `apagar` e para as ações que mexem no corpo
- * ou nos triggers — tudo que muda o que o contato vive. `renomear` e `mover` ficam de
- * fora de propósito: não alteram execução nenhuma (limite declarado, ver CHANGELOG).
- */
-async function guardaPublicado(
-  client: GhlClient, o: Opts, saida: Record<string, unknown>,
-  log: (m: string) => void, modo: "gravar" | "apagar",
-): Promise<void> {
-  const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
-  const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado, modo);
-  saida.aviso = aviso;
-  log(aviso);
-  if (!o.publicado) {
-    const verbo = modo === "apagar" ? "apagar" : "gravar";
-    throw new Error(`${aviso} Para ${verbo} mesmo assim, repita com --publicado junto de --confirmo.`);
-  }
-}
-
-/**
  * Trigger: só `remover`, e pelo DELETE dedicado. O documento do workflow NÃO traz a
  * lista (só `triggersFilePath`) e o `only-triggers` responde 200 sem criar nada — então
  * `adicionar` e `substituir` recusam em vez de devolver sucesso falso.
@@ -251,19 +246,38 @@ async function acaoTrigger(
     const documento = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar", documento,
+      versao: documento.version,
     });
     return imprimir(saida, o, log);
   }
 
-  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string };
+  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
+  conferirVersaoEsperada(o, meta?.version);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 
+  // Registro ANTES da escrita, como no caminho de corpo: remover trigger é destrutivo e
+  // morte de processo entre o DELETE e o registro deixaria produção mexida sem rastro.
+  const registro = registroEscrita(o.location, "_workflows", o.id!, {
+    acao: "trigger", triggerAcao: "remover", aplicado: false, antes: triggers,
+  });
   const resposta = await apagarTrigger(client, o.location, o.id!, o.triggerId);
   const depois = await listarTriggers(client, o.location, o.id!);
-  const registro = registroEscrita(o.location, "_workflows", o.id!, {
-    acao: "trigger", triggerAcao: "remover", aplicado: true, antes: triggers, depois, resposta,
-  });
-  Object.assign(saida, { aplicado: true, resposta, registro });
+  // 200 aqui vale ainda menos que em outras rotas: o `only-triggers` irmão responde 200,
+  // bumpa `version` e não grava nada. A prova é o id ter sumido da lista autoritativa.
+  if (depois.some((t) => t?.id === o.triggerId)) {
+    fs.writeFileSync(registro, JSON.stringify(
+      { em: new Date().toISOString(), acao: "trigger", triggerAcao: "remover", aplicado: false, antes: triggers, depois, resposta }, null, 2,
+    ));
+    throw new Error(
+      `o servidor respondeu sucesso mas o trigger ${o.triggerId} CONTINUA na lista do workflow. ` +
+      `Nada mudou: a remoção não foi aplicada (registro em ${registro}).`,
+    );
+  }
+  fs.writeFileSync(registro, JSON.stringify(
+    { em: new Date().toISOString(), acao: "trigger", triggerAcao: "remover", aplicado: true, antes: triggers, depois, resposta }, null, 2,
+  ));
+  // `triggers` na saída passa a ser a lista REAL relida, não a prevista.
+  Object.assign(saida, { aplicado: true, resposta, registro, triggers: depois });
   imprimir(saida, o, log);
 }
 
@@ -293,6 +307,7 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
     .option("--trigger-acao <a>", "remover (só; criar e trocar não têm rota conhecida)")
     .option("--trigger-id <id>", "id do trigger a remover")
+    .option("--versao-esperada <n>", "version que a prévia viu; aborta se o workflow mudou desde então")
     .option("--usuario <id>", "autor da edição; sem ele, sai do token")
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")
     .option("--publicado", "obrigatório junto de --confirmo quando o workflow está publicado")

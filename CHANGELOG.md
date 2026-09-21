@@ -14,11 +14,28 @@ comando `npm run workflow-editar`. Continuam 18 regras de auditoria.
   `trocar-tag` (pelo nome, só onde tag mora — nunca em texto de mensagem), `limpar-orfaos`
   (steps que nunca executam), `atributo` (um campo de um step) e `trigger` (remover).
   Mais `criar`, `renomear`, `mover`, `duplicar`, `apagar` e `historico`.
-- **Guardas, todas provadas ao vivo:** snapshot do antes em `<dumps>/_workflows/`; prévia com
-  diff que não grava nada sem `--confirmo`; validação do documento editado contra as 18 regras,
-  que RECUSA a gravação se a edição introduzir um ERROR novo; releitura da `version` antes de
-  gravar (alguém salvou pelo app → aborta); `--publicado` obrigatório junto de `--confirmo` em
-  workflow publicado, com a contagem de quem está dentro agora.
+- **Guardas do COMANDO** (`npm run workflow-editar`, e portanto de tudo que passa por ele):
+  snapshot do antes em `<dumps>/_workflows/`, gravado ANTES da escrita em toda ação destrutiva;
+  prévia com diff que não grava nada sem `--confirmo`; releitura da `version` antes de gravar
+  (alguém salvou pelo app → aborta) e `--versao-esperada` para a janela entre prévia e gravação,
+  que são dois processos; `--publicado` obrigatório junto de `--confirmo` em workflow publicado,
+  com a contagem de quem está dentro agora; `--de` de `trocar-ref` tem que ter cara de id.
+- **Guarda da TOOL MCP `workflow_editar`, e só dela:** a validação do documento editado contra
+  as 18 regras, que RECUSA a gravação se a edição introduzir um ERROR novo. Ela mora na tool,
+  não no comando — quem roda a CLI com `--confirmo` escreve sem passar por regra nenhuma, de
+  propósito (o comando não carrega o auditor). Mover a guarda para a CLI é parte B.
+- **200 não é prova nesta API, e bump de `version` também não** — a rota irmã `only-triggers`
+  faz os dois e não grava nada. Toda escrita agora CONFERE o efeito relendo: a edição de corpo
+  compara o que pediu com o que ficou e responde `aplicado: "duvidoso"` com o diff residual
+  quando sobra diferença; a remoção de trigger relê a lista autoritativa e dá erro explícito se
+  o id ainda estiver lá. A saída de `trigger` passa a trazer a lista REAL relida.
+- **`apagar` guarda cópia do que apagou**: o documento inteiro e a lista de triggers vão para o
+  registro antes do DELETE. É a única escrita irreversível daqui — `PUT /<loc>/<wid>/recover`
+  aparece no bundle do editor e está no mapa da spec, mas nunca foi exercitada (não se sabe o
+  corpo nem se restaura workflow apagado ou versão do histórico), então a função morta saiu do
+  código e `apagar` continua sem desfazer até haver prova ao vivo.
+- **A tool MCP não devolve mais o documento inteiro do workflow**: ele existe para a validação
+  local e só; voltava para o contexto do modelo sem teto nenhum.
 - **Achado do servidor:** publicar workflow com referência quebrada dá
   `400 {"message":"Referenced asset(s) missing from this location: Form '…'."}`. O
   `broken_form_ref` do auditor tem eco no próprio GHL.
@@ -37,7 +54,8 @@ comando `npm run workflow-editar`. Continuam 18 regras de auditoria.
   Quando não há o que validar, a resposta traz `validacao.rodou: false` com o motivo — a chave
   nunca some em silêncio.
 - **Fora, declarado:** remover step vivo e recosturar ponteiros, criar step do zero, reordenar
-  fluxo, restaurar versão do histórico (não há rota) e criar/trocar trigger — tudo parte B.
+  fluxo, restaurar versão ou workflow apagado (a rota `recover` existe no bundle mas nunca foi
+  exercitada), criar/trocar trigger e mover a validação pelas 18 regras para a CLI — tudo parte B.
 - **Limitações conhecidas** (deixadas de propósito, com motivo): `trocar-ref` troca o id e o
   rótulo humano (`title`) do step continua o antigo, porque não há de onde tirar o rótulo novo —
   o comando passou a AVISAR quando isso acontece; `renomear` e `mover` não passam pela guarda de

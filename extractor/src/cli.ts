@@ -59,6 +59,7 @@ import {
   createPipeline, updatePipeline, deletePipeline,
 } from "./api/opportunities.js";
 import {
+  todosOsInscritos, WF_TETO_PADRAO,
   listarWorkflows, getWorkflowMeta, paginaDeInscritos, inscricoesDoContato,
   resumoPorWorkflow, resumoPorContato, saidaWorkflowAcao, avisoDespublicar, contarNaoTerminados, cortar,
   mudarStatus, inscreverContato, removerContato, retomarInscricao, resolverInscricao, nomeContato,
@@ -559,7 +560,6 @@ export function registroEscrita(loc: string, pasta: string, chave: string, dados
 
 const WF_LEITURA = ["lista", "dentro", "contato"];
 const WF_ACOES = ["publicar", "inscrever", "remover", "retomar"];
-export const WF_TETO_PADRAO = 500;
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
@@ -2115,31 +2115,6 @@ program
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runPipeline(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
-/**
- * Busca páginas até o teto. O cursor vem da última linha de cada página, e é INCLUSIVO:
- * a página seguinte repete essa linha na frente. `juntarPaginas` descarta a repetição
- * (achado ao vivo, item 8 da prova de leitura).
- */
-export async function todosOsInscritos(
-  client: GhlClient, loc: string, wid: string, teto: number,
-): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
-  // um número só: o tamanho pedido e a condição de "veio página cheia" têm que concordar,
-  // e separá-los em dois literais quebra o laço em silêncio quando alguém mexe num deles
-  const TAMANHO_PAGINA = 100;
-  let cruas: InscricaoCrua[] = [];
-  let cursor: Cursor | undefined;
-  let estrangulado = false;
-  // teto + 1 para saber que havia mais; `cortar` apara depois
-  while (cruas.length <= teto) {
-    const p = await paginaDeInscritos(client, loc, wid, TAMANHO_PAGINA, cursor);
-    estrangulado = estrangulado || p.estrangulado;
-    cruas = juntarPaginas(cruas, p.linhas);
-    if (p.linhas.length < TAMANHO_PAGINA || !p.cursor) break;
-    cursor = p.cursor;
-  }
-  const c = cortar(cruas, teto);
-  return { cruas: c.linhas, cortou: c.cortou, estrangulado };
-}
 
 /** Nome de cada contato, uma chamada por id. Falha em um não derruba a lista. */
 async function nomesDeContatos(

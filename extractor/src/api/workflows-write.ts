@@ -38,9 +38,11 @@ export function apagarWorkflow(client: GhlClient, loc: string, wid: string, user
   return client.deleteJson(`${WF_WRITE}/${loc}/${wid}?userId=${encodeURIComponent(userId)}`);
 }
 
-export function recuperarWorkflow(client: GhlClient, loc: string, wid: string, corpo: Record<string, unknown>): Promise<unknown> {
-  return client.putJson(`${WF_WRITE}/${loc}/${wid}/recover`, corpo);
-}
+// `PUT /<loc>/<wid>/recover` aparece no bundle do editor e está no mapa da spec, mas NUNCA
+// foi exercitado: não se sabe o corpo, nem se restaura workflow apagado ou versão do
+// histórico. Enquanto não houver prova ao vivo, `apagar` é irreversível — é por isso que ele
+// guarda cópia do documento no registro antes do DELETE. A função morta saiu daqui para
+// ninguém a reencontrar e acreditar que existe desfazer.
 
 /** Salva o workflow inteiro. O corpo é o documento lido, com o alvo trocado. */
 export function salvarWorkflow(client: GhlClient, loc: string, wid: string, corpo: Record<string, unknown>): Promise<unknown> {

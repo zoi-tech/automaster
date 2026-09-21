@@ -37,11 +37,30 @@ export interface Resultado {
 const clonar = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 /**
- * Troca um id em qualquer profundidade do documento. Ids do GHL são opacos e
- * longos (uuid/ObjectId), então comparar a string inteira não colide com texto
- * de mensagem. Para TAG, que é referenciada por NOME, use `trocarTag`.
+ * Ids do GHL são opacos: uuid, ObjectId (24 hex) ou base62 de 20+ caracteres. Texto
+ * com espaço, acento ou curto não é id. É a única defesa de `trocarReferencia`, que
+ * faz substring replace em TODA string do documento — `--de "Olá"` reescreveria o
+ * corpo de SMS, e-mail e WhatsApp que o cliente manda para a base dele, e nenhuma das
+ * 18 regras acha isso estranho.
+ */
+export function pareceId(v: string): boolean {
+  return /^[A-Za-z0-9_-]{16,}$/.test(v.trim());
+}
+
+/**
+ * Troca um id em qualquer profundidade do documento, inclusive dentro de strings
+ * maiores. Por isso `de` TEM que ser um id: ver `pareceId`. Para TAG, que é
+ * referenciada por NOME, use `trocarTag`.
  */
 export function trocarReferencia(doc: Documento, de: string, para: string): Resultado {
+  if (!pareceId(de)) {
+    throw new Error(
+      `--de ${JSON.stringify(de)} não parece um id: trocar-ref substitui em qualquer profundidade ` +
+      "do documento, inclusive DENTRO do texto de SMS, e-mail e WhatsApp. Texto livre aqui reescreveria " +
+      "o que o cliente fala com a base dele. Para trocar tag pelo nome use --acao trocar-tag; para um " +
+      "campo de um step, --acao atributo.",
+    );
+  }
   const out = clonar(doc);
   const mudancas: string[] = [];
   const avisos: string[] = [];
@@ -276,3 +295,31 @@ export function diffWorkflow(antes: Documento, depois: Documento): DiffWorkflow 
     triggersAdicionados, triggersRemovidos, triggersAlterados, vazio,
   };
 }
+
+/**
+ * 200 não é prova nesta API: a rota irmã `only-triggers` responde 200, incrementa
+ * `version` e não grava nada (prova ao vivo, §2.1b). Depois de gravar, o comando relê e
+ * compara o que PEDIU (`editado`) com o que o servidor TEM (`depois`). Sobrou diferença,
+ * a escrita é duvidosa — não sucesso.
+ */
+export function conferirEscrita(editado: Documento, depois: Documento): { ok: boolean; residual: DiffWorkflow } {
+  const residual = diffWorkflow(editado, depois);
+  return { ok: residual.vazio, residual };
+}
+
+/**
+ * I1: a prévia e a gravação são DOIS processos — na tool MCP, com um Chrome subindo entre
+ * elas e dezenas de segundos de janela. A guarda interna (`version` lida x meta) só enxerga
+ * o que acontece dentro da segunda invocação. `--versao-esperada` carrega a `version` que a
+ * prévia viu e aborta se o workflow mudou entre as duas.
+ */
+export function conferirVersaoEsperada(o: { versaoEsperada?: string }, versaoAgora: number | undefined): void {
+  if (o.versaoEsperada === undefined) return;
+  if (String(versaoAgora) !== String(o.versaoEsperada)) {
+    throw new Error(
+      `o workflow mudou entre a prévia e a gravação (versão esperada ${o.versaoEsperada}, agora ${versaoAgora}). ` +
+      "Nada foi gravado: rode a prévia de novo para ver o estado atual.",
+    );
+  }
+}
+

@@ -258,3 +258,65 @@ def test_sem_documento_a_resposta_diz_que_nao_validou(monkeypatch):
     r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
     assert r["validacao"]["rodou"] is False
     assert "não devolveu documento" in r["validacao"]["motivo"]
+
+
+# --- I1: a prévia e a gravação são dois processos, com um Chrome subindo no meio ---
+
+def test_versao_da_previa_viaja_para_a_gravacao(monkeypatch):
+    """Sem carregar a `version` que a prévia leu, a guarda de concorrência não enxerga
+    nada do que mudou entre os dois processos — uma janela de dezenas de segundos."""
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        return {"aplicado": False, "documento": {"workflowData": {}}, "versao": 7}
+
+    monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert "--versao-esperada" not in vistos[0]          # a prévia não recebe a flag
+    assert "--versao-esperada" in vistos[1] and "7" in vistos[1]
+
+
+def test_sem_versao_na_previa_a_gravacao_nao_inventa_uma(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(mcp_server, "_run_extractor",
+                        lambda *a: vistos.append(a) or {"aplicado": False})
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert "--versao-esperada" not in vistos[1]
+
+
+# --- M3: o documento inteiro não volta para o contexto do modelo ---
+
+def test_documento_sai_da_resposta_depois_de_validar(monkeypatch):
+    doc = {"workflowData": {"templates": [{"id": "s1"}]}}
+    monkeypatch.setattr(mcp_server, "_run_extractor",
+                        lambda *a: {"aplicado": False, "documento": doc, "diff": {"vazio": False}})
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao", lambda *a: _ResultadoFalso(True))
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "documento" not in r
+    assert r["validacao"]["rodou"] is True
+    assert r["diff"] == {"vazio": False}
+
+
+def test_documento_sai_da_resposta_tambem_sem_dump(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_run_extractor",
+                        lambda *a: {"aplicado": False, "documento": {"x": 1}})
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "documento" not in r and r["validacao"]["rodou"] is False
+
+
+# --- M2: a dica do timeout tem que apontar para a tool certa ---
+
+def test_timeout_de_workflow_manda_conferir_com_a_tool_de_workflow(monkeypatch, tmp_path):
+    import subprocess
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True)
+    tsx.touch()
+    monkeypatch.setattr(mcp_server, "EXTRACTOR_DIR", tmp_path)
+    def estoura(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="tsx", timeout=600, stderr="")
+    monkeypatch.setattr(subprocess, "run", estoura)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server._run_extractor("workflow-editar", "-l", "L1")
+    assert "workflows_ao_vivo" in str(e.value) and "`contato`" not in str(e.value)

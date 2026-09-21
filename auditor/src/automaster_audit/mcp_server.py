@@ -256,6 +256,9 @@ def _run_extractor(*args: str) -> dict:
     except subprocess.TimeoutExpired as e:
         dica_estado = ("confira o estado atual com a tool `formularios`, o=detalhe."
                        if args[0].startswith("formulario-") else
+                       "confira o estado atual com a tool `workflows_ao_vivo` (ou `workflow_editar` "
+                       "com acao='historico', que lista as versões gravadas)."
+                       if args[0].startswith("workflow") else
                        "confira o estado atual com a tool `contato`.")
         raise ToolError(
             f"{args[0]} estourou 600 s e foi morto — provável login manual pendente na janela do Chrome. "
@@ -266,6 +269,9 @@ def _run_extractor(*args: str) -> dict:
     if r.returncode != 0 or not r.stdout.strip():
         dica = (" A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
                 if args[0].startswith("formulario-") else
+                " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool "
+                "`workflows_ao_vivo`, ou `workflow_editar` com acao='historico'."
+                if args[0].startswith("workflow") else
                 " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `contato`."
                 if args[0] == "contato-editar" else "")
         raise ToolError(f"{args[0]} falhou (código {r.returncode}): {_head_tail(r.stderr)}{dica}")
@@ -1017,14 +1023,23 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
     Para ação que mexe no corpo, roda SEMPRE a prévia primeiro e valida o documento
     editado contra as 18 regras (`validar_edicao`) antes de decidir se grava. Sem dump em
     disco a validação não roda, mas isso não trava a gravação.
+
+    O documento editado NÃO volta na resposta: serve à validação local e só. A `version`
+    que a prévia leu é carregada para a gravação (`--versao-esperada`), que aborta se o
+    workflow mudou entre os dois processos.
     """
     if acao not in WF_EDITAR_ACOES:
         raise ToolError(f"acao inválida: {acao!r}. Use uma de: {', '.join(WF_EDITAR_ACOES)}")
     if acao != "criar" and not id:
         raise ToolError(f"acao {acao!r} exige `id` (id do workflow)")
 
-    def _args(com_confirmo: bool) -> list[str]:
+    def _args(com_confirmo: bool, versao: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
+        # I1: a prévia e a gravação são dois processos, com um Chrome subindo no meio. Sem
+        # carregar a `version` que a prévia viu, a guarda de concorrência só enxerga o que
+        # acontece DENTRO da segunda invocação, e a janela entre as duas fica descoberta.
+        if versao is not None:
+            a += ["--versao-esperada", str(versao)]
         for flag, valor_opcional in (
             ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
             ("--step", step), ("--caminho", caminho), ("--valor", valor),
@@ -1061,17 +1076,20 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         ctx = None
 
     previa = _run_extractor(*_args(False))
+    # M3: o documento inteiro do workflow não volta para o contexto do modelo. Ele existe
+    # para a validação local, e só.
+    documento = previa.pop("documento", None)
+    versao = previa.get("versao")
 
     if ctx is None:
         previa["validacao"] = {"rodou": False, "motivo": sem_validacao}
         if not confirmo:
             return previa
         # a falta de dump não pode travar a escrita
-        resultado = _run_extractor(*_args(True))
+        resultado = _run_extractor(*_args(True, versao))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
-    documento = previa.get("documento")
     if documento is None:
         # nada a validar (ex: "nada a mudar: a operação não encontrou alvo"). Mesmo aqui a
         # resposta diz que as regras não rodaram: ausência silenciosa da chave `validacao`
@@ -1082,7 +1100,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         }
         if not confirmo:
             return previa
-        resultado = _run_extractor(*_args(True))
+        resultado = _run_extractor(*_args(True, versao))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
@@ -1092,7 +1110,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         previa["validacao"] = {"rodou": False, "motivo": str(e)}
         if not confirmo:
             return previa
-        resultado = _run_extractor(*_args(True))
+        resultado = _run_extractor(*_args(True, versao))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
@@ -1122,7 +1140,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         )
         return previa
 
-    resultado = _run_extractor(*_args(True))
+    resultado = _run_extractor(*_args(True, versao))
     resultado["validacao"] = validacao
     return resultado
 

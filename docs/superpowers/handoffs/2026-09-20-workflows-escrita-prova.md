@@ -342,3 +342,51 @@ reencarnado — e no caso em que a validação mais vale, já que remover trigge
   guarda cobre `apagar`, as ações de corpo e a remoção de trigger.
 - **`only-triggers` não é mais usado**, e a função foi removida em vez de ficar disponível
   para alguém reencontrar e acreditar que funciona.
+
+---
+
+## 6. Correções da revisão final (2026-09-21, mesma versão 0.15.0)
+
+Uma onda única, sem escrita ao vivo. A prova ao vivo do que está aqui ainda não foi feita.
+
+| item | o que mudou |
+|---|---|
+| **C1** as duas escritas devolviam sucesso sem conferir o efeito | 200 não é prova nesta API — `only-triggers` responde 200, bumpa `version` e não grava (§2.1b), e `inscrever` em `draft` faz o mesmo. O caminho de corpo agora compara `editado` com `depois` (`conferirEscrita`, sobre o `diffWorkflow` que já existia) e responde `aplicado: "duvidoso"` com o diff residual em vez de afirmar sucesso; `trigger` relê a lista autoritativa e dá erro explícito se o id removido ainda estiver lá. Custo zero em rede: o dado já estava em memória. |
+| **C2** `apagar` irreversível e sem cópia | lê o documento inteiro **e** a lista de triggers antes do DELETE e guarda no registro. O registro de `apagar` e de `trigger` passou a ser escrito ANTES da escrita e reescrito depois, como o caminho de corpo já fazia: morte de processo no meio deixava produção alterada sem rastro nenhum, justo nas duas ações destrutivas. |
+| **I1** validava um documento e gravava outro | `--versao-esperada` carrega a `version` que a prévia leu até a gravação, e a tool MCP a passa adiante. A guarda interna só enxergava o que acontecia dentro da segunda invocação, e entre prévia e gravação há um Chrome subindo — dezenas de segundos descobertos. |
+| **I2** CHANGELOG afirmava guarda que o comando não tem | a validação pelas 18 regras mora **só** na tool MCP. Quem roda `npm run workflow-editar -- … --confirmo` escreve sem passar por regra nenhuma, e é esse o modo documentado no `CLAUDE.md`. O texto agora separa guardas do comando de guardas da tool. Mover a guarda para a CLI é parte B. |
+| **I3** `trocarReferencia` fazia substring replace em toda string | `pareceId` recusa `de` sem cara de id (uuid, ObjectId, base62 de 16+). `--de "Olá" --para "Oi"` reescreveria corpo de SMS, e-mail e WhatsApp — o que o cliente fala com a base dele — e nenhuma das 18 regras acharia estranho. A defesa era um comentário. |
+| **I5** código e CHANGELOG se contradiziam sobre restaurar | decidido pela evidência do §3: `recuperarWorkflow` **nunca foi exercitada**; não se sabe o corpo, nem se `PUT /<loc>/<wid>/recover` restaura workflow apagado ou versão do histórico. A função morta saiu do código (ficou um comentário no lugar, com a rota e o motivo) e o CHANGELOG passou de "não há rota" para "há rota candidata mapeada do bundle, nunca exercitada". A leitura de risco do `apagar` **não muda**: continua sem desfazer. |
+| **M1** | a saída de `trigger` devolve a lista relida, não a prevista. |
+| **M2** | a dica de timeout de `_run_extractor` para comando de workflow aponta `workflows_ao_vivo` / `acao='historico'`, não a tool `contato`. |
+| **M3** | a prévia da tool MCP não devolve mais o documento inteiro do workflow: ele serve à validação local e é descartado. |
+
+Testes novos, todos sem rede: `extractor/test/workflow-editar.test.ts` (guarda de publicado
+recusa sem `--publicado`, grava com, e contagem cortada/estrangulada vira "pelo menos N";
+`pareceId`; `conferirEscrita`; `conferirVersaoEsperada`) e quatro casos novos em
+`auditor/tests/test_workflow_editar_tool.py` (versão viajando para a gravação, documento fora
+da resposta nos dois caminhos, dica de timeout). 151 testes no extractor, 297 no auditor.
+
+`todosOsInscritos`, `WF_TETO_PADRAO`, `avisoPublicado` e `guardaPublicado` mudaram de
+`cli.ts` para `api/workflows-live.ts`: importar o comando a partir do teste puxava `cli.ts`,
+que registra todos os subcomandos no import — ciclo. Nenhuma mudança de comportamento.
+
+---
+
+## 7. Achado FORA do escopo desta entrega, que precisa sobreviver
+
+**O auditor inteiro ainda lê `parent`.** O §2.2 acima matou o `parent` do *extractor*
+(`workflow-edit.ts`), mas `auditor/src/automaster_audit/flow.py:38` continua lendo o mesmo
+campo inexistente. As consequências são maiores do lado do auditor:
+
+- `roots()` devolve **todo step como raiz**, porque nenhum step tem `parent`.
+- Logo `reachable()` alcança tudo, e a regra `unreachable_step` **nunca dispara** — zero
+  ocorrências no relatório da Instaltech, o que se lia como "não há step morto" e é, na
+  verdade, "a regra não funciona".
+- `roots()`/`reachable()` alimentam `journey.py`, `simulate.py`, `path_report.py` e
+  `enumerate_paths`. Ou seja `paths.md`, `journey.html` e as **camadas 2 e 3** do
+  `validation.html` estão computados sobre a premissa "todo step é uma entrada".
+
+Não foi corrigido aqui de propósito: trocar o campo muda o que quatro saídas mostram e o que
+uma regra acusa, com fixtures a refazer — é trabalho próprio, de outra entrega, e merece a
+sua própria prova.
