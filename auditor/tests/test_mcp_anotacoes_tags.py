@@ -73,3 +73,76 @@ def test_contrato_das_tools_de_anotacao():
         assert nome in srv.TOOLS
         func, desc, props, obrig = srv.TOOLS[nome]
         assert callable(func) and desc and "loc" in props and "loc" in obrig
+
+
+def test_tags_cruza_com_o_indice_reverso(monkeypatch):
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: {
+        "total": 2, "tags": [{"id": "T1", "name": "Alfa"}, {"id": "T2", "name": "beta"}]})
+    monkeypatch.setattr(srv, "_load", lambda loc, snap=None: (_CtxFalso(), {"snapshot": "S"}))
+    monkeypatch.setattr(srv, "_dash", lambda p: {"tags": [
+        {"name": "alfa", "used_by": ["WF um", "WF dois"], "papeis": ["adiciona", "dispara"], "orphan": False},
+    ]})
+    r = srv.tags("L1")
+    por_nome = {t["name"]: t for t in r["tags"]}
+    # o cruzamento ignora maiúscula: "Alfa" ao vivo casa com "alfa" do índice
+    assert por_nome["Alfa"]["workflows"] == ["WF dois", "WF um"]
+    assert por_nome["Alfa"]["papeis"] == ["adiciona", "dispara"]
+    assert por_nome["beta"]["workflows"] == []
+    assert r["_snapshot"]["snapshot"] == "S"
+
+
+def test_tags_degrada_sem_dump(monkeypatch):
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: {
+        "total": 1, "tags": [{"id": "T1", "name": "alfa"}]})
+
+    def sem_dump(loc, snap=None):
+        raise ToolError("nenhum dump para L1")
+
+    monkeypatch.setattr(srv, "_load", sem_dump)
+    r = srv.tags("L1")
+    assert r["tags"][0]["workflows"] is None
+    assert "sem dump" in r["aviso"].lower()
+
+
+def test_tag_acao_apagar_citada_exige_a_guarda(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: chamadas.append(a) or {"ok": True})
+    monkeypatch.setattr(srv, "_impacto_tags", lambda loc, snap=None: (
+        {"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None))
+    with pytest.raises(ToolError) as e:
+        srv.tag_acao("L1", acao="apagar", tag="alfa", confirmo=True)
+    assert "WF um" in str(e.value)
+    assert chamadas == []
+    srv.tag_acao("L1", acao="apagar", tag="alfa", confirmo=True, apagar_citada=True)
+    assert chamadas and "--confirmo" in chamadas[0]
+
+
+def test_tag_acao_renomear_nao_exige_guarda(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(srv, "_run_extractor", lambda *a: chamadas.append(a) or {"ok": True})
+    monkeypatch.setattr(srv, "_impacto_tags", lambda loc, snap=None: (
+        {"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None))
+    srv.tag_acao("L1", acao="renomear", tag="alfa", nome="gama", confirmo=True)
+    assert "--confirmo" in chamadas[0]
+
+
+def test_tag_acao_valida_os_argumentos(espiao):
+    with pytest.raises(ToolError):
+        srv.tag_acao("L1", acao="inventada", tag="x")
+    with pytest.raises(ToolError):
+        srv.tag_acao("L1", acao="criar")
+    with pytest.raises(ToolError):
+        srv.tag_acao("L1", acao="renomear", tag="alfa")
+    assert espiao == []
+
+
+def test_contrato_das_tools_de_tag():
+    for nome in ("tags", "tag_acao"):
+        assert nome in srv.TOOLS
+        func, desc, props, obrig = srv.TOOLS[nome]
+        assert callable(func) and desc and "loc" in props and "loc" in obrig
+
+
+class _CtxFalso:
+    path = "/tmp/dump-falso"
+    workflows: list = []
