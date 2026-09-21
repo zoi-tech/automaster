@@ -178,6 +178,7 @@ apagados na hora. Detalhe e respostas verbatim em
 |---|---|---|---|
 | Ler o documento (steps completos) | `GET .../workflow/<loc>/<wid>` | — | ✓ |
 | Criar workflow | `POST .../workflow/<loc>` | `{name, parentId, location_id}` | ✓ (`{"id":"…","assetWarnings":[]}`) |
+| Criar pasta | `POST .../workflow/<loc>` | `{name, parentId: "root", type: "folder", location_id}` | ✗ |
 | Duplicar workflow | `POST .../workflow/<loc>` | `{new_workflow_name, workflow_id, parentId, location_id}` | ✓ (`{"id":"…"}`) |
 | Renomear | `PUT .../workflow/<loc>/rename-workflow/<wid>` | `{name}` | ✓ (`version` +1) |
 | Mover de pasta | `PUT .../workflow/<loc>/move-directory/<wid>` | `{parentId}` | ✓ (`{"msg":"Updated successfully","error":false}`) |
@@ -189,6 +190,13 @@ apagados na hora. Detalhe e respostas verbatim em
 | Apagar trigger | `DELETE .../workflow/<loc>/trigger/<tid>?workflowId=<wid>` | — | ✓ (`{}`, apagou de verdade) |
 | **Criar trigger** | `POST .../workflow/<loc>/trigger` | o trigger, com **`workflowId`** (camelCase) | ✓ (`{"id":"…"}`, criou de verdade) |
 | Só triggers (`only-triggers`) | `PUT .../workflow/<loc>/only-triggers/<wid>` | o corpo INTEIRO do save | ✓ — **e não serve para nada** (ver abaixo) |
+
+**Workflow recém-criado nasce invisível no app.** O `POST` de criação devolve um documento
+**sem `status`**, e com `parentId: ""` quando não se manda pasta. Nesse estado a lista da
+interface não o mostra e o editor abre em página branca, embora o `GET` e a lista da API o
+devolvam normalmente. Todo workflow real da subconta mora dentro de uma pasta. Depois de
+criar, portanto: `PUT .../move-directory/<wid>` com o `parentId` de uma pasta de verdade, e
+um save com `status: "draft"`. Medido ao vivo em 2026-09-21.
 
 **Criar trigger É possível — a chave é `workflowId` em camelCase** (provado ao vivo em
 2026-09-21). O `POST .../workflow/<loc>/trigger` responde `{"id":"…"}` nos dois casos, mas só
