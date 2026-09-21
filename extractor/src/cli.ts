@@ -81,57 +81,12 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
+import {
+  DUMPS_DIR, sleep, latestDumpDir, latestDumpEntity, withClient, registroEscrita,
+} from "./cli/shared.js";
 import { registrarWorkflowEditar } from "./cli/workflow-editar.js";
+import { registrarSmoke } from "./cli/smoke.js";
 
-const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-
-/** Snapshot mais recente da subconta: só pastas com manifest.json contam. */
-function latestDumpDir(locationId: string): string | undefined {
-  try {
-    const base = path.join(DUMPS_DIR, locationId);
-    const snaps = fs.readdirSync(base).filter((d) => fs.existsSync(path.join(base, d, "manifest.json"))).sort();
-    const latest = snaps.at(-1);
-    return latest ? path.join(base, latest) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** `raw` de uma entidade do dump mais recente; undefined sem dump ou sem o arquivo. */
-function latestDumpEntity(locationId: string, name: string): unknown {
-  const dir = latestDumpDir(locationId);
-  if (!dir) return undefined;
-  try {
-    return JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), "utf-8"))?.raw;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. */
-export async function withClient(
-  locationId: string,
-  log: (msg: string) => void,
-  // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
-  fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
-): Promise<void> {
-  const { context, page } = await openSession();
-  try {
-    log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
-    let tokens = await captureTokens(page, locationId);
-    const refresh = async (): Promise<Tokens> => {
-      log("401 — recapturando tokens...");
-      await page.reload({ waitUntil: "domcontentloaded" });
-      tokens = await captureTokens(page, locationId);
-      return tokens;
-    };
-    await fn(new GhlClient(context, tokens, refresh), page, tokens);
-  } finally {
-    await context.close();
-  }
-}
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
@@ -555,15 +510,6 @@ const MIME: Record<string, string> = {
   ".ogg": "audio/ogg", ".txt": "text/plain", ".csv": "text/csv",
 };
 
-/** Grava o rastro de uma escrita que não tem desfazer. */
-export function registroEscrita(loc: string, pasta: string, chave: string, dados: unknown): string {
-  const dir = path.join(DUMPS_DIR, pasta, loc, chave);
-  fs.mkdirSync(dir, { recursive: true });
-  const now = new Date();
-  const registro = path.join(dir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
-  fs.writeFileSync(registro, JSON.stringify({ em: now.toISOString(), ...(dados as object) }, null, 2));
-  return registro;
-}
 
 const WF_LEITURA = ["lista", "dentro", "contato"];
 const WF_ACOES = ["publicar", "inscrever", "remover", "retomar"];
@@ -2600,5 +2546,6 @@ program
   .action((o) => runWorkflowAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 registrarWorkflowEditar(program);
+registrarSmoke(program);
 
 program.parseAsync(process.argv);

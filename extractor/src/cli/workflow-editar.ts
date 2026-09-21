@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import fs from "node:fs";
-import { withClient, registroEscrita } from "../cli.js";
+import { withClient, registroEscrita } from "./shared.js";
 import { decodeUserId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
 import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";

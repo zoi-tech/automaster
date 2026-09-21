@@ -75,6 +75,7 @@ npm run anotacoes -- -l <loc> --contato <contactId> --tipo nota --json   # notas
 npm run anotacao-acao -- -l <loc> --contato <id> --tipo tarefa --acao criar --titulo "..." --prazo <iso> --confirmo --json  # ESCREVE: nota/tarefa
 npm run tags -- -l <loc> --json                                          # tags da subconta (leitura ao vivo)
 npm run tag-acao -- -l <loc> --acao renomear --tag <nomeOuId> --nome <novo> --confirmo --json  # ESCREVE: tag da subconta
+npm run smoke -- -l <loc> [--contato <id>] --json         # confere se as rotas de leitura ainda respondem na forma esperada
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 

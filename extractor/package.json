@@ -42,6 +42,7 @@
     "tags": "tsx src/cli.ts tags",
     "tag-acao": "tsx src/cli.ts tag-acao",
     "agenda-acao": "tsx src/cli.ts agenda-acao",
+    "smoke": "tsx src/cli.ts smoke",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
