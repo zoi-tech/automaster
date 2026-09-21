@@ -2074,7 +2074,7 @@ async function runAnotacoes(o: OptsAnotacoes): Promise<void> {
       });
     }
     const r = { op, tipo, contato: o.contato ?? null, resultado: saida };
-    console.log(o.json ? JSON.stringify(r, null, 2) : JSON.stringify(r, null, 2));
+    console.log(o.json ? JSON.stringify(r) : JSON.stringify(r, null, 2));
   });
 }
 
@@ -2126,7 +2126,7 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
       previa: true, aplicado: false, acao: o.acao, tipo, contato: o.contato, id: o.id ?? null,
       corpo, aviso: "nada foi gravado. Repita com --confirmo para gravar.",
     };
-    console.log(JSON.stringify(previa, null, 2));
+    console.log(o.json ? JSON.stringify(previa) : JSON.stringify(previa, null, 2));
     return;
   }
 
@@ -2145,7 +2145,7 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
       aplicado: true, acao: o.acao, tipo, contato: o.contato, id: o.id ?? null,
       resposta, apagou: o.acao === "apagar" ? deuCerto(resposta) : undefined, registro,
     };
-    console.log(JSON.stringify(r, null, 2));
+    console.log(o.json ? JSON.stringify(r) : JSON.stringify(r, null, 2));
   });
 }
 
@@ -2159,7 +2159,8 @@ async function runTags(o: { location: string; termo?: string; json?: boolean }):
       const alvo = o.termo.trim().toLowerCase();
       tags = tags.filter((t) => t.name.toLowerCase().includes(alvo));
     }
-    console.log(JSON.stringify({ total: tags.length, tags }, null, 2));
+    const saida = { total: tags.length, tags };
+    console.log(o.json ? JSON.stringify(saida) : JSON.stringify(saida, null, 2));
   });
 }
 
@@ -2212,7 +2213,7 @@ async function runTagAcao(o: OptsTagAcao): Promise<void> {
           "GHL não expõe contagem de contatos por tag. Pode disparar os workflows com trigger " +
           "de tag removida — isso não tem prova, nem a favor nem contra.";
       }
-      console.log(JSON.stringify(previa, null, 2));
+      console.log(o.json ? JSON.stringify(previa) : JSON.stringify(previa, null, 2));
       return;
     }
 
@@ -2224,7 +2225,8 @@ async function runTagAcao(o: OptsTagAcao): Promise<void> {
     const registro = registroEscrita(o.location, "_tags", alvo?.id ?? "nova", {
       acao: o.acao, antes: alvo ?? null, nome: o.nome ?? null, resposta,
     });
-    console.log(JSON.stringify({ aplicado: true, acao: o.acao, resposta, registro }, null, 2));
+    const feito = { aplicado: true, acao: o.acao, resposta, registro };
+    console.log(o.json ? JSON.stringify(feito) : JSON.stringify(feito, null, 2));
   });
 }
 
