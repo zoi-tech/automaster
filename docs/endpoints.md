@@ -255,8 +255,10 @@ Firebase (`fileUrl`) por causa do formato do dump; a escrita lê os steps direto
 **O encadeamento de step é `parentKey`.** Não existe campo `parent` em step nenhum — quem ler
 `parent` conclui que todo step é raiz e que nada é inalcançável.
 
-**Duplicar é o POST de criação com `workflow_id`**, e copia steps **e** triggers, com ids
-novos. **Não existe rota de restaurar versão**: o histórico lê, não escreve.
+**Duplicar é o POST de criação com `workflow_id`**, e copia steps e triggers. **Os ids dos
+STEPS são PRESERVADOS**: a cópia de `test.cmd [review]` feita em 2026-09-21 trouxe os seis
+steps com exatamente os mesmos ids do original (a nota anterior, de que os ids eram novos,
+estava errada para steps). O id dos triggers não foi conferido nesta rodada. **Não existe rota de restaurar versão**: o histórico lê, não escreve.
 
 **O servidor recusa publicar workflow com referência quebrada:**
 
@@ -265,6 +267,34 @@ novos. **Não existe rota de restaurar versão**: o histórico lê, não escreve
 
 O `broken_form_ref` do auditor tem eco no servidor: workflow com asset morto não publica. Só
 publicou depois que a trigger do formulário apagado foi removida pelo DELETE de trigger.
+
+### Steps do canvas — validado ao vivo 2026-09-21
+
+Criar, mover e remover step não estreiam rota: todos passam pelo mesmo `PUT .../workflow/<loc>/<wid>`
+(salvar o corpo). O que muda é o `workflowData.templates` mandado, e as listas
+`createdSteps`/`modifiedSteps`/`deletedSteps`, que já saem do diff.
+
+**O step criado sem `advanceCanvasMeta.position` aparece no lugar certo.** Era a pergunta
+aberta desta entrega: 1.536 dos 4.017 steps reais têm o campo e 2.481 não. A prova ao vivo
+mostrou que o editor calcula o layout sozinho — o step novo apareceu exatamente entre a
+âncora e o step seguinte, com as setas certas. Não é preciso inventar coordenada.
+
+**A recostura é mínima e verificável no diff.** Inserir um step depois de X alterou só dois
+campos em dois steps: o `next` de X e o `parentKey` do que vinha depois. A conferência por
+releitura (`conferirEscrita`) devolveu residual nulo nas quatro gravações.
+
+**As três famílias de nó** (medidas nos 4.017 steps da Instaltech): simples (`next` string ou
+ausente, 1.830), container (`next` array com mais de um id, 640) e ramo (`type: transition`
+ou `nodeType` começando em `branch`, 1.547). O ramo `if_else` tem o MESMO id do
+`attributes.branches[].id` correspondente no container, e `sibling[]` com os outros ramos —
+por isso ramo não se remove sozinho.
+
+**`order` não é endereço.** Existe em todos os steps, mas em 42 dos 71 workflows a sequência
+não é contígua (num deles todo step tem `order: 0`). Serve como campo a preencher.
+
+Removido um container com a subárvore inteira (um `whatsapp_v2` multi-path com dois
+`transition` e o step que pendia deles), o editor desenhou o fluxo terminando na âncora, sem
+seta solta nem caixa fantasma.
 
 ### Correção: descoberta de bundle
 

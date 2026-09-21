@@ -432,3 +432,30 @@ def test_cada_acao_monta_a_linha_de_comando_e_valida_quando_deve(acao, monkeypat
     else:
         assert len(chamadas) == 1
         assert "validacao" not in r
+
+
+def _extractor_que_falha(monkeypatch):
+    """Dublê de subprocess.run: código 1 e stderr, como um comando recusado pelo extractor."""
+    class _R:
+        returncode = 1
+        stdout = ""
+        stderr = "o step s1 é um ramo (transition) de um container"
+    monkeypatch.setattr(mcp_server.subprocess, "run", lambda *a, **k: _R())
+    monkeypatch.setattr(mcp_server, "_load",
+                        lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+
+
+def test_previa_recusada_nao_diz_que_producao_pode_ter_mudado(monkeypatch):
+    _extractor_que_falha(monkeypatch)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server.workflow_editar(loc="L1", acao="step-remover", id="W1", step="s1")
+    assert "parcialmente aplicada" not in str(e.value)
+
+
+def test_gravacao_que_falha_ainda_manda_conferir_o_estado(monkeypatch):
+    # `apagar` não tem prévia: a única invocação já leva `--confirmo`, e aí produção PODE
+    # ter mudado antes da falha.
+    _extractor_que_falha(monkeypatch)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server.workflow_editar(loc="L1", acao="apagar", id="W1", confirmo=True)
+    assert "parcialmente aplicada" in str(e.value)

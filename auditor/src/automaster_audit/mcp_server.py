@@ -267,7 +267,12 @@ def _run_extractor(*args: str) -> dict:
             + _head_tail(e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace"))
         ) from e
     if r.returncode != 0 or not r.stdout.strip():
-        dica = (" A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
+        # A dica de rastro só faz sentido quando havia escrita para ser aplicada. Numa prévia
+        # recusada ela dizia que produção podia ter mudado, e não podia. `contato-editar` é a
+        # exceção: grava direto, não tem prévia.
+        gravava = "--confirmo" in args or args[0] == "contato-editar"
+        dica = "" if not gravava else (
+               " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
                 if args[0].startswith("formulario-") else
                 " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool "
                 "`workflows_ao_vivo`, ou `workflow_editar` com acao='historico'."

@@ -4,6 +4,31 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.18.0 — 2026-09-21
+
+O corpo do workflow passa a se montar pelo MCP: criar, remover e mover step do canvas.
+Continuam 31 tools e 18 regras; 179 testes no extractor, 328 no auditor.
+
+- **Três ações novas no `workflow_editar`: `step-criar`, `step-remover` e `step-mover`.**
+  Como mexem no corpo, herdam tudo que a parte A construiu — snapshot antes da escrita,
+  guarda de workflow publicado, releitura de `version`, conferência por releitura e a
+  validação contra as 18 regras nas duas portas.
+- **O step novo vai em JSON cru** (`corpo`). Os `attributes` dos 41 tipos de step não são
+  modelados: o comando decide só o encadeamento (`id`, `parentKey`/`parent`, `next`, `order`).
+  Copie um step existente do mesmo tipo como molde — schema inventado por tipo geraria caixa
+  que o editor do app não abre.
+- **A âncora (`depois_de`) pode ser um nó de ramo**, que é como se põe uma ação dentro do
+  "sim" de um `if_else`. Container de N saídas é recusado, com a mensagem dizendo em qual
+  ramo ancorar.
+- **Nó de ramo não se remove sozinho** — é estrutura do container, indexada por
+  `attributes.branches` e pelo `sibling[]` dos irmãos. Container só sai com `com_subarvore`,
+  levando os ramos e tudo que pende deles; a recusa diz quantos steps sairiam.
+- **A pergunta aberta do canvas fechou ao vivo**: step criado sem
+  `advanceCanvasMeta.position` aparece no lugar certo, porque o editor calcula o layout.
+  Nenhuma coordenada é inventada.
+- **Prévia recusada não diz mais que produção pode ter mudado.** A dica de rastro saía em
+  toda falha, inclusive na de uma prévia que não escreveu nada.
+
 ## 0.17.0 — 2026-09-21
 
 Os débitos que a 0.15.0 e a 0.16.x deixaram declarados, fechados antes de abrir a escrita de
