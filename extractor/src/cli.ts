@@ -559,7 +559,7 @@ export function registroEscrita(loc: string, pasta: string, chave: string, dados
 
 const WF_LEITURA = ["lista", "dentro", "contato"];
 const WF_ACOES = ["publicar", "inscrever", "remover", "retomar"];
-const WF_TETO_PADRAO = 500;
+export const WF_TETO_PADRAO = 500;
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 const PIPE_ACOES = ["criar", "editar", "apagar"];
@@ -2120,7 +2120,7 @@ program
  * a página seguinte repete essa linha na frente. `juntarPaginas` descarta a repetição
  * (achado ao vivo, item 8 da prova de leitura).
  */
-async function todosOsInscritos(
+export async function todosOsInscritos(
   client: GhlClient, loc: string, wid: string, teto: number,
 ): Promise<{ cruas: InscricaoCrua[]; cortou: boolean; estrangulado: boolean }> {
   // um número só: o tamanho pedido e a condição de "veio página cheia" têm que concordar,

@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import fs from "node:fs";
-import { withClient, registroEscrita } from "../cli.js";
+import { withClient, registroEscrita, todosOsInscritos, WF_TETO_PADRAO } from "../cli.js";
 import { decodeUserId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
-import { getWorkflowMeta, paginaDeInscritos } from "../api/workflows-live.js";
+import { getWorkflowMeta, contarNaoTerminados } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
   salvarWorkflow, salvarSomenteTriggers, historicoVersoes, WF_WRITE,
@@ -49,6 +49,18 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
     if (SEM_CORPO.has(o.acao)) {
       if (!o.confirmo) throw new Error(exigeConfirmo(o.acao));
+      if (o.acao === "apagar") {
+        const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string };
+        if (meta?.status === "published") {
+          const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
+          const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado);
+          saida.aviso = aviso;
+          log(aviso);
+          if (!o.publicado) {
+            throw new Error(`${aviso} Para apagar mesmo assim, repita com --publicado junto de --confirmo.`);
+          }
+        }
+      }
       const registro = registroEscrita(o.location, "_workflows", o.id ?? "novo", { acao: o.acao, opts: semSegredo(o) });
       const resposta = await escritaSemCorpo(client, o, usuarioId);
       fs.writeFileSync(registro, JSON.stringify({ em: new Date().toISOString(), acao: o.acao, aplicado: true, resposta }, null, 2));
@@ -83,10 +95,8 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     }
 
     if (doc.status === "published") {
-      const dentro = await contarDentro(client, o.location, o.id!);
-      const aviso =
-        `workflow PUBLICADO com ${dentro} contato(s) dentro agora. Quem está no meio termina o passo ` +
-        `atual na versão antiga e segue pela nova daí em diante.`;
+      const { cruas, cortou, estrangulado } = await todosOsInscritos(client, o.location, o.id!, WF_TETO_PADRAO);
+      const aviso = avisoPublicado(contarNaoTerminados(cruas), cortou || estrangulado);
       saida.aviso = aviso;
       log(aviso);
       if (!o.publicado) {
@@ -181,13 +191,15 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
 }
 
 /**
- * Conta quem está dentro AGORA. Só a primeira página (até 100 linhas): subcontar quem
- * está além dela é melhor, para uma guarda, do que paginar a busca inteira aqui.
- * A busca devolve linhas `finished` junto das vivas, por isso o filtro de status.
+ * Mensagem da guarda de publicado, usada tanto para editar o corpo quanto para apagar.
+ * `aoMenos` vem de `cortou || estrangulado` de `todosOsInscritos`: quando a paginação
+ * corta ou o servidor estrangula, `n` é um piso, nunca o total — a mensagem tem que
+ * dizer "pelo menos N", nunca apresentar o número cortado como se fosse total.
  */
-async function contarDentro(client: GhlClient, loc: string, wid: string): Promise<number> {
-  const pagina = await paginaDeInscritos(client, loc, wid, 100);
-  return pagina.linhas.filter((l) => l.status !== "finished").length;
+function avisoPublicado(n: number, aoMenos: boolean): string {
+  const quantos = aoMenos ? `pelo menos ${n}` : `${n}`;
+  return `workflow PUBLICADO com ${quantos} contato(s) dentro agora. Quem está no meio termina o passo ` +
+    `atual na versão antiga e segue pela nova daí em diante.`;
 }
 
 const exigeConfirmo = (acao: string) =>
