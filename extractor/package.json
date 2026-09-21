@@ -34,6 +34,8 @@
     "formularios": "tsx src/cli.ts formularios",
     "formulario-acao": "tsx src/cli.ts formulario-acao",
     "formulario-estilo": "tsx src/cli.ts formulario-estilo",
+    "anotacoes": "tsx src/cli.ts anotacoes",
+    "anotacao-acao": "tsx src/cli.ts anotacao-acao",
     "agenda-acao": "tsx src/cli.ts agenda-acao",
     "test": "tsx --test test/*.test.ts"
   },
