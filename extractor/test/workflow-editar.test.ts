@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { avisoPublicado, guardaPublicado } from "../src/api/workflows-live.js";
 import {
-  trocarReferencia, pareceId, conferirEscrita, conferirVersaoEsperada, type Documento,
+  trocarReferencia, pareceId, conferirEscrita, conferirVersaoEsperada, conferirCamadaCrua,
+  type Documento,
 } from "../src/api/workflow-edit.js";
 import { lerDocumento, listarTriggersPrevia } from "../src/api/workflows-write.js";
 
@@ -154,4 +155,13 @@ test("falha ao ler o documento nomeia a chamada que caiu", async () => {
     () => lerDocumento(clienteQueFalha("GET https://interno/... → HTTP 500"), "LOC1", "WF1"),
     /documento do workflow WF1/,
   );
+});
+
+// A camada crua grava sem as 18 regras. Aviso em stderr some no log; a recusa não.
+test("camada crua RECUSA gravar sem --sem-regras", () => {
+  assert.throws(() => conferirCamadaCrua({ acao: "trocar-tag", confirmo: true }), /camada CRUA/);
+  // prévia não grava: a flag não faz falta
+  conferirCamadaCrua({ acao: "trocar-tag" });
+  // por fora de propósito: passa, e o aviso sai
+  conferirCamadaCrua({ acao: "trocar-tag", confirmo: true, semRegras: true });
 });

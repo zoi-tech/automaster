@@ -101,7 +101,8 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
 - **API interna não-documentada, muda sem aviso.** Endpoints hardcoded em `extractor/src/api/*.ts` (catálogo em `docs/endpoints.md`). Quebrou? Rode `discover`, re-mapeie, atualize o doc.
 - **Dois esquemas de auth:** workflows aceitam só `Bearer`; entidades `locations/*` e `opportunities/*` exigem `token-id`. UA de browser obrigatório (UA não-browser → 403).
 - **Steps vêm do Firebase no extrator de hoje** (`detail.fileUrl`, URL pré-assinada, baixada **sem** headers de auth — nunca mandar auth nessa chamada). Mas o detalhe da API **já traz os steps completos** em `workflowData` (medido em 1.041 workflows, zero divergência), e é de lá que a ESCRITA os lê: `workflow-editar` nunca toca no Firebase.
-- **Trigger não se edita pelo documento.** O `GET` do workflow não traz a lista (só `triggersFilePath`); ela vem de `GET /workflow/<loc>/trigger?workflowId=<wid>`. Escreve-se por rota dedicada: `POST .../trigger` cria e `DELETE .../trigger/<tid>?workflowId=<wid>` apaga. **No POST o corpo leva `workflowId` em camelCase** — com `workflow_id`, que é como a leitura devolve o campo, o servidor responde 200 com id e o trigger nasce órfão. `only-triggers` responde 200 sem criar nada, com ou sem `newTriggers`. Encadeamento de step é `parentKey`; `parent` é o campo legado, ainda presente em parte dos steps e às vezes o único — os dois lados leem os dois (`flow.parent_of`, `workflow-edit.paiDe`).
+- **Trigger não se edita pelo documento.** O `GET` do workflow não traz a lista (só `triggersFilePath`); ela vem de `GET /workflow/<loc>/trigger?workflowId=<wid>`. Escreve-se por rota dedicada: `POST .../trigger` cria e `DELETE .../trigger/<tid>?workflowId=<wid>` apaga. Apagar trigger NÃO incrementa o `version` do workflow, então a guarda de concorrência desse
+  caminho é a lista de ids (`--triggers-esperados`), não a versão. **No POST o corpo leva `workflowId` em camelCase** — com `workflow_id`, que é como a leitura devolve o campo, o servidor responde 200 com id e o trigger nasce órfão. `only-triggers` responde 200 sem criar nada, com ou sem `newTriggers`. Encadeamento de step é `parentKey`; `parent` é o campo legado, ainda presente em parte dos steps e às vezes o único — os dois lados leem os dois (`flow.parent_of`, `workflow-edit.paiDe`).
 - **Workflow criado por API nasce invisível**: sem `status` e, sem pasta, com `parentId` vazio — a API o lista, a interface não. `criar`/`duplicar` exigem `--pasta` e rodam `nascerVisivel` depois. A URL do editor é `workflow` no SINGULAR (`/automation/workflow/<wid>`); com o plural o app dá 404 e a página fica branca.
 - **Lista de workflows:** `?type=workflow` (lista plana); `parentId=root` só traz pastas.
 - **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
@@ -111,14 +112,15 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
   molde. A âncora (`--depois-de`) pode ser um nó de ramo (é assim que se põe ação dentro do
   "sim"), nunca um container; **sem `--depois-de` o step entra no início do fluxo**, que é a
   única porta num workflow recém-criado (ele nasce sem step nenhum). Com `--ramos` o step
-  nasce container: `if_else` ganha condition-node, `branch-yes`/`branch-no`, `sibling` e
+  nasce container, e o `name` do step vai também para `attributes.conditionName`, que é o
+  rótulo que o app desenha: `if_else` ganha condition-node, `branch-yes`/`branch-no`, `sibling` e
   `attributes.branches` com os ids batendo; os outros containers usam `transition`. Nó de ramo (`transition`, `branch-yes`, `branch-no`) não se
   remove sozinho: é estrutura do container, indexada por `attributes.branches` e pelo
   `sibling[]`. Container só sai com `--com-subarvore`. Step criado sem
   `advanceCanvasMeta.position` aparece no lugar certo — o editor calcula o layout (provado ao
   vivo em 2026-09-21).
 - **A validação pelas 18 regras mora acima do comando.** `npm run workflow-editar` é a camada crua e
-  grava sem rodar regra nenhuma (avisa em stderr). As duas portas com guarda são a tool MCP
+  RECUSA gravar sem `--sem-regras` (o aviso em stderr não segurava ninguém). As duas portas com guarda são a tool MCP
   `workflow_editar` e `automaster-audit workflow-editar`, que chamam o mesmo caminho: prévia sem
   `--confirmo` → `validar_edicao` → gravação. Ação nova entra nas três, e com teste próprio.
 - **Nova regra de auditoria** = novo arquivo em `auditor/src/automaster_audit/rules/` com `check(ctx)->list[Finding]`; o registry pkgutil descobre sozinho. Adicione fixture quebrada + limpa em `tests/` (use `conftest.make_dump(...)`).

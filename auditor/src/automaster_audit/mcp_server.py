@@ -1058,8 +1058,16 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
     if ramos is not None and not isinstance(ramos, str):
         ramos = json.dumps(ramos, ensure_ascii=False)
 
-    def _args(com_confirmo: bool, versao: object = None) -> list[str]:
+    def _args(com_confirmo: bool, versao: object = None, triggers: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
+        # Esta porta É a guarda das 18 regras: a camada crua recusa gravar sem esta flag,
+        # justamente para que ninguém passe por fora dela sem querer.
+        if com_confirmo:
+            a.append("--sem-regras")
+        # Apagar trigger não mexe no `version`, então a guarda de concorrência do caminho de
+        # trigger é a lista de ids que a prévia viu, não a versão.
+        if triggers:
+            a += ["--triggers-esperados", ",".join(str(t) for t in triggers)]
         # I1: a prévia e a gravação são dois processos, com um Chrome subindo no meio. Sem
         # carregar a `version` que a prévia viu, a guarda de concorrência só enxerga o que
         # acontece DENTRO da segunda invocação, e a janela entre as duas fica descoberta.
@@ -1109,13 +1117,14 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
     # para a validação local, e só.
     documento = previa.pop("documento", None)
     versao = previa.get("versao")
+    triggers_antes = previa.get("triggersAntes")
 
     if ctx is None:
         previa["validacao"] = {"rodou": False, "motivo": sem_validacao}
         if not confirmo:
             return previa
         # a falta de dump não pode travar a escrita
-        resultado = _run_extractor(*_args(True, versao))
+        resultado = _run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
@@ -1129,7 +1138,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         }
         if not confirmo:
             return previa
-        resultado = _run_extractor(*_args(True, versao))
+        resultado = _run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
@@ -1139,7 +1148,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         previa["validacao"] = {"rodou": False, "motivo": str(e)}
         if not confirmo:
             return previa
-        resultado = _run_extractor(*_args(True, versao))
+        resultado = _run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
         return resultado
 
@@ -1169,7 +1178,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         )
         return previa
 
-    resultado = _run_extractor(*_args(True, versao))
+    resultado = _run_extractor(*_args(True, versao, triggers_antes))
     resultado["validacao"] = validacao
     return resultado
 

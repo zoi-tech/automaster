@@ -12,6 +12,7 @@ import {
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
+  conferirTriggersEsperados, conferirCamadaCrua,
   criarStep, removerStep, moverStep,
   type Documento,
 } from "../api/workflow-edit.js";
@@ -27,7 +28,8 @@ export interface Opts {
   de?: string; para?: string; step?: string; caminho?: string; valor?: string;
   corpo?: string; depoisDe?: string; ramos?: string; comSubarvore?: boolean;
   triggerAcao?: string; triggerId?: string; triggerCorpo?: string; versaoEsperada?: string;
-  usuario?: string; confirmo?: boolean; publicado?: boolean; json?: boolean;
+  triggersEsperados?: string;
+  usuario?: string; confirmo?: boolean; publicado?: boolean; semRegras?: boolean; json?: boolean;
 }
 
 /** As ações que não tocam no corpo do workflow e por isso pulam diff e validação. */
@@ -41,16 +43,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
   const precisaId = o.acao !== "criar";
   if (precisaId && !o.id) throw new Error(`--acao ${o.acao} exige -i/--id (id do workflow)`);
 
-  // Esta é a camada crua: grava sem rodar as 18 regras de auditoria. A guarda mora um
-  // nível acima (tool MCP `workflow_editar` e `automaster-audit workflow-editar`), que
-  // chamam este mesmo comando duas vezes, com a validação no meio. Quem entra por aqui
-  // tem de saber que passou por fora dela.
-  if (o.confirmo && o.acao !== "historico") {
-    console.error(
-      "aviso: gravação SEM validação contra as 18 regras — esta rota é a camada crua. " +
-        "A guarda está em `automaster-audit workflow-editar` (auditor) e na tool MCP `workflow_editar`.",
-    );
-  }
+  conferirCamadaCrua(o);
 
   await withClient(o.location, log, async (client, _page, tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
@@ -300,7 +293,12 @@ async function acaoTrigger(
   const diff = diffWorkflow({ ...vazio, triggersData: triggers }, { ...vazio, triggersData: restantes });
   // `triggers` na saída é sempre a lista do DEPOIS, igual a `documento`: é ela que quem
   // valida contra as 18 regras precisa. A lista de antes está no `diff`.
-  Object.assign(saida, { diff, mudancas: [`trigger ${o.triggerId} removido`], triggers: restantes });
+  // `triggersAntes` é o que a porta com guarda carrega para a gravação
+  // (`--triggers-esperados`): sem version que se mexa, é esta lista que fecha a janela.
+  Object.assign(saida, {
+    diff, mudancas: [`trigger ${o.triggerId} removido`], triggers: restantes,
+    triggersAntes: triggers.map((t) => t?.id).filter(Boolean),
+  });
 
   if (!o.confirmo) {
     // O corpo não muda aqui, mas a prévia devolve o `documento` do mesmo jeito: sem ele
@@ -319,6 +317,7 @@ async function acaoTrigger(
   // workflow. A guarda aqui pega save de corpo alheio entre a prévia e a gravação, mas NÃO
   // pega outra remoção de trigger — para essa, quem vale é a lista relida logo abaixo.
   conferirVersaoEsperada(o, meta?.version);
+  conferirTriggersEsperados(o, triggers);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 
   // Registro ANTES da escrita, como no caminho de corpo: remover trigger é destrutivo e
@@ -376,6 +375,7 @@ async function adicionarTrigger(
     mudancas: [substituir ? `trigger ${o.triggerId} trocado` : "trigger adicionado"],
   });
   if (antes) {
+    saida.triggersAntes = antes.map((t) => t?.id).filter(Boolean);
     const previsto = [...(substituir ? antes.filter((t) => t?.id !== o.triggerId) : antes), { ...corpo, id: "(novo)" }];
     const vazio = { workflowData: { templates: [] } } as unknown as Documento;
     Object.assign(saida, {
@@ -395,6 +395,7 @@ async function adicionarTrigger(
 
   const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
   conferirVersaoEsperada(o, meta?.version);
+  if (antes) conferirTriggersEsperados(o, antes);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 
   const registro = registroEscrita(o.location, "_workflows", o.id!, {
@@ -471,6 +472,8 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--trigger-id <id>", "id do trigger que sai (remover, substituir)")
     .option("--trigger-corpo <json>", "JSON do trigger que entra (adicionar, substituir)")
     .option("--versao-esperada <n>", "version que a prévia viu; aborta se o workflow mudou desde então")
+    .option("--triggers-esperados <ids>", "ids de trigger que a prévia viu, separados por vírgula; apagar trigger não mexe no version, então é esta lista que guarda a janela entre prévia e gravação")
+    .option("--sem-regras", "assume gravar por fora da validação das 18 regras (camada crua)")
     .option("--usuario <id>", "autor da edição; sem ele, sai do token")
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")
     .option("--publicado", "obrigatório junto de --confirmo quando o workflow está publicado")

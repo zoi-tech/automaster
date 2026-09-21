@@ -472,3 +472,49 @@ def test_ramos_vira_json_e_depois_de_pode_faltar(monkeypatch):
     args = vistos[0]
     assert json.loads(args[args.index("--ramos") + 1]) == [{"name": "Sim"}, {"else": True}]
     assert "--depois-de" not in args
+
+
+def test_gravacao_carrega_sem_regras_e_previa_nao(monkeypatch):
+    """Esta porta É a guarda; a camada crua recusa gravar sem a flag.
+
+    Se um dia a flag sumir daqui, a gravação passa a falhar em vez de passar por fora da
+    validação sem ninguém notar — mas o teste pega antes, e a prévia não pode carregá-la.
+    """
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"}, "versao": 7}
+
+    monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao", lambda *a: _ResultadoFalso(True))
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+
+    previa = next(v for v in vistos if "--confirmo" not in v)
+    gravacao = next(v for v in vistos if "--confirmo" in v)
+    assert "--sem-regras" not in previa
+    assert "--sem-regras" in gravacao
+
+
+def test_triggers_da_previa_viram_guarda_da_gravacao(monkeypatch):
+    """Apagar trigger não mexe no `version`: a lista de ids é a única guarda da janela."""
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"},
+                "versao": 7, "triggersAntes": ["t1", "t2"]}
+
+    monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao", lambda *a: _ResultadoFalso(True))
+    mcp_server.workflow_editar(loc="L1", acao="trigger", id="W1", trigger_acao="remover",
+                               trigger_id="t1", confirmo=True)
+
+    gravacao = list(next(v for v in vistos if "--confirmo" in v))
+    assert gravacao[gravacao.index("--triggers-esperados") + 1] == "t1,t2"

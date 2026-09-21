@@ -39,6 +39,11 @@ corrigido, então hoje os dois lados discordam.
 janela entre a leitura e a escrita; só a releitura da lista autoritativa protege esse
 caminho. Não há contador alternativo conhecido. Está comentado no código.
 
+> **FECHADO em 2026-09-21 (plugin 0.19.0).** A própria lista virou o contador: a prévia
+> devolve `triggersAntes` e a gravação confere a lista relida contra `--triggers-esperados`,
+> abortando se o conjunto mudou. Sem prova ao vivo — provar exige alguém apagando um trigger
+> pelo app dentro da janela —, mas a comparação é pura e tem teste.
+
 **A conferência de escrita está provada contra falso positivo, não contra falso negativo.**
 Cinco gravações ao vivo devolveram `aplicado: true` com residual nulo, inclusive num
 workflow de 579 steps — a comparação não vira ruído. Mas nunca se viu ela pegar uma escrita

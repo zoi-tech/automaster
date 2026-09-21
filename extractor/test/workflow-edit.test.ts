@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
-  criarStep, removerStep, moverStep,
+  criarStep, removerStep, moverStep, conferirTriggersEsperados,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -406,4 +406,28 @@ test("criarStep recusa um ramo só e mais de um else", () => {
     [{ else: true }, { else: true }]), /só um ramo pode ser o `else`/);
   assert.throws(() => criarStep(doc([]), { type: "workflow_split" }, undefined,
     [{ name: "A" }, { else: true }]), /só existe em if_else/);
+});
+
+test("conferirTriggersEsperados aceita mesma lista em qualquer ordem e recusa lista mudada", () => {
+  const agora = [{ id: "t2" }, { id: "t1" }];
+  conferirTriggersEsperados({ triggersEsperados: "t1,t2" }, agora);
+  conferirTriggersEsperados({}, agora); // sem a flag, não há o que conferir
+  assert.throws(
+    () => conferirTriggersEsperados({ triggersEsperados: "t1,t2,t3" }, agora),
+    /lista de triggers mudou/,
+  );
+});
+
+test("container if_else leva o nome do step para attributes.conditionName", () => {
+  // O app rotula a caixa por `conditionName`; sem isso a condição sai como "Condition".
+  const d = doc([]);
+  const r = criarStep(d, { type: "if_else", name: "Tem a tag?" }, undefined, [{ name: "Tem" }, { else: true }]);
+  const cont = r.doc.workflowData.templates.find((s: any) => s.nodeType === "condition-node") as any;
+  assert.equal(cont.attributes.conditionName, "Tem a tag?");
+
+  const d2 = doc([]);
+  const r2 = criarStep(d2, { type: "if_else", name: "X", attributes: { conditionName: "Escolhido" } },
+    undefined, [{ name: "a" }, { name: "b" }]);
+  const c2 = r2.doc.workflowData.templates.find((s: any) => s.nodeType === "condition-node") as any;
+  assert.equal(c2.attributes.conditionName, "Escolhido");
 });

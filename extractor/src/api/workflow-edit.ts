@@ -330,6 +330,51 @@ export function conferirEscrita(editado: Documento, depois: Documento): { ok: bo
  * o que acontece dentro da segunda invocação. `--versao-esperada` carrega a `version` que a
  * prévia viu e aborta se o workflow mudou entre as duas.
  */
+/**
+ * Guarda de concorrência para as rotas de TRIGGER, onde `version` não serve.
+ *
+ * Prova ao vivo (segunda prova): apagar trigger NÃO incrementa o `version` do workflow.
+ * Logo `--versao-esperada` não enxerga outra remoção de trigger na janela entre a prévia e
+ * a gravação — dois processos, com um Chrome subindo no meio. A lista autoritativa de
+ * triggers é o único contador que muda, então é ela que carrega a janela: a prévia devolve
+ * os ids que viu, a gravação relê a lista e aborta se o conjunto mudou.
+ */
+/**
+ * Recusa gravar pela camada CRUA (o `npm run workflow-editar`), que passa por fora das 18
+ * regras de auditoria. Um aviso em stderr não segurava ninguém — some no meio do log —,
+ * então passar por fora virou decisão explícita (`--sem-regras`). As portas com guarda
+ * (tool MCP `workflow_editar`, `automaster-audit workflow-editar`) mandam a flag sozinhas.
+ */
+export function conferirCamadaCrua(o: { confirmo?: boolean; semRegras?: boolean; acao?: string }): void {
+  if (!o.confirmo || o.acao === "historico") return;
+  if (o.semRegras) {
+    console.error(
+      "aviso: gravação SEM validação contra as 18 regras — esta rota é a camada crua. " +
+      "A guarda está em `automaster-audit workflow-editar` (auditor) e na tool MCP `workflow_editar`.",
+    );
+    return;
+  }
+  throw new Error(
+    "esta é a camada CRUA: grava sem rodar as 18 regras de auditoria. Entre pela porta com guarda " +
+    "(`automaster-audit workflow-editar` ou a tool MCP `workflow_editar`), ou repita com --sem-regras " +
+    "para gravar por fora dela de propósito.",
+  );
+}
+
+export function conferirTriggersEsperados(
+  o: { triggersEsperados?: string }, agora: Array<{ id?: string } | null>,
+): void {
+  if (o.triggersEsperados === undefined) return;
+  const esperado = o.triggersEsperados.split(",").map((s) => s.trim()).filter(Boolean).sort();
+  const atual = agora.map((t) => t?.id).filter((x): x is string => !!x).sort();
+  if (esperado.join(",") === atual.join(",")) return;
+  throw new Error(
+    `a lista de triggers mudou entre a prévia e a gravação (esperados ${esperado.join(", ") || "nenhum"}, ` +
+    `agora ${atual.join(", ") || "nenhum"}). Apagar trigger não mexe no version, então esta é a única ` +
+    "guarda deste caminho. Nada foi gravado: rode de novo para ver o estado atual.",
+  );
+}
+
 export function conferirVersaoEsperada(o: { versaoEsperada?: string }, versaoAgora: number | undefined): void {
   if (o.versaoEsperada === undefined) return;
   if (String(versaoAgora) !== String(o.versaoEsperada)) {
@@ -505,6 +550,10 @@ function montarRamos(no: Step, ramos: Ramo[], ordemBase: number): Step[] {
     no.nodeType = "condition-node";
     no.cat = "conditions";
     no.attributes = {
+      // O app rotula a caixa do `if_else` por `attributes.conditionName`, NÃO pelo `name`
+      // do step (prova ao vivo, parte B): sem isto a condição sai como "Condition" no
+      // canvas mesmo com nome escolhido. `conditionName` explícito no corpo vence.
+      conditionName: (no.attributes?.conditionName as string | undefined) ?? no.name ?? "Condition",
       ...(no.attributes ?? {}),
       branches: ramos.flatMap((r, i) =>
         r.else ? [] : [{ ...(r.branch ?? {}), id: nos[i].id, name: nos[i].name }]),

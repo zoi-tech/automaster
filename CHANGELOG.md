@@ -4,6 +4,24 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.19.0 — 2026-09-21
+
+Os três débitos que a 0.18.0 deixou declarados. Continuam 31 tools e 18 regras; 189 testes no
+extractor, 331 no auditor.
+
+- **A camada crua deixa de gravar por acidente.** `npm run workflow-editar --confirmo` avisava
+  em stderr que passava por fora das 18 regras — e o aviso sumia no meio do log. Agora a
+  gravação é RECUSADA sem `--sem-regras`, e a mensagem diz por onde entrar com guarda. As duas
+  portas validadas (`automaster-audit workflow-editar` e a tool MCP `workflow_editar`) mandam
+  a flag sozinhas, então nada muda para quem já entrava por elas.
+- **A janela entre prévia e gravação do caminho de TRIGGER ganhou guarda.** Apagar trigger não
+  incrementa o `version` do workflow, então `--versao-esperada` nunca enxergou outra remoção
+  de trigger nessa janela. A prévia agora devolve `triggersAntes` e a gravação confere a lista
+  relida contra `--triggers-esperados`: conjunto diferente aborta antes de escrever.
+- **O `if_else` criado por `step-criar` sai com o nome certo no canvas.** O app rotula a caixa
+  por `attributes.conditionName`, não pelo `name` do step: o nome do step agora vai para os
+  dois, e `conditionName` escrito à mão no corpo continua vencendo.
+
 ## 0.18.0 — 2026-09-21
 
 O corpo do workflow passa a se montar pelo MCP: criar, remover e mover step do canvas — e,
