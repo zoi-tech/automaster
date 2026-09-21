@@ -252,6 +252,9 @@ async function acaoTrigger(
   }
 
   const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
+  // Limite provado ao vivo (segunda prova): apagar trigger NÃO incrementa o `version` do
+  // workflow. A guarda aqui pega save de corpo alheio entre a prévia e a gravação, mas NÃO
+  // pega outra remoção de trigger — para essa, quem vale é a lista relida logo abaixo.
   conferirVersaoEsperada(o, meta?.version);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 

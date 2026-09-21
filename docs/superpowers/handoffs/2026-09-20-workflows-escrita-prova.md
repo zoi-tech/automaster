@@ -390,3 +390,119 @@ campo inexistente. As consequências são maiores do lado do auditor:
 Não foi corrigido aqui de propósito: trocar o campo muda o que quatro saídas mostram e o que
 uma regra acusa, com fixtures a refazer — é trabalho próprio, de outra entrega, e merece a
 sua própria prova.
+
+---
+
+# Segunda prova ao vivo (2026-09-21)
+
+Exercita contra o servidor o que a §5 e a §6 mudaram **depois** da primeira prova e que
+nunca tinha visto rede: a conferência de escrita (`conferirEscrita`), a remoção de trigger
+pelo comando, o `--versao-esperada` e a travessia por `parentKey` do `limpar-orfaos`.
+
+Mesma subconta, **Instaltech `Xb9gDxwxYhdqtprGcb5E`**, 72 workflows de produção, nenhum
+tocado. Dois descartáveis criados e apagados:
+
+- `443c14e2-8cc6-4713-acc2-6e8d84abb882` — "ZZ TESTE AUTOMASTER prova2", cópia de `test.cmd`
+- `576257d3-a0ba-46b7-b5c4-db96280fc2b6` — "ZZ TESTE AUTOMASTER prova2 grande", cópia de
+  "1A - Disparo Promo única" (`99552315-…`), **579 steps, 12 tipos**
+
+Um comando por vez, sempre com `AUTOMASTER_DUMPS=~/.automaster/dumps`.
+
+## 1. A conferência de escrita é sinal, não ruído — `aplicado: true` em 5 de 5
+
+O medo era o servidor carimbar campo DENTRO de um step no save, o que faria toda edição boa
+sair como `duvidoso`. **Não carimba.** Cinco gravações de corpo, releitura e
+`diffWorkflow(editado, depois)` **vazio** nas cinco:
+
+| # | ação | workflow | step / tipo | versão | `aplicado` | `residual` |
+|---|---|---|---|---|---|---|
+| 1 | `atributo` `tags` | prova2 | `add_contact_tag` | 1→2 | `true` | — |
+| 2 | `trocar-tag` | prova2 | `add_contact_tag` | 2→3 | `true` | — |
+| 3 | `atributo` `only_unassigned_contact` | prova2 | `assign_user` | 3→4 | `true` | — |
+| 4 | `atributo` `zzprova.aninhado` = `{"a":1}` | prova2 | `add_to_workflow` | 4→5 | `true` | — |
+| 5 | `atributo` `conditionName` | **grande (579 steps)** | `if_else` | 1→2 | `true` | — |
+
+A #4 é a mais informativa: uma chave **inventada, aninhada, que o app não conhece** voltou
+idêntica na releitura. O servidor não normaliza, não remove chave desconhecida e não reescreve
+step. A #5 mostra que isso vale num documento com `wait`, `goto`, `transition`, `whatsapp_v2`,
+`ai_agent` e `workflow_split` — os campos novos que a primeira prova viu (`meta`,
+`senderAddress`, `updatedBy`) são todos de RAIZ, e `conferirEscrita` compara step a step, não
+a raiz. Nenhum campo precisa ficar de fora da comparação.
+
+**Não exercitado:** o caso POSITIVO da guarda (200 sem efeito no caminho de corpo). A rota
+conhecida com esse defeito, `only-triggers`, saiu do código na Task 9, e não se achou outra
+maneira de fazer o servidor mentir no PUT de corpo. A guarda está provada contra falso
+positivo, não contra falso negativo.
+
+## 2. A remoção de trigger pelo comando funciona inteira
+
+Cópia com 2 triggers herdados (`c9mTolwkpL0rki4xNik1` form_submission,
+`cZxcdrapRgqPgup7nT81` customer_reply).
+
+- **Prévia** (sem `--confirmo`): devolve `documento` (4 steps), `triggers` = a lista **depois**
+  (1), `versao: 5`, `diff.triggersRemovidos: [{id: c9mTolwk…, nome: "Formulário Enviado"}]`.
+  É o caminho que a tool MCP valida.
+- **`--versao-esperada 99`**: `o workflow mudou entre a prévia e a gravação (versão esperada
+  99, agora 5). Nada foi gravado`, exit 1. A guarda dispara.
+- **`--versao-esperada 5 --confirmo`**: `{}` do servidor, `aplicado: true`, e a lista
+  autoritativa relida ficou com **1 trigger** (`cZxcdrapRgqPgup7nT81`). Sumiu de verdade.
+- **Rastro ANTES da escrita, provado por observação direta** (poller de 0,1 s sobre a pasta
+  do registro): o mesmo arquivo existiu em dois estados,
+  `14:12:38.021 aplicado:false, antes:[2 triggers]` → `14:12:38.922 aplicado:true, antes/depois/resposta`.
+  A cópia de segurança está em disco antes do DELETE sair.
+- **`adicionar` e `substituir`** recusam com a mensagem explícita e exit 1. Não fingem sucesso.
+
+### Achado: apagar trigger NÃO incrementa o `version` do workflow
+
+A prévia leu `versao: 5`; depois do DELETE, a leitura seguinte (pela tool MCP) continuou em
+`5`, e só a gravação de corpo seguinte levou a 6. Consequência: `--versao-esperada` e a guarda
+`metaAgora.version !== versaoLida` **não detectam outra remoção de trigger** acontecida na
+janela. O que protege esse caminho é a releitura da lista autoritativa, que o comando já faz.
+Ficou comentado em `src/cli/workflow-editar.ts`, ao lado da chamada.
+
+## 3. `limpar-orfaos` é seguro nos 72 workflows reais
+
+A travessia por `parentKey` rodou (prévia, sem gravar nada) sobre **os 72 workflows reais**,
+lendo o documento de cada um pelo `GET /workflow/<loc>/<wid>`:
+
+```
+RESUMO {"total":72,"comOrfao":0,"semRaiz":0,"erro":0}
+```
+
+Zero steps a remover, zero workflow sem raiz identificável (`semRaiz` = documento com steps em
+que TODOS têm `parentKey`, o caso em que a heurística de raiz falharia e a função se protege
+não mexendo). Inclui o de 579 steps com 60 `goto` e 113 `transition`. Nada foi gravado — a
+prévia é leitura pura.
+
+## 4. `--versao-esperada` atravessando a tool MCP
+
+`workflow_editar(..., acao='atributo', confirmo=True)` sobre o descartável, num fluxo de dois
+processos: prévia → validação local → gravação. Saiu
+
+```json
+{"aplicado": true, "versao": 5, "versaoDepois": 6,
+ "validacao": {"rodou": false, "motivo": "workflow 443c14e2-… não está no dump 2026-09-20_0856 (criado ou duplicado depois da última extração): as 18 regras não foram rodadas. Extraia a subconta de novo para validar."}}
+```
+
+Três correções da §5/§6 confirmadas de uma vez: a `version` da prévia chegou à gravação
+(`versao: 5` → gravou → `versaoDepois: 6`, sem abortar); workflow fora do dump virou
+`validacao.rodou: false` com motivo em vez da `ValueError` crua da §2.3; e o `documento`
+inteiro **não** volta na resposta (M3).
+
+**Não exercitado:** a recusa por erro novo das 18 regras nesta rodada (foi provada na primeira
+prova) e a corrida real entre prévia e gravação — a janela é o tempo de subir um Chrome e não
+há como injetar um save alheio nela sem uma pessoa no app.
+
+## 5. Resíduo
+
+**Nenhum.** Os dois descartáveis foram apagados e a lista voltou a 72
+(`TOTAL 72`, `ZZ: nenhum`). Nenhum contato foi inscrito, nenhum workflow real foi lido com
+escrita, nenhum trigger real foi removido — o trigger apagado era o da cópia. Registros de
+escrita em `~/.automaster/dumps/_workflows/Xb9gDxwxYhdqtprGcb5E/<wid>/`, incluindo a cópia do
+documento e dos triggers antes de cada `apagar`.
+
+## 6. Mudança de código nesta prova
+
+Uma só, e é comentário: o limite do `version` que não se move ao apagar trigger (§2 acima),
+em `src/cli/workflow-editar.ts`. Nada mais precisou mudar — as três coisas a provar passaram.
+152 testes no extractor, 297 no auditor.
