@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
-  editarTriggers, renomear, type Documento,
+  editarTriggers, renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -112,4 +112,69 @@ test("renomear apara espaço nas pontas e recusa nome vazio", () => {
   const d = doc([]);
   assert.equal(renomear(d, "  Novo  ").doc.name, "Novo");
   assert.throws(() => renomear(d, "   "), /vazio/);
+});
+
+test("montarCorpo parte do documento editado e calcula as três listas de steps", () => {
+  const antes = doc([
+    { id: "a", type: "wait", attributes: { dias: 2 } },
+    { id: "b", type: "sms", attributes: {} },
+  ]);
+  const depois = doc([
+    { id: "a", type: "wait", attributes: { dias: 5 } },
+    { id: "c", type: "sms", attributes: {} },
+  ]);
+  const corpo = montarCorpo(antes, depois, "U1");
+  assert.deepEqual(corpo.createdSteps, ["c"]);
+  assert.deepEqual(corpo.modifiedSteps, ["a"]);
+  assert.deepEqual(corpo.deletedSteps, ["b"]);
+  assert.equal(corpo.updatedBy, "U1");
+  assert.equal(corpo.name, "Fluxo");
+});
+
+test("montarCorpo não inventa campo que a leitura não trouxe", () => {
+  const d = doc([]);
+  const corpo = montarCorpo(d, d, "U1");
+  for (const proibido of ["paused", "workflowType", "templateId", "location_id"]) {
+    assert.equal(proibido in corpo, false, `${proibido} não deveria ser inventado`);
+  }
+});
+
+test("checarPublicavel acusa workflow sem nenhuma ação", () => {
+  assert.deepEqual(
+    checarPublicavel(doc([])),
+    ["o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio"],
+  );
+});
+
+test("checarPublicavel acusa goto apontando para step que não existe", () => {
+  const d = doc([{ id: "a", type: "goto", attributes: { targetNodeId: "sumiu" } }]);
+  assert.match(checarPublicavel(d)[0], /goto.*sumiu/);
+});
+
+test("checarPublicavel aprova workflow são", () => {
+  assert.deepEqual(checarPublicavel(doc([{ id: "a", type: "sms", attributes: {} }])), []);
+});
+
+test("diffWorkflow separa step somado, removido e alterado, e mostra o campo", () => {
+  const antes = doc([
+    { id: "a", type: "wait", name: "Espera", attributes: { dias: 2 } },
+    { id: "b", type: "sms", name: "Aviso", attributes: {} },
+  ], [{ id: "t1", name: "Form" }]);
+  const depois = doc([
+    { id: "a", type: "wait", name: "Espera", attributes: { dias: 5 } },
+    { id: "c", type: "sms", name: "Novo", attributes: {} },
+  ], []);
+  const d = diffWorkflow(antes, depois);
+  assert.deepEqual(d.stepsAdicionados, [{ id: "c", nome: "Novo", tipo: "sms" }]);
+  assert.deepEqual(d.stepsRemovidos, [{ id: "b", nome: "Aviso", tipo: "sms" }]);
+  assert.equal(d.stepsAlterados.length, 1);
+  assert.equal(d.stepsAlterados[0].id, "a");
+  assert.deepEqual(d.stepsAlterados[0].campos, ["attributes.dias"]);
+  assert.deepEqual(d.triggersRemovidos, [{ id: "t1", nome: "Form" }]);
+  assert.equal(d.vazio, false);
+});
+
+test("diffWorkflow marca vazio quando nada mudou", () => {
+  const d = doc([{ id: "a", type: "sms", attributes: {} }]);
+  assert.equal(diffWorkflow(d, d).vazio, true);
 });
