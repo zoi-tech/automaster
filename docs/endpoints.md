@@ -187,7 +187,24 @@ apagados na hora. Detalhe e respostas verbatim em
 | Uma versão do histórico | `GET .../workflow/<loc>/<wid>/history-by-number/<n>` | — | ✗ |
 | Lista de triggers (autoritativa) | `GET .../workflow/<loc>/trigger?workflowId=<wid>` | — | ✓ |
 | Apagar trigger | `DELETE .../workflow/<loc>/trigger/<tid>?workflowId=<wid>` | — | ✓ (`{}`, apagou de verdade) |
+| **Criar trigger** | `POST .../workflow/<loc>/trigger` | o trigger, com **`workflowId`** (camelCase) | ✓ (`{"id":"…"}`, criou de verdade) |
 | Só triggers (`only-triggers`) | `PUT .../workflow/<loc>/only-triggers/<wid>` | o corpo INTEIRO do save | ✓ — **e não serve para nada** (ver abaixo) |
+
+**Criar trigger É possível — a chave é `workflowId` em camelCase** (provado ao vivo em
+2026-09-21). O `POST .../workflow/<loc>/trigger` responde `{"id":"…"}` nos dois casos, mas só
+persiste quando o corpo traz `workflowId`. Com `workflow_id` (snake, que é como a LEITURA
+devolve o campo) o trigger nasce órfão: a resposta é 200 com id, e
+`GET .../trigger?workflowId=<wid>` continua vazio para sempre. É mais um falso positivo de
+escrita desta API, e foi o que levou a nota anterior a concluir que criar trigger não existia.
+
+O corpo é o mesmo formato da leitura, menos o `id`: `name`, `type`, `masterType: "highlevel"`,
+`belongs_to: "workflow"`, `workflowId`, `location_id`, `active`, `deleted: false`,
+`schedule_config: {}`, `actions: [{workflow_id, type: "add_to_workflow"}]` e `conditions`.
+
+`newTriggers`/`oldTriggers`/`triggersChanged` no corpo do save (do bundle do editor) **não
+criam trigger nenhum**, nem pelo save normal nem pelo `only-triggers` — testados com a versão
+certa e com corpo mínimo, sempre 200 e zero trigger. São metadado de auditoria; quem grava é
+o POST acima.
 
 **O documento não tem `triggersData`.** As chaves de raiz do `GET` são `filePath`, `fileUrl`,
 `triggersFilePath`, `workflowData`, `version`, `status`, `name`… — trigger nenhum. A lista
