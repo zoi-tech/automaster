@@ -9,6 +9,14 @@ Detalhe do que o servidor faz e do que caiu nas provas:
 
 ## O achado que vale mais que esta entrega
 
+> **FECHADO em 2026-09-21 (plugin 0.16.1).** E a premissa abaixo estava meio errada: `parent`
+> EXISTE no dump — 3.788 dos 4.017 steps da Instaltech o têm. O problema é que `parentKey`
+> cobre mais steps e discorda dele em 1.017. `flow.parent_of()` agora lê `parentKey` com
+> fallback no `parent` legado. Efeito: 229 → 71 entradas de fluxo na Instaltech, `paths.md`
+> de 4.827 para 3.364 caminhos. `unreachable_step` continua em zero lá porque a subconta não
+> tem step órfão, não por causa do bug; em todos os dumps em disco ele vê 3.
+
+
 **O auditor inteiro ainda lê `parent`.** `auditor/src/automaster_audit/flow.py:38` procura
 os steps "sem `parent`" para achar as entradas do fluxo. A prova ao vivo demonstrou que o
 campo não existe — o servidor usa `parentKey`. Consequência medida no dump da Instaltech:

@@ -4,6 +4,22 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.16.1 — 2026-09-21
+
+O grafo de execução do auditor passa a ler `parentKey`, o campo que o servidor grava.
+Continuam 31 tools e 18 regras; 300 testes no auditor.
+
+- **`parent` não era o campo errado, era o incompleto.** Os dois existem no dump: em 26.393
+  steps de 1.027 workflows, `parentKey` cobre mais steps e discorda de `parent` em 1.017.
+  Lendo `parent`, `roots()` devolvia 4.864 entradas onde existem ~1.027 — quase cinco vezes
+  mais. `parent_of()` lê `parentKey` e cai no `parent` legado, então dump velho continua lendo.
+- **Efeito medido na Instaltech**: as entradas de fluxo caem de 229 para 71 (uma por workflow)
+  e `paths.md` sai de 4.827 caminhos para 3.364 — 1.463 eram caminhos-fantasma, começando no
+  meio do fluxo. Os truncamentos no cap caem de 4 para 1.
+- `journey.html` e as camadas 2 e 3 do `validation.html` andam sobre o mesmo grafo e mudam
+  junto. Os achados da camada 1 não mudaram na Instaltech: ela não tem step órfão. Em todos os
+  dumps em disco `unreachable_step` passa a ver 3 steps de verdade.
+
 ## 0.16.0 — 2026-09-21
 
 Os cinco aprendizados da primeira montagem de automação de ponta a ponta viram guarda no

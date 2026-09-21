@@ -3,7 +3,8 @@
 Modelo (reverso-engenheirado do GHL):
 - step.next = id do próximo step (linear) OU lista de ids de nós-branch (container
   if_else/find_opportunity). Cada nó-branch tem next = início do corpo do ramo.
-- step.parent ausente → raiz (entrada após o trigger).
+- step.parentKey ausente → raiz (entrada após o trigger). O servidor usa parentKey;
+  `parent` é o campo legado, presente em parte dos dumps e mantido como fallback.
 - goto: attributes.targetNodeId = salto para outro step do mesmo workflow.
 - next vazio/ausente → terminal (contato sai do workflow).
 """
@@ -33,9 +34,14 @@ def index_steps(wf: Workflow) -> dict[str, dict]:
     return {s["id"]: s for s in wf.steps if s.get("id")}
 
 
+def parent_of(step: dict) -> str | None:
+    """Pai do step. O servidor grava `parentKey`; `parent` é o campo legado."""
+    return step.get("parentKey") or step.get("parent")
+
+
 def roots(wf: Workflow) -> list[str]:
-    """Steps sem parent = pontos de entrada (após o trigger)."""
-    return [s["id"] for s in wf.steps if s.get("id") and not s.get("parent")]
+    """Steps sem pai = pontos de entrada (após o trigger)."""
+    return [s["id"] for s in wf.steps if s.get("id") and not parent_of(s)]
 
 
 def reachable(wf: Workflow) -> set[str]:
@@ -57,7 +63,7 @@ def is_branch_node(step: dict) -> bool:
     """Nó-branch = ramo de um container (transition, ou if_else filho com else/condição)."""
     if step.get("type") == "transition":
         return True
-    if step.get("type") == "if_else" and step.get("parent"):
+    if step.get("type") == "if_else" and parent_of(step):
         a = step.get("attributes", {})
         return not a.get("branches")  # container tem branches; ramo não
     return False

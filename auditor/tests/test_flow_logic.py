@@ -1,5 +1,7 @@
 """Testes da camada 1 (lógica sã): flow graph + regras estruturais."""
-from automaster_audit.flow import reachable, successors
+from types import SimpleNamespace
+
+from automaster_audit.flow import reachable, roots, successors
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_goto, unreachable_step, uncovered_condition, workflow_call_cycle
 from conftest import wf
@@ -92,3 +94,15 @@ def test_covered_condition_clean(make_dump):
     ]
     path = make_dump(workflows=[wf(steps=steps)])
     assert uncovered_condition.check(load_dump(path)) == []
+
+
+def test_roots_usa_parentkey_o_campo_do_servidor():
+    """O servidor grava parentKey; com `parent` todo step virava entrada."""
+    doc = SimpleNamespace(steps=[
+        {"id": "a", "next": "b"},
+        {"id": "b", "parentKey": "a", "next": "c"},
+        {"id": "c", "parentKey": "b"},
+        {"id": "d", "parent": "a"},  # campo legado ainda conta como pai
+    ])
+    assert roots(doc) == ["a"]
+    assert reachable(doc) == {"a", "b", "c"}
