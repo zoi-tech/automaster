@@ -288,7 +288,17 @@ const semSegredo = (o: Opts) => ({ ...o, json: undefined, confirmo: undefined })
 
 function imprimir(saida: Record<string, unknown>, o: Opts, log: (m: string) => void): void {
   if (o.json) console.log(JSON.stringify(saida));
-  else log(`${saida.aplicado ? "ok" : "sem gravar"} — ${o.acao}${saida.registro ? `; registro em ${saida.registro}` : ""}`);
+  else {
+    let status: string;
+    if (saida.aplicado === true) {
+      status = "ok";
+    } else if (saida.aplicado === "duvidoso") {
+      status = "duvidoso (releitura não confirmou)";
+    } else {
+      status = "sem gravar";
+    }
+    log(`${status} — ${o.acao}${saida.registro ? `; registro em ${saida.registro}` : ""}`);
+  }
 }
 
 export function registrarWorkflowEditar(program: Command): void {

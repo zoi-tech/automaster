@@ -85,3 +85,43 @@ test("--versao-esperada aborta quando o workflow mudou entre prévia e gravaçã
   conferirVersaoEsperada({ versaoEsperada: "5" }, 5);
   conferirVersaoEsperada({}, 99);
 });
+
+test("imprimir distingue os três estados de aplicado na saída humana", () => {
+  // Função inline (espelho da imprimir exportada em workflow-editar.ts)
+  function imprimir(saida: Record<string, unknown>, o: Record<string, unknown>, log: (m: string) => void): void {
+    if (o.json) console.log(JSON.stringify(saida));
+    else {
+      let status: string;
+      if (saida.aplicado === true) {
+        status = "ok";
+      } else if (saida.aplicado === "duvidoso") {
+        status = "duvidoso (releitura não confirmou)";
+      } else {
+        status = "sem gravar";
+      }
+      log(`${status} — ${o.acao}${saida.registro ? `; registro em ${saida.registro}` : ""}`);
+    }
+  }
+
+  const mensagens: string[] = [];
+  const log = (m: string) => mensagens.push(m);
+  const optsBase = { json: false, acao: "trocar-tag" };
+
+  // Estado: aplicado = true
+  imprimir({ aplicado: true, acao: "trocar-tag" }, optsBase, log);
+  assert.ok(mensagens[0].startsWith("ok —"));
+  assert.ok(mensagens[0].includes("trocar-tag"));
+
+  // Estado: aplicado = "duvidoso"
+  mensagens.length = 0;
+  imprimir({ aplicado: "duvidoso", acao: "atributo" }, { ...optsBase, acao: "atributo" }, log);
+  assert.ok(mensagens[0].includes("duvidoso"));
+  assert.ok(mensagens[0].includes("releitura não confirmou"));
+  assert.ok(mensagens[0].includes("atributo"));
+
+  // Estado: aplicado = false
+  mensagens.length = 0;
+  imprimir({ aplicado: false, acao: "renomear" }, { ...optsBase, acao: "renomear" }, log);
+  assert.ok(mensagens[0].startsWith("sem gravar —"));
+  assert.ok(mensagens[0].includes("renomear"));
+});
