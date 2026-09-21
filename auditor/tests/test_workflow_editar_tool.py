@@ -54,14 +54,20 @@ def test_gravar_sem_confirmo_nao_chega_a_escrever(monkeypatch):
 
 
 def test_confirmo_true_passa_a_flag_para_o_extractor(monkeypatch):
-    # "L1" não tem dump em disco: cai no caminho "sem dump", que não trava a escrita.
+    # O alvo aqui é só a linha de comando montada, então o teste força o caminho
+    # "sem dump" em vez de depender de "L1" não existir em ~/.automaster/dumps: com um
+    # dump desse nome em disco ele mudaria de ramo e passaria a medir outra coisa.
     vistos = []
 
     def falso(*args):
         vistos.append(args)
         return {"aplicado": True, "registro": "/tmp/x.json"}
 
+    def sem_dump(loc, snap):
+        raise mcp_server.ToolError("subconta sem dump")
+
     monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_server, "_load", sem_dump)
     r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
     assert r["aplicado"] is True
     assert any("--confirmo" in v for v in vistos)
@@ -346,3 +352,73 @@ def test_timeout_de_workflow_manda_conferir_com_a_tool_de_workflow(monkeypatch, 
     with pytest.raises(mcp_server.ToolError) as e:
         mcp_server._run_extractor("workflow-editar", "-l", "L1")
     assert "workflows_ao_vivo" in str(e.value) and "`contato`" not in str(e.value)
+
+
+# --- uma ação, um teste ---------------------------------------------------------------
+#
+# A ação `trigger` passou meses sem validação sem ninguém notar porque os testes cobriam
+# `trocar-tag` e nada mais: ação nova nascia no schema e entrava no mesmo código sem que
+# nada fixasse o caminho dela. Os dois testes abaixo cobrem TODAS as ações de uma vez, e
+# uma ação nova sem entrada aqui quebra a suíte em vez de passar em silêncio.
+
+_ARGS_POR_ACAO = {
+    "trocar-ref": {"id": "W1", "de": "abc123abc123abc123ab", "para": "xyz789xyz789xyz789xy"},
+    "trocar-tag": {"id": "W1", "de": "tag velha", "para": "tag nova"},
+    "limpar-orfaos": {"id": "W1"},
+    "atributo": {"id": "W1", "step": "s1", "caminho": "attributes.message", "valor": "oi"},
+    "trigger": {"id": "W1", "trigger_acao": "remover", "trigger_id": "t1"},
+    "criar": {"nome": "Novo", "pasta": "P1"},
+    "renomear": {"id": "W1", "nome": "Outro"},
+    "mover": {"id": "W1", "pasta": "P2"},
+    "duplicar": {"id": "W1", "nome": "Cópia", "pasta": "P1"},
+    "apagar": {"id": "W1"},
+    "historico": {"id": "W1"},
+}
+
+
+def test_toda_acao_da_tool_tem_caso_de_teste():
+    assert set(_ARGS_POR_ACAO) == set(mcp_server.WF_EDITAR_ACOES), (
+        "ação nova em WF_EDITAR_ACOES sem entrada em _ARGS_POR_ACAO: escreva o caso dela"
+    )
+
+
+@pytest.mark.parametrize("acao", sorted(_ARGS_POR_ACAO))
+def test_cada_acao_monta_a_linha_de_comando_e_valida_quando_deve(acao, monkeypatch):
+    chamadas = []
+
+    def falso(*args):
+        chamadas.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"},
+                "triggers": [], "versao": 7}
+
+    validou = []
+    monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_server, "_load",
+                        lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao",
+                        lambda *a: (validou.append(a), _ResultadoFalso(True))[1])
+
+    r = mcp_server.workflow_editar(loc="L1", acao=acao, confirmo=True, **_ARGS_POR_ACAO[acao])
+
+    assert r["aplicado"] is True
+    primeira = chamadas[0]
+    assert primeira[0] == "workflow-editar"
+    assert "--acao" in primeira and acao in primeira
+    assert "--json" in primeira
+    for valor in _ARGS_POR_ACAO[acao].values():
+        assert valor in primeira, f"{valor!r} não chegou na linha de comando"
+
+    com_corpo = acao in mcp_server._WF_EDITAR_COM_CORPO
+    assert bool(validou) is com_corpo, (
+        f"ação {acao!r}: validação das 18 regras {'devia' if com_corpo else 'não devia'} ter rodado"
+    )
+    if com_corpo:
+        # prévia e gravação são duas invocações, e a `version` da prévia viaja para a segunda
+        assert len(chamadas) == 2
+        assert "--versao-esperada" in chamadas[1]
+        assert r["validacao"]["rodou"] is True
+    else:
+        assert len(chamadas) == 1
+        assert "validacao" not in r

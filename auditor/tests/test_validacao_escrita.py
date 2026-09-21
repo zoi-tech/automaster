@@ -100,3 +100,76 @@ def test_triggers_passados_pelo_chamador_mandam(make_dump):
     r = validar_edicao(ctx, "w1", editado, triggers=[])  # trigger removido de verdade
     assert r.triggers_do_dump is False
     assert any("formQueSumiu" in e for e in r.erros_resolvidos)
+
+
+# --- a propriedade que a normalização do detalhe existe para garantir -----------------
+#
+# A chave de comparação antes/depois não pode depender do NOME do step: renomear um step
+# não é introduzir erro. Hoje `_normalizar_detalhe` neutraliza a fraseologia `step '...'`,
+# que é a única usada pelas regras. Os dois testes abaixo guardam a propriedade em vez da
+# fraseologia: o primeiro prova o efeito, o segundo falha quando nasce uma regra que cita
+# nome de step de outro jeito — o caso que traria o falso positivo de volta.
+
+def _steps_com_erro_de_cada_tipo(sufixo=""):
+    """Um step por regra ERROR que cita nome de step, todos com referência quebrada."""
+    return [
+        {"id": "s1", "type": "add_contact_tag", "name": f"Marca{sufixo}",
+         "attributes": {"tags": ["tag-fantasma"]}, "next": "s2"},
+        {"id": "s2", "type": "update_contact_field", "name": f"Atualiza{sufixo}",
+         "attributes": {"fields": [{"field": "GHOST", "title": "Campo X"}]}, "parentKey": "s1", "next": "s3"},
+        {"id": "s3", "type": "sms", "name": f"SMS{sufixo}",
+         "attributes": {"body": "{{custom_values.fantasma}}"}, "parentKey": "s2", "next": "s4"},
+        {"id": "s4", "type": "add_to_workflow", "name": f"Encaminha{sufixo}",
+         "attributes": {"workflow_id": "GHOST"}, "parentKey": "s3", "next": "s5"},
+        {"id": "s5", "type": "goto", "name": f"Salta{sufixo}",
+         "attributes": {"targetNodeId": "NAO-EXISTE"}, "parentKey": "s4"},
+    ]
+
+
+def test_renomear_steps_nao_inventa_erro_novo(make_dump):
+    caminho = make_dump(
+        workflows=[wf(id="w1", steps=_steps_com_erro_de_cada_tipo())],
+        tags=["tag-boa"],
+        fields=[{"id": "F1"}],
+        custom_values=[{"id": "c1", "name": "Estoque", "fieldKey": "{{ custom_values.estoque }}"}],
+    )
+    ctx = load_dump(caminho)
+    editado = {"workflowData": {"templates": _steps_com_erro_de_cada_tipo(" (renomeado)")}}
+    r = validar_edicao(ctx, "w1", editado, triggers=[])
+
+    assert r.total_erros_antes >= 5, "o fixture tem de disparar as regras que citam step"
+    assert r.erros_novos == []
+    assert r.erros_resolvidos == []
+    assert r.pode_gravar is True
+
+
+def test_regra_que_cita_nome_de_no_usa_uma_fraseologia_normalizada():
+    import re
+    from pathlib import Path
+
+    from automaster_audit import rules
+    from automaster_audit.validacao_escrita import ROTULOS_DE_NO
+
+    conhecida = re.compile("(" + "|".join(re.escape(r) for r in ROTULOS_DE_NO) + r") '\{")
+    fora = []
+    for arquivo in Path(rules.__file__).parent.glob("*.py"):
+        for n, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), 1):
+            if "step.get('name'" not in linha and 'step.get("name"' not in linha:
+                continue
+            if not conhecida.search(linha):
+                fora.append(f"{arquivo.name}:{n}")
+    assert not fora, (
+        "estas linhas põem o nome do nó no detalhe fora das fraseologias que "
+        f"`_normalizar_detalhe` neutraliza ({', '.join(ROTULOS_DE_NO)}) — renomear o nó "
+        f"passaria a contar como erro novo e recusaria a gravação: {fora}"
+    )
+
+
+def test_normalizacao_cobre_cada_rotulo_conhecido():
+    from automaster_audit.validacao_escrita import ROTULOS_DE_NO, _normalizar_detalhe
+
+    for rotulo in ROTULOS_DE_NO:
+        antes = _normalizar_detalhe(f"{rotulo} 'Nome Velho' usa tag inexistente: 'x'")
+        depois = _normalizar_detalhe(f"{rotulo} 'Nome Novo' usa tag inexistente: 'x'")
+        assert antes == depois
+        assert "'x'" in antes, "o alvo quebrado não pode sumir junto com o nome"

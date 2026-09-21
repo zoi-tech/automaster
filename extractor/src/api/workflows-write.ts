@@ -128,3 +128,44 @@ export function historicoVersoes(client: GhlClient, loc: string, wid: string): P
 export function versaoPorNumero(client: GhlClient, loc: string, wid: string, n: number): Promise<unknown> {
   return client.getJson(`${WF_WRITE}/${loc}/${wid}/history-by-number/${n}`);
 }
+
+/**
+ * Lê o documento do workflow. Existe para que a falha nomeie a chamada: o erro cru do
+ * cliente é uma URL interna, e quem chama não tem como saber que era ESTA leitura que
+ * caiu (a prévia faz duas).
+ */
+export async function lerDocumento(client: GhlClient, loc: string, wid: string): Promise<any> {
+  try {
+    return await client.getJson(`${WF_WRITE}/${loc}/${wid}`);
+  } catch (e) {
+    throw new Error(
+      `não foi possível ler o documento do workflow ${wid} (${e instanceof Error ? e.message : e}). ` +
+      "Sem ele não há prévia nem o que validar contra as 18 regras.",
+    );
+  }
+}
+
+/**
+ * Lista os triggers para a PRÉVIA, degradando quando dá.
+ *
+ * Na adição a lista só alimenta o diff, então perdê-la não justifica derrubar a prévia
+ * inteira: ela sai sem `triggers`, e a validação cai na lista do dump (`triggers_do_dump`).
+ * Devolver `[]` seria pior que falhar — lista vazia faz toda referência quebrada de
+ * trigger sair como "resolvida". Em `remover`/`substituir` a lista é o que prova que o
+ * trigger alvo existe, e na gravação ela é o rastro do registro: ali a falha continua fatal.
+ */
+export async function listarTriggersPrevia(
+  client: GhlClient, loc: string, wid: string, degradavel: boolean,
+): Promise<{ triggers: any[] | null; aviso?: string }> {
+  try {
+    return { triggers: await listarTriggers(client, loc, wid) };
+  } catch (e) {
+    if (!degradavel) throw e;
+    return {
+      triggers: null,
+      aviso:
+        `a lista de triggers não pôde ser lida (${e instanceof Error ? e.message : e}): a prévia segue ` +
+        "sem ela, e quem validar contra as 18 regras vai usar a lista do dump",
+    };
+  }
+}

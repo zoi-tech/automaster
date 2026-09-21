@@ -29,10 +29,20 @@ class ResultadoValidacao:
     triggers_do_dump: bool = False
 
 
+#: Rótulos com que as regras nomeiam um nó do fluxo no `detail` ("step 'Marca'",
+#: "if/else 'Tem tag?'"). O nome vem do CRM e muda legitimamente — renomear um step não
+#: é introduzir erro —, então ele sai da chave de comparação. Regra nova que nomeie um nó
+#: por outra palavra tem de entrar aqui; `test_validacao_escrita` recusa as que não entram.
+ROTULOS_DE_NO = ("step", "if/else")
+
+_RE_ROTULO = re.compile(
+    "(" + "|".join(re.escape(r) for r in ROTULOS_DE_NO) + r") '[^']*'"
+)
+
+
 def _normalizar_detalhe(detail: str) -> str:
-    """Remove nomes de steps (que podem mudar legitimamente) do detalhe, mantendo a essência do erro."""
-    # Remove "step 'XXX'" do detalhe para tornar a chave estável em relação a mudanças de nome
-    return re.sub(r"step '[^']*'", "step '<...>'", detail)
+    """Tira o nome do nó do detalhe, mantendo a essência do erro."""
+    return _RE_ROTULO.sub(r"\1 '<...>'", detail)
 
 
 def _chaves_erro(ctx: DumpContext, workflow_id: str) -> list[str]:

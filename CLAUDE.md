@@ -69,7 +69,7 @@ npm run agenda-acao -- -l <loc> --acao marcar --calendario <id> --contato <conta
 npm run agenda-acao -- -l <loc> --acao bloquear --dono <userId> --inicio <isoComFuso> --fim <isoComFuso> --confirmo --json  # ESCREVE: bloqueia horário na agenda de um usuário
 npm run workflows-ao-vivo -- -l <loc> -o dentro -i <workflowId> --json    # quem está dentro de um workflow, ao vivo
 npm run workflow-acao -- -l <loc> --acao inscrever -i <workflowId> --contato <contactId> --confirmo --json  # ESCREVE: publica/despublica, inscreve, remove ou retoma
-npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico); sem --confirmo é prévia
+npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico); sem --confirmo é prévia; camada CRUA, grava sem as 18 regras
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
@@ -83,7 +83,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit validation dumps/<loc>/<ts>/ --contracts contracts/        # validation.html (3 camadas)
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
-.venv/bin/python -m pytest -q                             # suíte (201 testes)
+.venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
+.venv/bin/python -m pytest -q                             # suíte (323 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -99,10 +100,14 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
 - **API interna não-documentada, muda sem aviso.** Endpoints hardcoded em `extractor/src/api/*.ts` (catálogo em `docs/endpoints.md`). Quebrou? Rode `discover`, re-mapeie, atualize o doc.
 - **Dois esquemas de auth:** workflows aceitam só `Bearer`; entidades `locations/*` e `opportunities/*` exigem `token-id`. UA de browser obrigatório (UA não-browser → 403).
 - **Steps vêm do Firebase no extrator de hoje** (`detail.fileUrl`, URL pré-assinada, baixada **sem** headers de auth — nunca mandar auth nessa chamada). Mas o detalhe da API **já traz os steps completos** em `workflowData` (medido em 1.041 workflows, zero divergência), e é de lá que a ESCRITA os lê: `workflow-editar` nunca toca no Firebase.
-- **Trigger não se edita pelo documento.** O `GET` do workflow não traz a lista (só `triggersFilePath`); ela vem de `GET /workflow/<loc>/trigger?workflowId=<wid>`. Escreve-se por rota dedicada: `POST .../trigger` cria e `DELETE .../trigger/<tid>?workflowId=<wid>` apaga. **No POST o corpo leva `workflowId` em camelCase** — com `workflow_id`, que é como a leitura devolve o campo, o servidor responde 200 com id e o trigger nasce órfão. `only-triggers` responde 200 sem criar nada, com ou sem `newTriggers`. Encadeamento de step é `parentKey`, nunca `parent`.
+- **Trigger não se edita pelo documento.** O `GET` do workflow não traz a lista (só `triggersFilePath`); ela vem de `GET /workflow/<loc>/trigger?workflowId=<wid>`. Escreve-se por rota dedicada: `POST .../trigger` cria e `DELETE .../trigger/<tid>?workflowId=<wid>` apaga. **No POST o corpo leva `workflowId` em camelCase** — com `workflow_id`, que é como a leitura devolve o campo, o servidor responde 200 com id e o trigger nasce órfão. `only-triggers` responde 200 sem criar nada, com ou sem `newTriggers`. Encadeamento de step é `parentKey`; `parent` é o campo legado, ainda presente em parte dos steps e às vezes o único — os dois lados leem os dois (`flow.parent_of`, `workflow-edit.paiDe`).
 - **Workflow criado por API nasce invisível**: sem `status` e, sem pasta, com `parentId` vazio — a API o lista, a interface não. `criar`/`duplicar` exigem `--pasta` e rodam `nascerVisivel` depois. A URL do editor é `workflow` no SINGULAR (`/automation/workflow/<wid>`); com o plural o app dá 404 e a página fica branca.
 - **Lista de workflows:** `?type=workflow` (lista plana); `parentId=root` só traz pastas.
 - **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
+- **A validação pelas 18 regras mora acima do comando.** `npm run workflow-editar` é a camada crua e
+  grava sem rodar regra nenhuma (avisa em stderr). As duas portas com guarda são a tool MCP
+  `workflow_editar` e `automaster-audit workflow-editar`, que chamam o mesmo caminho: prévia sem
+  `--confirmo` → `validar_edicao` → gravação. Ação nova entra nas três, e com teste próprio.
 - **Nova regra de auditoria** = novo arquivo em `auditor/src/automaster_audit/rules/` com `check(ctx)->list[Finding]`; o registry pkgutil descobre sozinho. Adicione fixture quebrada + limpa em `tests/` (use `conftest.make_dump(...)`).
 - **Regras devem evitar falso positivo.** Histórico: `empty_branch` removida (estrutura normal do GHL); `no_trigger` → `workflow_unreachable` (cruza `add_to_workflow` + execução manual). Regra que dependa de entidade não extraída deve ser no-op.
 - **HTML auto-contido + XSS-safe.** Nomes vêm do CRM (input externo): escapar (`_safe_json`/`html.escape`). Fonte via data-URI; só o grafo usa vis-network via CDN (com SRI).

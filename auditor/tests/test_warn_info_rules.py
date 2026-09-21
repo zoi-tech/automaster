@@ -70,3 +70,27 @@ def test_dead_end_clean_for_recent_draft(make_dump):
         extracted_at="2026-06-10T00:00:00+00:00",  # <90 dias
     )
     assert dead_end_draft.check(load_dump(path)) == []
+
+
+def test_ciclo_de_chamadas_ancora_sempre_no_mesmo_workflow(make_dump):
+    """O mesmo dump não pode gerar dois relatórios diferentes em duas rodadas.
+
+    O DFS acha o ciclo entrando por um nó qualquer; sem âncora fixa, o achado mudava de
+    workflow entre execuções (ordem de iteração de `set`) e o `diff` de snapshots
+    acusava mudança onde nada mudou.
+    """
+    from automaster_audit.rules import workflow_call_cycle
+
+    def chama(destino):
+        return {"id": f"s-{destino}", "type": "add_to_workflow", "name": "Manda",
+                "attributes": {"workflow_id": destino}}
+
+    anel = [("wfA", "wfB"), ("wfB", "wfC"), ("wfC", "wfA")]
+    ancoras = set()
+    for ordem in (anel, list(reversed(anel))):
+        caminho = make_dump(workflows=[wf(id=a, name=a, steps=[chama(b)]) for a, b in ordem])
+        achados = workflow_call_cycle.check(load_dump(caminho))
+        assert len(achados) == 1
+        ancoras.add((achados[0].workflow_id, achados[0].detail))
+    assert len(ancoras) == 1, f"o achado mudou conforme a ordem dos workflows: {ancoras}"
+    assert ancoras.pop()[0] == "wfA"

@@ -3,8 +3,13 @@ export interface Step {
   id: string;
   type?: string;
   name?: string;
-  /** Pai no encadeamento. O servidor grava `parentKey`; `parent` nunca aparece. */
+  /**
+   * Pai no encadeamento. O servidor grava `parentKey`; `parent` é o campo legado, que
+   * ainda aparece em parte dos steps (3.788 dos 4.017 da Instaltech) e às vezes é o
+   * único presente. Leia os dois por `paiDe`, como o auditor faz em `flow.parent_of`.
+   */
   parentKey?: string;
+  parent?: string;
   next?: string | string[] | null;
   attributes?: Record<string, any>;
   [k: string]: unknown;
@@ -127,10 +132,13 @@ export function trocarTag(doc: Documento, de: string, para: string): Resultado {
   return { doc: out, mudancas };
 }
 
+/** Pai do step: `parentKey` do servidor, com o `parent` legado como reserva. */
+export const paiDe = (s: Step): string | undefined => s.parentKey || s.parent;
+
 /** Ids alcançáveis a partir das entradas, seguindo `next` e `goto`. */
 function alcancaveis(steps: Step[]): Set<string> {
   const porId = new Map(steps.filter((s) => s.id).map((s) => [s.id, s]));
-  const raizes = steps.filter((s) => s.id && !s.parentKey).map((s) => s.id);
+  const raizes = steps.filter((s) => s.id && !paiDe(s)).map((s) => s.id);
   const vistos = new Set<string>();
   const fila = [...raizes];
   while (fila.length) {
@@ -160,7 +168,7 @@ function alcancaveis(steps: Step[]): Set<string> {
 export function removerStepsInalcancaveis(doc: Documento): Resultado {
   const out = clonar(doc);
   const steps = out.workflowData?.templates ?? [];
-  const temRaiz = steps.some((s) => s.id && !s.parentKey);
+  const temRaiz = steps.some((s) => s.id && !paiDe(s));
   if (!steps.length || !temRaiz) return { doc: out, mudancas: [] };
   const vivos = alcancaveis(steps);
   const removidos = steps.filter((s) => s.id && !vivos.has(s.id)).map((s) => s.id);
@@ -259,6 +267,14 @@ export interface DiffWorkflow {
 function camposDiferentes(a: any, b: any, prefixo = ""): string[] {
   if (igual(a, b)) return [];
   const obj = (v: unknown) => v && typeof v === "object" && !Array.isArray(v);
+  // Array com os mesmos itens em outra ordem é o caso que mais confunde na leitura do
+  // diff: aparecia como o campo inteiro alterado, sem dizer que nada entrou nem saiu.
+  // Descer por índice diria menos ainda em lista grande (toda posição a partir da
+  // primeira mudança conta como alterada), então o diff só marca a reordenação.
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const ordenado = (v: unknown[]) => [...v].map((x) => JSON.stringify(x)).sort();
+    if (igual(ordenado(a), ordenado(b))) return [`${prefixo || "(valor)"} (reordenado)`];
+  }
   if (!obj(a) || !obj(b)) return [prefixo || "(valor)"];
   const chaves = new Set([...Object.keys(a), ...Object.keys(b)]);
   const out: string[] = [];

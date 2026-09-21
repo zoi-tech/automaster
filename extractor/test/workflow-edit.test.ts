@@ -85,16 +85,6 @@ test("removerStepsInalcancaveis tira o bloco órfão e preserva o fluxo vivo", (
   assert.deepEqual(r.doc.workflowData.templates.map((s) => s.id), ["a", "b"]);
 });
 
-test("removerStepsInalcancaveis usa parentKey: com `parent` (campo que não existe) tudo vira raiz", () => {
-  const comCampoErrado = doc([
-    { id: "a", type: "wait", next: "b" },
-    { id: "b", type: "sms", parent: "a" },
-    { id: "orf", type: "sms", parent: "x" },   // órfão SÓ se o campo lido fosse `parent`
-  ]);
-  // sem `parentKey` nenhum step tem pai: todos são entrada, nada é inalcançável
-  assert.deepEqual(removerStepsInalcancaveis(comCampoErrado).mudancas, []);
-});
-
 test("removerStepsInalcancaveis segue goto ao decidir o que é alcançável", () => {
   const d = doc([
     { id: "a", type: "goto", next: null, attributes: { targetNodeId: "z" } },
@@ -187,7 +177,32 @@ test("diffWorkflow separa step somado, removido e alterado, e mostra o campo", (
   assert.equal(d.vazio, false);
 });
 
+test("array com os mesmos itens em outra ordem sai marcado como reordenado", () => {
+  // sem isso o diff dizia só "attributes.tags", que se lê como "as tags mudaram" —
+  // quem revisa não tinha como saber que nada entrou nem saiu.
+  const antes = doc([{ id: "a", type: "add_contact_tag", name: "Marca", attributes: { tags: ["x", "y"] } }]);
+  const depois = doc([{ id: "a", type: "add_contact_tag", name: "Marca", attributes: { tags: ["y", "x"] } }]);
+  assert.deepEqual(diffWorkflow(antes, depois).stepsAlterados[0].campos, ["attributes.tags (reordenado)"]);
+});
+
+test("array com item somado continua aparecendo como o campo alterado", () => {
+  const antes = doc([{ id: "a", type: "add_contact_tag", name: "Marca", attributes: { tags: ["x"] } }]);
+  const depois = doc([{ id: "a", type: "add_contact_tag", name: "Marca", attributes: { tags: ["x", "y"] } }]);
+  assert.deepEqual(diffWorkflow(antes, depois).stepsAlterados[0].campos, ["attributes.tags"]);
+});
+
 test("diffWorkflow marca vazio quando nada mudou", () => {
   const d = doc([{ id: "a", type: "sms", attributes: {} }]);
   assert.equal(diffWorkflow(d, d).vazio, true);
+});
+
+test("limpar-orfaos lê o `parent` legado quando é o único campo de ancestralidade", () => {
+  // O servidor grava `parentKey`, mas parte dos steps em disco só tem o `parent` antigo.
+  // Lendo só `parentKey`, esses steps contariam como entrada do fluxo e nada seria órfão.
+  const d = doc([
+    { id: "a", type: "wait", attributes: {}, next: "b" },
+    { id: "b", type: "sms", attributes: {}, parent: "a" },
+    { id: "z", type: "sms", attributes: {}, parent: "a" },
+  ]);
+  assert.deepEqual(removerStepsInalcancaveis(d).mudancas, ["z"]);
 });

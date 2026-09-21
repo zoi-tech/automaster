@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from .graph_html import write_graph_html
 from .journey import DEFAULT_MAX_DEPTH, DEFAULT_MAX_NODES, build_journey
 from .journey_html import write_journey_html
 from .loader import DumpError, load_dump
+from .mcp_server import WF_EDITAR_ACOES
 from .path_report import write_paths_report
 from .report import write_reports
 from .validation import build_validation
@@ -174,6 +176,32 @@ def run_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_workflow_editar(args: argparse.Namespace) -> int:
+    """ESCREVE workflow ao vivo passando pela validação das 18 regras.
+
+    Mesma orquestração da tool MCP (prévia → validação → gravação): esta função só
+    dá uma porta de linha de comando para ela. `npm run workflow-editar` é a camada
+    crua e grava sem passar por regra nenhuma; quem quer a guarda entra por aqui.
+    """
+    # lazy de propósito: deixa o teste trocar `mcp_server.workflow_editar` por um dublê.
+    from . import mcp_server
+
+    campos = ("loc", "acao", "id", "nome", "pasta", "de", "para", "step", "caminho", "valor",
+              "trigger_acao", "trigger_id", "trigger_corpo", "confirmo", "publicado", "snapshot")
+    try:
+        r = mcp_server.workflow_editar(**{c: getattr(args, c) for c in campos})
+    except mcp_server.ToolError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    print(json.dumps(r, ensure_ascii=False))
+    aplicado = r.get("aplicado")
+    if aplicado is True:
+        return 0
+    # "duvidoso" é gravação que a releitura não confirmou: não pode sair como sucesso
+    # para quem lê o código de saída num roteiro.
+    return 3 if aplicado == "duvidoso" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -223,6 +251,29 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.add_argument("depois", type=Path, help="pasta do dump mais recente")
     p_diff.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <depois>/diff.md)")
     p_diff.set_defaults(func=run_diff)
+
+    p_we = sub.add_parser("workflow-editar",
+                          help="ESCREVE workflow ao vivo com a validação das 18 regras (a guarda da tool MCP)")
+    p_we.add_argument("-l", "--loc", required=True, help="locationId da subconta")
+    p_we.add_argument("--acao", required=True, choices=WF_EDITAR_ACOES, help="operação a aplicar")
+    p_we.add_argument("-i", "--id", help="id do workflow (obrigatório fora de 'criar')")
+    p_we.add_argument("--nome", help="nome (criar/renomear/duplicar)")
+    p_we.add_argument("--pasta", help="id da pasta (obrigatório em criar/duplicar)")
+    p_we.add_argument("--de", help="id ou tag de origem (trocar-ref/trocar-tag)")
+    p_we.add_argument("--para", help="id ou tag de destino (trocar-ref/trocar-tag)")
+    p_we.add_argument("--step", help="id do step (atributo)")
+    p_we.add_argument("--caminho", help="caminho do campo dentro do step (atributo)")
+    p_we.add_argument("--valor", help="valor novo do campo (atributo)")
+    p_we.add_argument("--trigger-acao", choices=("adicionar", "remover", "substituir"),
+                      help="operação de trigger (acao=trigger)")
+    p_we.add_argument("--trigger-id", help="id do trigger (remover/substituir)")
+    p_we.add_argument("--trigger-corpo", help="JSON do trigger novo (adicionar/substituir)")
+    p_we.add_argument("--confirmo", action="store_true",
+                      help="grava de verdade; sem ele devolve só a prévia com o diff")
+    p_we.add_argument("--publicado", action="store_true",
+                      help="obrigatório junto de --confirmo em workflow publicado")
+    p_we.add_argument("--snapshot", help="snapshot do dump usado na validação (default: o último)")
+    p_we.set_defaults(func=run_workflow_editar)
     return parser
 
 
@@ -230,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "diff", "-h", "--help") and Path(raw[0]).exists():
+    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "diff", "workflow-editar", "-h", "--help") and Path(raw[0]).exists():
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

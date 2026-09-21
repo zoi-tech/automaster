@@ -180,6 +180,13 @@ Como ler a resposta:
   alguma referência — extraia a subconta de novo se quiser a rede de proteção.
 - `validacao.pode_gravar: false` é recusa de verdade: a edição introduziria um ERROR novo, e
   nada foi gravado. `erros_resolvidos` é o contrário: achados que a edição conserta.
+- **`aviso` numa prévia de trigger quer dizer que a lista de triggers não pôde ser lida.** A
+  prévia segue sem ela em vez de falhar inteira, e a validação cai na lista do dump — o que
+  vier de achado de trigger ali vale para o snapshot, não para agora.
+- **A guarda das 18 regras é desta tool, não do comando cru.** `npm run workflow-editar` é a
+  camada de baixo e grava sem rodar regra nenhuma (ele avisa disso em stderr). Fora daqui, a
+  outra porta com validação é `automaster-audit workflow-editar`, que chama exatamente o mesmo
+  caminho desta tool.
 - **Trigger: `adicionar`, `remover` e `substituir`.** O que entra vai em `trigger_corpo`
   (precisa de `type`; o `workflowId` a tool preenche sozinha, em camelCase — com `workflow_id`,
   que é como a LEITURA devolve o campo, o servidor responde 200 com id e o trigger nasce órfão,

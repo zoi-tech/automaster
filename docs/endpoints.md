@@ -229,8 +229,9 @@ o POST acima.
 `triggersFilePath`, `workflowData`, `version`, `status`, `name`… — trigger nenhum. A lista
 autoritativa vem da rota de trigger, a mesma que a leitura já usava. Consequência medida: o
 `only-triggers` responde 200, incrementa `version` e muda `triggersFilePath`, **sem criar o
-trigger**. É falso positivo de escrita, como `inscrever` em `draft`. Por isso criar e trocar
-trigger **recusam** no comando; só `remover` existe, pelo DELETE acima.
+trigger**. É falso positivo de escrita, como `inscrever` em `draft`. Por isso
+criar e trocar trigger não passam pelo save: quem grava é o `POST .../trigger` acima, com
+`workflowId` em camelCase, e `substituir` é esse POST mais o DELETE.
 
 **Salvar o corpo não apaga trigger.** Três saves mandaram o documento sem lista de triggers e
 os dois triggers do workflow continuaram lá. O risco de wipe não existe.

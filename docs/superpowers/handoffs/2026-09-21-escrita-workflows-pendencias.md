@@ -48,28 +48,47 @@ saiu do código, e não se achou outra forma de fazer o servidor mentir.
 **A corrida real entre prévia e gravação continua sem prova direta.** Provar exige uma
 pessoa salvando pelo builder do GHL enquanto o comando roda.
 
-**O comando de CLI não passa pelas 18 regras.** Essa guarda mora só na tool MCP. Quem roda
-`npm run workflow-editar -- ... --confirmo` escreve sem validação. Está dito no CHANGELOG;
-mover a guarda para o CLI é trabalho da parte B.
+**O comando de CLI não passa pelas 18 regras.** ~~Essa guarda mora só na tool MCP.~~
+
+> **FECHADO em 2026-09-21 (plugin 0.17.0)**, por um caminho diferente do previsto: em vez de
+> o extractor chamar o Python, o auditor ganhou `automaster-audit workflow-editar`, que chama
+> a mesma função da tool MCP. A orquestração não foi duplicada e a dependência continua
+> unidirecional (auditor → extractor). `npm run workflow-editar` segue sendo a camada crua e
+> grava sem regra nenhuma, agora avisando em stderr a cada gravação.
 
 ## Achados menores que sobraram
 
-- `_normalizar_detalhe` (`validacao_escrita.py`) só cobre a fraseologia `step '...'`. Regra
-  ERROR futura com outro texto traz de volta o falso positivo em renomeação. Degrada para o
-  lado seguro: recusa a mais, nunca gravação indevida.
-- `test_confirmo_true_passa_a_flag_para_o_extractor` não injeta `_load`; passa porque não
-  existe dump da subconta literal `L1` em disco. Dívida de duas linhas.
-- `camposDiferentes` não detalha o que mudou dentro de um array — reordenação aparece como
-  o campo inteiro alterado. Só afeta o texto do diff.
-- A prévia de `trigger` faz três chamadas de rede e nenhuma delas degrada com elegância: se
-  uma falhar, a prévia inteira falha.
+> **Os cinco itens abaixo foram FECHADOS em 2026-09-21 (plugin 0.17.0).** O detalhe do que
+> cada um virou está no `CHANGELOG.md`; ficam aqui porque o motivo de existirem ensina mais
+> que o conserto.
+
+- `_normalizar_detalhe` (`validacao_escrita.py`) só cobria a fraseologia `step '...'`. Regra
+  ERROR futura com outro texto traria de volta o falso positivo em renomeação. FECHADO: a
+  lista de rótulos virou explícita (`ROTULOS_DE_NO`) e um teste varre as regras procurando
+  quem nomeie um nó por fora dela. Achou `uncovered_condition`, com `if/else '...'`.
+- `test_confirmo_true_passa_a_flag_para_o_extractor` não injetava `_load`; passava porque não
+  existe dump da subconta literal `L1` em disco. FECHADO: injeta.
+- `camposDiferentes` não detalhava o que mudou dentro de um array — reordenação aparecia como
+  o campo inteiro alterado. FECHADO: sai marcada como `(reordenado)`. Descer por índice foi
+  recusado de propósito: em lista grande diria menos, não mais.
+- A prévia de `trigger` não degradava: uma chamada de rede que caísse derrubava a prévia
+  inteira. FECHADO só onde dá — na ADIÇÃO a lista de triggers vira `aviso` e a validação usa
+  a do dump. Lista vazia seria pior que falhar (todo erro de trigger sairia como resolvido), e
+  em `remover`/`substituir` e em qualquer gravação a falha continua fatal.
 - Os testes da tool MCP cobriam só `trocar-tag`, e foi por isso que a ação `trigger` passou
-  meses de execução sem validação sem ninguém notar. Ação com formato de saída próprio
-  precisa de teste próprio — vale para cada ação nova da parte B.
+  meses de execução sem validação sem ninguém notar. FECHADO: teste parametrizado pelas onze
+  ações, mais um que falha quando nasce ação sem caso de teste.
+
+Achado de fora do inventário, fechado junto: o MESMO dump gerava dois `report.json`
+diferentes em duas rodadas. `workflow_call_cycle` ancorava o achado no nó por onde o DFS
+entrou no anel, e a ordem de iteração de um `set` muda a cada processo — três achados da
+Instaltech trocavam de workflow sozinhos e o `diff` de snapshots acusava mudança inexistente.
 
 ## O que a parte A não faz, por decisão
 
 Remover step vivo (exige recosturar `next`), criar step do zero, reordenar fluxo, restaurar
-versão do histórico, adicionar ou substituir trigger. A rota `/recover` foi mapeada do
-bundle e nunca exercitada; o código que a implementava saiu para que ninguém a reencontre e
-acredite que existe desfazer.
+versão do histórico. A rota `/recover` foi mapeada do bundle e nunca exercitada; o código
+que a implementava saiu para que ninguém a reencontre e acredite que existe desfazer.
+
+Adicionar e substituir trigger saíram desta lista na 0.16.0: a rota existe, e a chave era
+`workflowId` em camelCase.

@@ -7,7 +7,7 @@ import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
   salvarWorkflow, historicoVersoes, listarTriggers, apagarTrigger, WF_WRITE,
-  criarTrigger, nascerVisivel, urlEditor, listarPastas,
+  criarTrigger, nascerVisivel, urlEditor, listarPastas, lerDocumento, listarTriggersPrevia,
 } from "../api/workflows-write.js";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
@@ -37,6 +37,17 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
   const log = (m: string) => (o.json ? console.error(m) : console.log(m));
   const precisaId = o.acao !== "criar";
   if (precisaId && !o.id) throw new Error(`--acao ${o.acao} exige -i/--id (id do workflow)`);
+
+  // Esta é a camada crua: grava sem rodar as 18 regras de auditoria. A guarda mora um
+  // nível acima (tool MCP `workflow_editar` e `automaster-audit workflow-editar`), que
+  // chamam este mesmo comando duas vezes, com a validação no meio. Quem entra por aqui
+  // tem de saber que passou por fora dela.
+  if (o.confirmo && o.acao !== "historico") {
+    console.error(
+      "aviso: gravação SEM validação contra as 18 regras — esta rota é a camada crua. " +
+        "A guarda está em `automaster-audit workflow-editar` (auditor) e na tool MCP `workflow_editar`.",
+    );
+  }
 
   await withClient(o.location, log, async (client, _page, tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
@@ -268,7 +279,7 @@ async function acaoTrigger(
     // O corpo não muda aqui, mas a prévia devolve o `documento` do mesmo jeito: sem ele
     // quem chama não tem o que validar, e remover trigger é justo o caso que dispara
     // `workflow_unreachable` — a validação não pode sumir aqui.
-    const documento = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+    const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar", documento,
       versao: documento.version,
@@ -311,6 +322,7 @@ async function acaoTrigger(
 
 export const TRIGGER_ACOES = ["adicionar", "remover", "substituir"] as const;
 
+
 /**
  * Cria o trigger pelo `POST .../trigger`. A guarda que importa está em `criarTrigger`: o
  * `workflowId` vai em CAMELCASE, senão o servidor responde 200 com id e o trigger nasce
@@ -326,20 +338,27 @@ async function adicionarTrigger(
   try { corpo = JSON.parse(o.triggerCorpo); } catch (e) { throw new Error(`--trigger-corpo não é JSON válido: ${e}`); }
   if (!corpo?.type) throw new Error("--trigger-corpo precisa de `type` (ex.: appointment, contact_tag, form_submission)");
 
-  const antes = await listarTriggers(client, o.location, o.id!);
-  if (substituir && !antes.some((t) => t?.id === o.triggerId)) {
+  const { triggers: antes, aviso } = await listarTriggersPrevia(
+    client, o.location, o.id!, !substituir && !o.confirmo,
+  );
+  if (aviso) saida.aviso = aviso;
+  if (substituir && antes && !antes.some((t) => t?.id === o.triggerId)) {
     throw new Error(`trigger ${o.triggerId} não existe neste workflow (ids: ${antes.map((t) => t?.id).join(", ") || "nenhum"})`);
   }
-  const previsto = [...(substituir ? antes.filter((t) => t?.id !== o.triggerId) : antes), { ...corpo, id: "(novo)" }];
-  const vazio = { workflowData: { templates: [] } } as unknown as Documento;
   Object.assign(saida, {
-    diff: diffWorkflow({ ...vazio, triggersData: antes }, { ...vazio, triggersData: previsto }),
     mudancas: [substituir ? `trigger ${o.triggerId} trocado` : "trigger adicionado"],
-    triggers: previsto,
   });
+  if (antes) {
+    const previsto = [...(substituir ? antes.filter((t) => t?.id !== o.triggerId) : antes), { ...corpo, id: "(novo)" }];
+    const vazio = { workflowData: { templates: [] } } as unknown as Documento;
+    Object.assign(saida, {
+      diff: diffWorkflow({ ...vazio, triggersData: antes }, { ...vazio, triggersData: previsto }),
+      triggers: previsto,
+    });
+  }
 
   if (!o.confirmo) {
-    const documento = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+    const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
       documento, versao: documento.version,

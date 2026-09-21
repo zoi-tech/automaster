@@ -4,6 +4,7 @@ import { avisoPublicado, guardaPublicado } from "../src/api/workflows-live.js";
 import {
   trocarReferencia, pareceId, conferirEscrita, conferirVersaoEsperada, type Documento,
 } from "../src/api/workflow-edit.js";
+import { lerDocumento, listarTriggersPrevia } from "../src/api/workflows-write.js";
 
 const opts = (extra: { publicado?: boolean } = {}) => ({ location: "LOC1", id: "WF1", ...extra });
 
@@ -124,4 +125,33 @@ test("imprimir distingue os três estados de aplicado na saída humana", () => {
   imprimir({ aplicado: false, acao: "renomear" }, { ...optsBase, acao: "renomear" }, log);
   assert.ok(mensagens[0].startsWith("sem gravar —"));
   assert.ok(mensagens[0].includes("renomear"));
+});
+
+// --- prévia que degrada: a rota de listagem de triggers pode cair sozinha --------------
+//
+// A prévia faz duas leituras. Perder a do documento é fatal (sem ele não há o que
+// validar); perder a lista de triggers, na ADIÇÃO, não é — ela só alimenta o diff.
+
+const clienteQueFalha = (msg: string) =>
+  ({ getJson: () => Promise.reject(new Error(msg)) }) as never;
+
+test("prévia de adicionar segue sem a lista de triggers, e diz que seguiu", async () => {
+  const r = await listarTriggersPrevia(clienteQueFalha("GET .../trigger → HTTP 503"), "LOC1", "WF1", true);
+  assert.equal(r.triggers, null, "lista ausente, NUNCA vazia: [] faria todo erro de trigger sair como resolvido");
+  assert.match(String(r.aviso), /lista de triggers não pôde ser lida/);
+  assert.match(String(r.aviso), /dump/);
+});
+
+test("quando a lista é indispensável (substituir, ou gravação) a falha continua fatal", async () => {
+  await assert.rejects(
+    () => listarTriggersPrevia(clienteQueFalha("HTTP 503"), "LOC1", "WF1", false),
+    /HTTP 503/,
+  );
+});
+
+test("falha ao ler o documento nomeia a chamada que caiu", async () => {
+  await assert.rejects(
+    () => lerDocumento(clienteQueFalha("GET https://interno/... → HTTP 500"), "LOC1", "WF1"),
+    /documento do workflow WF1/,
+  );
 });

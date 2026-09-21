@@ -25,6 +25,11 @@ def check(ctx) -> list[Finding]:
         if key in reported:
             continue
         reported.add(key)
+        # O ciclo é um anel: qual nó o DFS vê primeiro depende da ordem de iteração, e
+        # ancorar nele fazia o MESMO dump gerar relatórios diferentes em duas rodadas —
+        # ruído puro no `diff` de snapshots. Começa sempre no menor id.
+        inicio = cycle.index(min(cycle))
+        cycle = cycle[inicio:] + cycle[:inicio]
         names = " → ".join(ctx.workflow_names.get(c, c) for c in cycle + [cycle[0]])
         # ancora o achado no primeiro workflow do ciclo
         findings.append(
@@ -49,7 +54,7 @@ def _find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
     def dfs(n: str) -> None:
         color[n] = GREY
         stack.append(n)
-        for m in graph.get(n, ()):
+        for m in sorted(graph.get(n, ())):
             if color.get(m, WHITE) == GREY:
                 # ciclo: do ponto m até o topo da pilha
                 idx = stack.index(m)

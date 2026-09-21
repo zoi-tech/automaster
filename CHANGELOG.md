@@ -4,6 +4,42 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.17.0 — 2026-09-21
+
+Os débitos que a 0.15.0 e a 0.16.x deixaram declarados, fechados antes de abrir a escrita de
+steps. Continuam 31 tools e 18 regras; 163 testes no extractor, 323 no auditor.
+
+- **A validação contra as 18 regras ganhou uma porta de linha de comando.**
+  `automaster-audit workflow-editar` chama a mesma função da tool MCP — prévia sem
+  `--confirmo`, validação, gravação —, então a guarda deixa de existir só dentro do MCP. Nada
+  foi reimplementado: é um segundo chamador. `npm run workflow-editar` continua sendo a camada
+  crua e agora AVISA em stderr, a cada gravação, que passou por fora das regras.
+- **Ação nova sem teste próprio quebra a suíte.** Um teste parametrizado cobre as onze ações da
+  tool, fixando o que vai na linha de comando e se a validação rodou; outro compara a lista de
+  ações com a tabela de casos e falha quando nasce ação sem caso. Foi a falta disso que deixou
+  `trigger` rodar sem validação sem ninguém notar.
+- **A prévia de trigger não cai mais inteira quando a lista de triggers falha.** Na adição a
+  lista só alimenta o diff: perdê-la agora vira `aviso` e a validação usa a do dump. Devolver
+  lista vazia seria pior que falhar — faria toda referência quebrada de trigger sair como
+  "resolvida". Em `remover`/`substituir`, e em qualquer gravação, a falha continua fatal.
+- **O mesmo dump gerava dois relatórios diferentes em duas rodadas.** `workflow_call_cycle`
+  ancorava o achado no nó por onde o DFS entrou no anel, que depende da ordem de iteração de um
+  `set`: três achados trocavam de workflow a cada execução e o `diff` de snapshots acusava
+  mudança onde nada mudou. O ciclo passa a começar sempre pelo menor id. Contagem de achados
+  inalterada (Instaltech: 31 ERROR, 19 WARN, 132 INFO).
+- **Renomear um step não pode contar como erro novo, seja qual for a regra.** A normalização do
+  detalhe cobria só a fraseologia `step '...'`; agora a lista de rótulos é explícita
+  (`ROTULOS_DE_NO`) e um teste varre as regras e recusa quem nomeie um nó por fora dela —
+  `uncovered_condition` já estava fora, com `if/else '...'`.
+- **Array reordenado aparece como reordenado.** No diff e no residual, `["x","y"]` virando
+  `["y","x"]` dizia só "attributes.tags", que se lê como "as tags mudaram".
+- **Os dois lados leem o mesmo campo de ancestralidade.** `limpar-orfaos` lia só `parentKey`; o
+  auditor já lia `parentKey` com o `parent` legado como reserva desde a 0.16.1.
+- Corrigidos na documentação: `docs/endpoints.md` ainda dizia que criar e trocar trigger
+  recusam no comando (a 0.16.0 implementou os dois) e o `CLAUDE.md` dizia que `parent` nunca
+  aparece. O teste da tool que passava só porque a subconta `L1` não tem dump em disco agora
+  força o ramo que queria medir.
+
 ## 0.16.1 — 2026-09-21
 
 O grafo de execução do auditor passa a ler `parentKey`, o campo que o servidor grava.
