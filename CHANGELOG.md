@@ -4,6 +4,41 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.20.0 — notas e tarefas do contato, tags da subconta
+
+Quatro tools novas (35 no total): `anotacoes`, `anotacao_acao`, `tags`, `tag_acao`. 18 regras
+de auditoria, sem mudança; 200 testes no extractor, 347 no auditor. Dois módulos novos no
+extractor (`api/annotations.ts`, `api/tags.ts`) e quatro comandos de CLI.
+
+Nada entra no dump: as quatro áreas são ao vivo. A tool `tags` é a única que também lê o
+dump, para dizer quais workflows citam cada tag e em que papel; sem dump ela degrada, com
+aviso, em vez de falhar. Na Instaltech, 42 das 126 tags são citadas por workflow.
+
+O que a pesquisa e a prova ao vivo mudaram no desenho:
+
+- **Tag em workflow é o nome, nunca o id** — em step, em trigger e em condição.
+- **Renomear pela API propaga** para os três lugares, provado ao vivo. Por isso `renomear` é
+  escrita comum, sem guarda extra e sem propagação própria.
+- **Apagar é a operação perigosa**: tira a tag de todos os contatos e pode disparar os
+  workflows com trigger de "tag removida" — isso não tem prova nem a favor nem contra. Apagar
+  tag citada por workflow exige `apagar_citada`.
+- **Não existe contagem de contatos por tag** no GHL. A prévia do apagar declara que não sabe
+  esse número em vez de estimá-lo.
+- **Criar tarefa exige `completed`**, e a data é texto ISO.
+- **Tarefa criada sem dono fica sem responsável** — o servidor não atribui ninguém. E a busca
+  de tarefa por subconta usa índice: logo depois de apagar, a tarefa ainda aparece lá. A
+  leitura por contato é a fonte confiável.
+
+Dívidas declaradas, nenhuma bloqueia esta entrega:
+
+- `workflow-editar --acao trocar-tag` continua sem tocar trigger nem `attributes.customTags`.
+  Quem o usar para trocar tag deixa o trigger com o nome velho.
+- Quando um step escolhe a tag em tempo de execução por merge field (`customTags`), a coluna
+  de impacto de `tags` é incompleta — a resposta avisa, e nenhuma ferramenta consegue fechar
+  essa contagem.
+- O código HTTP do POST de nota não foi medido: o cliente devolve o corpo já decodificado e
+  descarta o status. Não afeta nada, porque qualquer 2xx é tratado igual.
+
 ## 0.19.0 — 2026-09-21
 
 Os três débitos que a 0.18.0 deixou declarados. Continuam 31 tools e 18 regras; 189 testes no

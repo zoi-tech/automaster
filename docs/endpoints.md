@@ -1408,8 +1408,10 @@ mirror offline dos docs v3 (skill `ghl-api-docs`) e provado ao vivo na Instaltec
 **Não confundir com nota de compromisso** (`/calendars/appointments/<id>/notes`, seção
 `## Agenda`): o pai ali é o compromisso, não o contato.
 
-`title`, `color` e `pinned` aparecem no schema de create/update mas não no exemplo de
-resposta — trate como possivelmente ausentes na leitura.
+**Provado ao vivo em 2026-09-21:** `title` e `color` NÃO voltam na leitura; `pinned` volta,
+`false` quando não foi pedido. A resposta traz ainda `bodyText`, `userId` (o dono da sessão),
+`dateAdded`, `relations` e `attachments`, nenhum deles na doc. O corpo vem dentro de
+`{note: {...}}`.
 
 ### Tarefas do contato
 
@@ -1425,6 +1427,16 @@ resposta — trate como possivelmente ausentes na leitura.
 
 **`completed` é obrigatório na criação** — sem ele o POST recusa. A CLI manda `false` por
 padrão.
+
+**Tarefa criada sem `assignedTo` fica sem responsável**, provado ao vivo em 2026-09-21: o
+servidor não atribui ninguém, e o campo some da resposta e da leitura (`null` na busca). É
+estado normal — tarefas reais da Instaltech também estão assim.
+
+**O índice da busca por subconta fica defasado.** Logo depois do DELETE, a tarefa apagada
+ainda voltava em `/tasks/search` com `deleted: false`, enquanto `GET /contacts/<id>/tasks` já
+a tinha removido. A leitura por contato é a fonte confiável. Em compensação a busca traz o que
+a leitura por contato não tem: `assignedToUserDetails`, `contactDetails`, `status`/
+`statusGroup` e `searchAfter` para paginar.
 
 **`dueDate` é texto ISO 8601** (`2026-10-25T11:00:00Z`). É o inverso da armadilha da agenda,
 onde `/calendars/events` só aceita epoch em milissegundos e texto ISO devolve lista vazia sem
@@ -1446,6 +1458,9 @@ campos já traziam o nome novo. Isso importa porque **workflow guarda o NOME da 
 id** — em step, em trigger e em condição de `if_else`, medido em 34 de 34 valores do dump da
 Instaltech. Se o servidor não propagasse, renomear quebraria em silêncio todo workflow que
 cita a tag.
+
+Nome de tag **não distingue maiúscula**: criar `ZZ-PROVA-020` com `zz-prova-020` já existente
+é duplicata. A guarda é local, na CLI, e foi exercitada ao vivo em 2026-09-21.
 
 O `POST` devolve campos que a doc não lista: `categoryId`, `description`, `color`, todos
 `null`. O `DELETE` devolve **as duas grafias**: `{"succeded":true,"succeeded":true}`.

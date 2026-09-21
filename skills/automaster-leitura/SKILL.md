@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, workflow_editar, modelos_email) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, workflow_editar, modelos_email, anotacoes, anotacao_acao, tags, tag_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -253,3 +253,36 @@ para revisão humana, nunca como lista de coisas para apagar.
 **Dump antigo não tem `email_templates.json`.** Nesse caso as duas regras ficam no-op e o
 relatório diz isso na seção "Regras cegas". Ausência de achado de e-mail num dump velho não
 significa que está tudo certo.
+
+## Notas, tarefas e tags (`anotacoes`, `anotacao_acao`, `tags`, `tag_acao`)
+
+As quatro são **ao vivo**: não saem do dump, não têm regra de auditoria e não envelhecem com o
+snapshot. A única que também toca o dump é `tags`, e só para dizer quem cita cada tag.
+
+`aplicado: false` numa resposta de escrita é **prévia**, não falha. É o que sai quando
+`confirmo` não foi passado: o corpo que iria para o servidor, sem gravar nada. Falha de
+verdade vem como erro, não como prévia.
+
+**`workflows: null` em `tags` significa "sem dump", não "tag órfã".** Quando a subconta não
+tem extração, a lista sai inteira com a coluna de impacto zerada em `null` e um aviso
+explicando. Tag órfã de verdade é `workflows: []` — lista vazia, com `_snapshot` presente.
+Confundir as duas leva a concluir que 126 tags estão sem uso.
+
+`papeis` vazio com `workflows` preenchido não acontece: quem cita, cita em algum papel
+(`dispara`, `adiciona`, `remove`, `condicao`). Se aparecer assim, é defeito, não desenho.
+
+**O aviso de merge field significa que a contagem é incompleta por natureza.** Quando a
+subconta tem step que escolhe a tag em tempo de execução (`attributes.customTags`), nenhuma
+contagem de citação enxerga essa ligação — nem esta, nem qualquer outra ferramenta. Com esse
+aviso na tela, "0 workflows citam esta tag" quer dizer "nenhum a cita pelo nome", não
+"ninguém a usa".
+
+**Renomear tag é seguro; apagar não é.** O servidor propaga o nome novo para step, trigger e
+condição (provado ao vivo). Apagar tira a tag de todos os contatos e pode acordar automação de
+"tag removida" — e quantos contatos são não dá para saber, porque o GHL não expõe essa
+contagem em lugar nenhum. A recusa de `tag_acao` com `apagar_citada` ausente é a guarda
+funcionando, não um bug.
+
+**Tarefa sem responsável é normal.** Criada sem `dono`, nasce sem `assignedTo`, e boa parte
+das tarefas reais de uma subconta está assim. E a busca por subconta (`o=buscar`) usa índice:
+logo depois de apagar, a tarefa ainda aparece lá. A lista por contato é a fonte confiável.

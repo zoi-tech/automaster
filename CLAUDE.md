@@ -27,7 +27,7 @@ Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** 
 
   As 4 saídas HTML compartilham o design system **"Sala de Controle"** (IBM Carbon): tema claro `#f4f4f4`/painéis brancos, IBM Plex Sans/Mono embutidas como data-URI, radius zero, shell unificado (topbar escura 48px + sidebar 256px com links relativos entre `dashboard.html`/`graph.html`/`validation.html`/`journey.html`). Acento azul `#0f62fe` só em link/ativo; severidade só em status (`#da1e28`/`#f1c21b`/`#24a148`); vermelho reservado a referência quebrada.
 
-Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plugin/mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`, `skills/automaster-formulario-visual/` (identidade visual de formulário/survey — tokens que a tool `formulario_estilo` aplica). A config MCP fica **fora da raiz de propósito**, apontada pelo campo `mcpServers` do plugin.json: um `.mcp.json` na raiz o Claude Code também carrega como servidor de projeto, e nesse contexto `${CLAUDE_PLUGIN_ROOT}` não expande — o servidor falha com ENOENT em toda sessão aberta no repo. O servidor `mcp_server.py` expõe trinta e uma tools (`dumps`, `comparar`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `conversas`, `conversas_buscar`, `conversa_acao`, `rascunho`, `anexar`, `enviar`, `whatsapp`, `whatsapp_enviar`, `config`, `grupo`, `editar`, `oportunidades`, `oportunidade_acao`, `pipeline`, `agenda`, `agenda_acao`, `formularios`, `formulario_acao`, `formulario_estilo`, `workflows_ao_vivo`, `workflow_acao`, `workflow_editar`, `modelos_email`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`. **Versões do plugin em `CHANGELOG.md`** — mudança que altere o comportamento do plugin instalado sobe a versão no plugin.json e entra lá.
+Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plugin/mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`, `skills/automaster-formulario-visual/` (identidade visual de formulário/survey — tokens que a tool `formulario_estilo` aplica). A config MCP fica **fora da raiz de propósito**, apontada pelo campo `mcpServers` do plugin.json: um `.mcp.json` na raiz o Claude Code também carrega como servidor de projeto, e nesse contexto `${CLAUDE_PLUGIN_ROOT}` não expande — o servidor falha com ENOENT em toda sessão aberta no repo. O servidor `mcp_server.py` expõe trinta e cinco tools (`dumps`, `comparar`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `conversas`, `conversas_buscar`, `conversa_acao`, `rascunho`, `anexar`, `enviar`, `whatsapp`, `whatsapp_enviar`, `config`, `grupo`, `editar`, `oportunidades`, `oportunidade_acao`, `pipeline`, `agenda`, `agenda_acao`, `formularios`, `formulario_acao`, `formulario_estilo`, `workflows_ao_vivo`, `workflow_acao`, `workflow_editar`, `modelos_email`, `anotacoes`, `anotacao_acao`, `tags`, `tag_acao`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`. **Versões do plugin em `CHANGELOG.md`** — mudança que altere o comportamento do plugin instalado sobe a versão no plugin.json e entra lá.
 
 **Escrita ao vivo é serial por construção.** O perfil persistente do Chrome (`~/.automaster/chrome-profile`) é único: dois comandos de escrita ao vivo rodando em paralelo (`formulario-acao`/`formulario-estilo`, mas também qualquer outro comando que abra Chrome) disputam o mesmo `SingletonLock` e um deles trava ou falha. Nunca despachar dois agentes escrevendo ao vivo ao mesmo tempo — descoberto ao vivo durante a validação de formulários (`docs/endpoints.md`).
 
@@ -71,6 +71,10 @@ npm run workflows-ao-vivo -- -l <loc> -o dentro -i <workflowId> --json    # quem
 npm run workflow-acao -- -l <loc> --acao inscrever -i <workflowId> --contato <contactId> --confirmo --json  # ESCREVE: publica/despublica, inscreve, remove ou retoma
 npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico); sem --confirmo é prévia; camada CRUA, grava sem as 18 regras
 npm run workflow-editar -- -l <loc> --acao step-criar -i <wid> --depois-de <stepId> --corpo '{"type":"sms",...}' --confirmo --json  # ESCREVE: monta o canvas (step-criar/step-remover/step-mover)
+npm run anotacoes -- -l <loc> --contato <contactId> --tipo nota --json   # notas e tarefas do contato (leitura ao vivo)
+npm run anotacao-acao -- -l <loc> --contato <id> --tipo tarefa --acao criar --titulo "..." --prazo <iso> --confirmo --json  # ESCREVE: nota/tarefa
+npm run tags -- -l <loc> --json                                          # tags da subconta (leitura ao vivo)
+npm run tag-acao -- -l <loc> --acao renomear --tag <nomeOuId> --nome <novo> --confirmo --json  # ESCREVE: tag da subconta
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
@@ -85,7 +89,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
-.venv/bin/python -m pytest -q                             # suíte (329 testes)
+.venv/bin/python -m pytest -q                             # suíte (347 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -105,6 +109,15 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
   caminho é a lista de ids (`--triggers-esperados`), não a versão. **No POST o corpo leva `workflowId` em camelCase** — com `workflow_id`, que é como a leitura devolve o campo, o servidor responde 200 com id e o trigger nasce órfão. `only-triggers` responde 200 sem criar nada, com ou sem `newTriggers`. Encadeamento de step é `parentKey`; `parent` é o campo legado, ainda presente em parte dos steps e às vezes o único — os dois lados leem os dois (`flow.parent_of`, `workflow-edit.paiDe`).
 - **Workflow criado por API nasce invisível**: sem `status` e, sem pasta, com `parentId` vazio — a API o lista, a interface não. `criar`/`duplicar` exigem `--pasta` e rodam `nascerVisivel` depois. A URL do editor é `workflow` no SINGULAR (`/automation/workflow/<wid>`); com o plural o app dá 404 e a página fica branca.
 - **Lista de workflows:** `?type=workflow` (lista plana); `parentId=root` só traz pastas.
+- **Tag em workflow é o NOME, nunca o id** — em step, em trigger e em condição (34 de 34 no
+  dump da Instaltech). Renomear pela API **propaga**: o servidor reescreve a referência nos
+  três lugares, provado ao vivo em 2026-09-21. Quem quebra é apagar, que arranca a tag de
+  todos os contatos — daí a guarda `apagar_citada`. Não existe contagem de contatos por tag
+  em lugar nenhum do GHL, então nenhuma prévia estima esse número.
+- **Criar tarefa exige `completed`** além de `title` e `dueDate`; a CLI manda `false` sozinha.
+  A data é texto ISO, o inverso da agenda, onde ISO devolve lista vazia em silêncio. Tarefa
+  criada sem dono fica mesmo sem responsável, e a busca por subconta ainda mostra por um tempo
+  a tarefa já apagada — a leitura por contato é a fonte confiável.
 - **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
 - **Os steps do canvas se montam por `step-criar`/`step-remover`/`step-mover`**, e nenhuma
   estreia rota: as três mandam o corpo pelo mesmo save. O step novo vai em JSON cru (`--corpo`)
