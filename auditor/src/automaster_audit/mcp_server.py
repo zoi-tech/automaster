@@ -996,6 +996,62 @@ def modelos_email(loc: str, o: str = "lista", id: str | None = None,
     return {"id": id, "texto": "\n".join(p.partes), "links": p.links, "_snapshot": meta}
 
 
+WF_EDITAR_ACOES = (
+    "criar", "renomear", "mover", "duplicar", "apagar",
+    "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
+)
+
+# ações que mexem no corpo do workflow e por isso passam pela validação das 18 regras
+_WF_EDITAR_COM_CORPO = {"trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger"}
+
+
+def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None = None,
+                    pasta: str | None = None, de: str | None = None, para: str | None = None,
+                    step: str | None = None, caminho: str | None = None, valor: str | None = None,
+                    trigger: str | None = None, trigger_acao: str | None = None,
+                    trigger_id: str | None = None, confirmo: bool = False,
+                    publicado: bool = False, snapshot: str | None = None) -> dict:
+    """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff."""
+    if acao not in WF_EDITAR_ACOES:
+        raise ToolError(f"acao inválida: {acao!r}. Use uma de: {', '.join(WF_EDITAR_ACOES)}")
+    if acao != "criar" and not id:
+        raise ToolError(f"acao {acao!r} exige `id` (id do workflow)")
+
+    args = ["workflow-editar", "-l", loc, "--acao", acao]
+    for flag, valor_opcional in (
+        ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
+        ("--step", step), ("--caminho", caminho), ("--valor", valor), ("--trigger", trigger),
+        ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
+    ):
+        if valor_opcional is not None:
+            args += [flag, str(valor_opcional)]
+    if confirmo:
+        args.append("--confirmo")
+    if publicado:
+        args.append("--publicado")
+    args.append("--json")
+
+    resultado = _run_extractor(*args)
+
+    # validação contra as 18 regras: só faz sentido para ação que mexe no corpo,
+    # e só quando o dump da subconta existe em disco
+    if acao in _WF_EDITAR_COM_CORPO and resultado.get("diff"):
+        try:
+            ctx, meta = _load(loc, snapshot)
+        except ToolError:
+            resultado["validacao"] = {
+                "rodou": False,
+                "motivo": "sem dump desta subconta em disco: as 18 regras não foram rodadas",
+            }
+        else:
+            resultado["validacao"] = {
+                "rodou": True,
+                "snapshot": meta["snapshot"],
+                "aviso": f"as regras rodaram contra o dump {meta['snapshot']}; ele pode estar velho",
+            }
+    return resultado
+
+
 TOOLS = {
     "comparar": (comparar, "Diff entre dois snapshots da mesma subconta: workflows adicionados/removidos/"
                  "alterados (nome, status, steps, triggers) e entidades que entraram ou sumiram. Sem antes/depois, "
@@ -1325,6 +1381,30 @@ TOOLS = {
                        "inicio": {"type": "string", "description": "início programado (inscrever), ISO com fuso"},
                        "confirmo": {"type": "boolean", "default": False}},
                       ["loc", "acao", "id"]),
+    "workflow_editar": (workflow_editar,
+                        "ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
+                        "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
+                        "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
+                        "atributo de step (`atributo`) e mexe em trigger (`trigger`). Sem `confirmo` devolve "
+                        "a PRÉVIA com o diff e não grava nada. Workflow publicado exige `publicado=true` "
+                        "junto. Não reordena fluxo nem cria step do zero — isso é a parte B.",
+                        {"loc": _LOC,
+                         "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
+                         "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},
+                         "nome": {"type": "string", "description": "criar, renomear, duplicar"},
+                         "pasta": {"type": "string", "description": "id da pasta; ausente = raiz"},
+                         "de": {"type": "string", "description": "id (trocar-ref) ou nome de tag (trocar-tag) a substituir"},
+                         "para": {"type": "string", "description": "id ou nome de tag novo"},
+                         "step": {"type": "string", "description": "id do step (atributo)"},
+                         "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
+                         "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
+                         "trigger": {"type": "string", "description": "JSON do trigger"},
+                         "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
+                         "trigger_id": {"type": "string"},
+                         "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
+                         "publicado": {"type": "boolean", "description": "obrigatório junto de confirmo se o workflow está publicado"},
+                         "snapshot": _SNAP},
+                        ["loc", "acao"]),
     "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
                "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",
