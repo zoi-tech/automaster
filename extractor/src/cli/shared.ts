@@ -1,10 +1,3 @@
-/**
- * O que todo comando da CLI usa: raiz dos dumps, sessão autenticada e rastro de
- * escrita.
- *
- * Vive aqui, e não no `cli.ts`, porque importar o `cli.ts` EXECUTA o programa
- * (ele termina em `program.parseAsync`). Módulo de comando importa daqui.
- */
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright";
@@ -71,4 +64,15 @@ export function registroEscrita(loc: string, pasta: string, chave: string, dados
   const registro = path.join(dir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
   fs.writeFileSync(registro, JSON.stringify({ em: now.toISOString(), ...(dados as object) }, null, 2));
   return registro;
+}
+
+/** Igual ao problema de --pagina: valor não numérico viraria NaN no filtro. Ausente fica undefined. */
+export function numeroOpcional(v: string | undefined, campo: string, log: (msg: string) => void): number | undefined {
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) {
+    log(`aviso: --${campo} ${v} inválido, ignorado.`);
+    return undefined;
+  }
+  return n;
 }

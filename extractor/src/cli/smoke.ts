@@ -1,21 +1,11 @@
-/**
- * Smoke das rotas de leitura da API interna.
- *
- * A API do GHL não é documentada e muda sem aviso; hoje isso só aparece com o
- * cliente na frente. Este comando chama, uma vez cada, as MESMAS funções de
- * `src/api/*` que as tools usam, e confere a FORMA da resposta. Quando o
- * servidor muda um campo ou uma rota, a checagem correspondente falha aqui.
- *
- * Só leitura. Nenhuma checagem escreve nada.
- */
 import type { Command } from "commander";
 import { withClient } from "./shared.js";
 import { decodeCompanyId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
 import { listWorkflows, fetchWorkflow, type ListEntry } from "../api/workflows.js";
 import {
-  fetchPipelines, fetchCustomFields, fetchTags, fetchUsers,
-  fetchCalendars, fetchCustomValues, fetchMessageTemplates,
+  fetchPipelines, fetchCustomFields, fetchTags, fetchUsers, fetchCalendars, fetchCustomValues,
+  fetchMessageTemplates
 } from "../api/entities.js";
 import { listForms, listSurveys } from "../api/forms.js";
 import { fetchEmailTemplates } from "../api/emails.js";

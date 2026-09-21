@@ -1,0 +1,290 @@
+import { Command } from "commander";
+import path from "node:path";
+import { stampNow } from "../dump/writer.js";
+import {
+  fetchAuditLogs, fetchContactAppointments, fetchContactOpportunityIds, type AuditLog
+} from "../api/audit.js";
+import { renderTimelineHtml } from "../timeline_html.js";
+import { getContact, updateContactFields, addContactTags, removeContactTags } from "../api/contacts.js";
+import fs from "node:fs";
+import os from "node:os";
+import { execFile } from "node:child_process";
+import { DUMPS_DIR, latestDumpDir, latestDumpEntity, withClient } from "./shared.js";
+
+/** id → nome dos workflows do dump mais recente da subconta (melhor esforço). */
+function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
+  const names = new Map<string, string>();
+  const dir = latestDumpDir(locationId);
+  if (!dir) return names;
+  try {
+    const wfDir = path.join(dir, "workflows");
+    for (const f of fs.readdirSync(wfDir)) {
+      const wf = JSON.parse(fs.readFileSync(path.join(wfDir, f), "utf-8"));
+      if (wf.id && wf.name) names.set(wf.id, wf.name);
+    }
+  } catch { /* sem dump local — timeline mostra o id cru */ }
+  return names;
+}
+
+/** id → nome de pipelines e stages do dump mais recente (melhor esforço). */
+function stageNamesFromLatestDump(locationId: string): { pipelines: Map<string, string>; stages: Map<string, string> } {
+  const pipelines = new Map<string, string>();
+  const stages = new Map<string, string>();
+  const raw = latestDumpEntity(locationId, "pipelines") as { pipelines?: any[] } | undefined;
+  for (const p of raw?.pipelines ?? []) {
+    if (p.id && p.name) pipelines.set(p.id, p.name);
+    for (const s of p.stages ?? []) if (s.id && s.name) stages.set(s.id, s.name);
+  }
+  return { pipelines, stages };
+}
+
+/** id → nome dos usuários do dump mais recente da subconta (melhor esforço). */
+function userNamesFromLatestDump(locationId: string): Map<string, string> {
+  const names = new Map<string, string>();
+  const raw = latestDumpEntity(locationId, "users") as { users?: any[] } | undefined;
+  for (const u of raw?.users ?? []) {
+    const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(" ");
+    if (u.id && name) names.set(u.id, name);
+  }
+  return names;
+}
+
+async function runTimeline(opts: { location: string; id: string; days: string; json?: boolean }): Promise<void> {
+  const locationId = opts.location;
+  const days = Number(opts.days) || 60;
+  // em --json o stdout é só o payload; progresso vai para stderr
+  const log = opts.json ? console.error : console.log;
+  await withClient(locationId, log, async (client, page) => {
+    log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
+    const logs = await fetchAuditLogs(client, locationId, opts.id, days);
+    log(`${logs.length} eventos do contato.`);
+
+    // oportunidades associadas → audit log de cada uma (criação, stage, status)
+    let oppLogs: AuditLog[] = [];
+    try {
+      const oppIds = await fetchContactOpportunityIds(client, locationId, opts.id);
+      for (const oid of oppIds) {
+        const ol = await fetchAuditLogs(client, locationId, oid, days);
+        oppLogs = oppLogs.concat(ol.map((l) => ({ ...l, documentType: l.documentType || "OPPORTUNITY" })));
+      }
+      log(`${oppIds.length} oportunidade(s), ${oppLogs.length} eventos.`);
+    } catch (e) {
+      console.warn(`aviso: oportunidades indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
+    }
+
+    // agendamentos → eventos sintéticos (marcos por natureza)
+    let apptLogs: AuditLog[] = [];
+    try {
+      const appts = await fetchContactAppointments(client, locationId, opts.id, days);
+      apptLogs = appts.map((a) => ({
+        documentType: "APPOINTMENT",
+        type: "APPOINTMENT",
+        id: String(a.id ?? ""),
+        documentName: String(a.title ?? "Agendamento"),
+        createdAt: String(a.startTime ?? a.dateAdded ?? ""),
+        after: a,
+        changedFields: [],
+        source: String((a as { createdBy?: { source?: string } }).createdBy?.source ?? ""),
+      }));
+      log(`${apptLogs.length} agendamento(s).`);
+    } catch (e) {
+      console.warn(`aviso: agendamentos indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
+    }
+
+    const { pipelines, stages } = stageNamesFromLatestDump(locationId);
+    const wfNames = workflowNamesFromLatestDump(locationId);
+    const events = [...logs, ...oppLogs, ...apptLogs];
+    if (opts.json) {
+      // sourceId → nome do workflow: o campo que costura a timeline às tools do dump
+      const withNames = events.map((l) =>
+        l.sourceId && wfNames.has(String(l.sourceId)) ? { ...l, sourceWorkflowName: wfNames.get(String(l.sourceId)) } : l,
+      );
+      process.stdout.write(JSON.stringify({ locationId, id: opts.id, days, events: withNames }) + "\n");
+      return;
+    }
+    const html = renderTimelineHtml(events, {
+      locationId,
+      id: opts.id,
+      days,
+      wfNames,
+      userNames: userNamesFromLatestDump(locationId),
+      pipelineNames: pipelines,
+      stageNames: stages,
+    });
+    const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
+    fs.writeFileSync(out, html, "utf-8");
+    log(`timeline (efêmera): ${out}`);
+    if (process.platform === "darwin") execFile("open", [out]);
+  });
+}
+
+/** nome ou id → id de custom field (a lista do dump mistura padrão e custom). */
+export function resolveFieldIds(fields: { id: string; name?: string; fieldKey?: string }[], wanted: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const w of wanted) {
+    const key = w.trim().toLowerCase();
+    const hits = fields.filter((f) => f.id === w || f.name?.toLowerCase() === key || f.fieldKey?.toLowerCase() === key
+      || f.fieldKey?.toLowerCase().replace(/^contact\./, "") === key
+      // camelCase do corpo do PUT ("companyName") também resolve para o fieldKey snake_case
+      || f.fieldKey?.toLowerCase().replace(/^contact\./, "").replace(/_/g, "") === key.replace(/_/g, ""));
+    if (hits.length === 0) throw new Error(`campo ${JSON.stringify(w)} não existe no dump; confira em inventario(fatia=fields) ou passe o id`);
+    if (new Set(hits.map((h) => h.id)).size > 1) throw new Error(`campo ${JSON.stringify(w)} é ambíguo: ${hits.map((h) => h.id).join(", ")}; passe o id`);
+    out.set(w, hits[0].id);
+  }
+  return out;
+}
+
+/**
+ * `contact.*` STANDARD_FIELD → chave camelCase do corpo do PUT (`docs/endpoints.md` §Escrita).
+ * Mapa explícito e fechado: fieldKey padrão fora daqui é erro, nunca fallback silencioso
+ * (o `.replace(/^contact\./, "")` anterior gerava snake_case, a API ignorava a chave e a
+ * escrita se perdia em silêncio com HTTP 200).
+ */
+const STANDARD_FIELD_BODY_KEY: Record<string, string> = {
+  "contact.first_name": "firstName",
+  "contact.last_name": "lastName",
+  "contact.email": "email",
+  "contact.website": "website",
+  "contact.phone": "phone",
+  "contact.company_name": "companyName",
+  "contact.source": "source",
+  "contact.date_of_birth": "dateOfBirth",
+  "contact.type": "type",
+  "contact.address1": "address1",
+  "contact.city": "city",
+  "contact.country": "country",
+  "contact.state": "state",
+  "contact.postal_code": "postalCode",
+  "contact.timezone": "timezone",
+};
+
+/**
+ * Valor de custom field: JSON quando o texto começa com `{`/`[`, senão string crua.
+ * TEXTBOX_LIST só aceita objeto `{optionId: texto}` — string vira `{}` em silêncio (HTTP 200).
+ */
+function parseCustomValue(value: string): unknown {
+  if (!/^\s*[{[]/.test(value)) return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+/** Corpo do PUT de campos: padrão vai cru no topo, custom em `customFields: [{id, value}]` (API interna — não `field_value`). */
+function buildFieldsBody(sets: readonly (readonly [string, string])[], ids: Map<string, string>, fields: any[]): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  const custom: unknown[] = [];
+  for (const [name, value] of sets) {
+    const f = fields.find((x) => x.id === ids.get(name));
+    if (f?.dataType === "STANDARD_FIELD") {
+      const bodyKey = STANDARD_FIELD_BODY_KEY[String(f.fieldKey)];
+      if (!bodyKey) throw new Error(`campo padrão ${JSON.stringify(f.fieldKey)} sem mapeamento conhecido para o corpo do PUT; adicione em STANDARD_FIELD_BODY_KEY antes de usar`);
+      // string vazia no campo padrão é ignorada pela API; `null` é o que a UI manda para limpar
+      body[bodyKey] = value === "" ? null : value;
+    } else {
+      // FILE_UPLOAD: a API aceita qualquer URL e forja o meta do anexo (size 1, mimetype pelo
+      // sufixo) sem baixar nada — grava um anexo que não existe. Só a UI sabe subir o arquivo.
+      if (f?.dataType === "FILE_UPLOAD") throw new Error(`campo ${JSON.stringify(name)} é FILE_UPLOAD: escrever por aqui grava um anexo falso (a API inventa o metadado a partir da URL). Suba o arquivo pela interface do GHL.`);
+      custom.push({ id: ids.get(name), value: parseCustomValue(value) });
+    }
+  }
+  if (custom.length) body.customFields = custom;
+  return body;
+}
+
+/** `contact` do envelope do GET, com os custom fields achatados em `cf:<id>`. */
+function flatContact(r: any): Record<string, unknown> {
+  const c = r?.contact ?? r ?? {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(c)) if (k !== "customFields") out[k] = v;
+  for (const f of (c.customFields ?? []) as any[]) out[`cf:${f.id}`] = f.value ?? f.field_value ?? f.fieldValue;
+  return out;
+}
+
+/** Avisos do antes/depois: chave que sumiu (PUT replace destrutivo?) e valor pedido que não mudou (escrita ignorada — o GHL responde 200 para chave desconhecida). */
+function diffAvisos(antes: unknown, depois: unknown, esperado: Map<string, string>, ignorar: Set<string>): string[] {
+  const a = flatContact(antes), d = flatContact(depois);
+  const vazio = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  const avisos: string[] = [];
+  for (const [k, v] of Object.entries(a))
+    if (!vazio(v) && vazio(d[k]) && !esperado.has(k) && !ignorar.has(k))
+      avisos.push(`possível PUT destrutivo: ${k} tinha valor antes e está vazio/ausente depois`);
+  for (const [k, v] of esperado)
+    if (String(d[k] ?? "") !== v && JSON.stringify(d[k] ?? "") !== v)
+      avisos.push(`escrita possivelmente ignorada: ${k} deveria ser ${JSON.stringify(v)}, veio ${JSON.stringify(d[k])} — compare os valores antes de concluir: o GHL normaliza (telefone em E.164, data em ISO), e valor equivalente com outra grafia significa que a escrita passou`);
+  return avisos;
+}
+
+async function runContatoEditar(opts: { location: string; id: string; set: string[]; tag: string[]; json?: boolean }): Promise<void> {
+  const loc = opts.location, id = opts.id;
+  const log = opts.json ? console.error : console.log;
+  const fieldsRaw = latestDumpEntity(loc, "custom_fields") as { customFields?: any[] } | undefined;
+  const tagsRaw = latestDumpEntity(loc, "tags") as { tags?: any[] } | undefined;
+  if (!fieldsRaw || !tagsRaw) throw new Error(`sem dump de ${loc} em ${DUMPS_DIR}; rode extract primeiro`);
+
+  const sets = opts.set.map((s) => { const i = s.indexOf("="); if (i < 1) throw new Error(`--set espera nome=valor, veio ${JSON.stringify(s)}`); return [s.slice(0, i), s.slice(i + 1)] as const; });
+  // `customFields` mistura model contact|business|opportunity (homônimos: email, phone, city, state,
+  // country, website, postal code); sem esse filtro os campos mais óbvios do contato caem em "ambíguo".
+  const contactFields = (fieldsRaw.customFields ?? []).filter((f: any) => f.model === "contact");
+  const fieldIds = resolveFieldIds(contactFields, sets.map(([n]) => n));
+  const tagNames = new Map((tagsRaw.tags ?? []).map((t: any) => [String(t.name).toLowerCase(), String(t.name)]));
+  const resolveTag = (t: string) => { const n = tagNames.get(t.trim().toLowerCase()); if (!n) throw new Error(`tag ${JSON.stringify(t)} não existe; a tool não cria tags`); return n; };
+  for (const t of opts.tag) if (!t.startsWith("+") && !t.startsWith("-")) throw new Error(`--tag espera +nome (adicionar) ou -nome (remover), veio ${JSON.stringify(t)}`);
+  const tagsAdd = opts.tag.filter((t) => t.startsWith("+")).map((t) => resolveTag(t.slice(1)));
+  const tagsDel = opts.tag.filter((t) => t.startsWith("-")).map((t) => resolveTag(t.slice(1)));
+  if (sets.length + tagsAdd.length + tagsDel.length === 0) throw new Error("nada a fazer: passe --set e/ou --tag");
+
+  await withClient(loc, log, async (client) => {
+    const antes = await getContact(client, loc, id);
+    const snapDir = path.join(DUMPS_DIR, "_contatos", loc, id);
+    fs.mkdirSync(snapDir, { recursive: true });
+    const now = new Date();
+    const snapPath = path.join(snapDir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
+    const snap: any = { fetchedAt: new Date().toISOString(), pedido: { set: Object.fromEntries(sets), tagsAdd, tagsDel }, raw: antes, escrito: false, aplicado: [] as string[] };
+    fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2));
+    log(`snapshot: ${snapPath}`);
+
+    const marca = (o: string) => { snap.escrito = true; snap.aplicado.push(o); fs.writeFileSync(snapPath, JSON.stringify(snap, null, 2)); };
+    const esperado = new Map<string, string>();
+    if (sets.length) {
+      const body = buildFieldsBody(sets, fieldIds, contactFields);
+      for (const [k, v] of Object.entries(body)) if (k !== "customFields") esperado.set(k, v === null ? "" : String(v));
+      for (const f of (body.customFields as any[] ?? [])) esperado.set(`cf:${f.id}`, typeof f.value === "object" && f.value !== null ? JSON.stringify(f.value) : String(f.value));
+      await updateContactFields(client, loc, id, body); marca("set");
+    }
+    if (tagsAdd.length) { await addContactTags(client, loc, id, tagsAdd); marca("tagsAdd"); }
+    if (tagsDel.length) { await removeContactTags(client, loc, id, tagsDel); marca("tagsDel"); }
+
+    let depois: unknown;
+    try {
+      depois = await getContact(client, loc, id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`escrita aplicada (${snap.aplicado.join(", ") || "nada"}), mas o GET final falhou: ${msg}. snapshot em ${snapPath}`);
+    }
+    const avisos = diffAvisos(antes, depois, esperado, new Set(tagsDel.length ? ["tags"] : []));
+    for (const a of avisos) console.error(`AVISO: ${a}`);
+    const out = { locationId: loc, id, snapshot: snapPath, antes, depois, avisos,
+      mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
+    if (opts.json) process.stdout.write(JSON.stringify(out) + "\n");
+    else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);
+  });
+}
+
+export function registrarContato(program: Command): void {
+  program
+    .command("timeline")
+    .description("Linha do tempo (audit log) de um contato — sob demanda, sem gravar em dumps/")
+    .requiredOption("-l, --location <id>", "locationId da subconta")
+    .requiredOption("-i, --id <id>", "id do contato/registro")
+    .option("-d, --days <n>", "janela em dias", "60")
+    .option("--json", "imprime os eventos em JSON no stdout em vez de renderizar HTML")
+    .action(runTimeline);
+
+  program
+    .command("contato-editar")
+    .description("ESCREVE: altera campos/tags de um contato via API interna, com snapshot antes")
+    .requiredOption("-l, --location <id>", "locationId da subconta")
+    .requiredOption("-i, --id <id>", "id do contato")
+    .option("--set <nome=valor>", "campo (nome, fieldKey ou id) = valor; repetível", (v: string, acc: string[]) => [...acc, v], [])
+    .option("--tag <+nome|-nome>", "adiciona (+) ou remove (-) tag; repetível", (v: string, acc: string[]) => [...acc, v], [])
+    .option("--json", "imprime o resultado em JSON no stdout")
+    .action((o) => runContatoEditar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+}
