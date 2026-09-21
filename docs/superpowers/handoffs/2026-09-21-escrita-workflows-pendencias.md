@@ -86,6 +86,11 @@ Instaltech trocavam de workflow sozinhos e o `diff` de snapshots acusava mudanç
 
 ## O que a parte A não faz, por decisão
 
+> **Criar, remover e mover step FECHARAM na 0.18.0** (`step-criar`, `step-remover`,
+> `step-mover`), com prova ao vivo em
+> `2026-09-21-workflow-steps-parte-b-prova.md`. Seguem fora: mover container, remover ramo
+> isolado e restaurar versão do histórico.
+
 Remover step vivo (exige recosturar `next`), criar step do zero, reordenar fluxo, restaurar
 versão do histórico. A rota `/recover` foi mapeada do bundle e nunca exercitada; o código
 que a implementava saiu para que ninguém a reencontre e acredite que existe desfazer.

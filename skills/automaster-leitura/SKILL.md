@@ -162,8 +162,8 @@ sucesso e não cria inscrição nenhuma** — a resposta do servidor é idêntic
 funciona; o comando lê o status antes de escrever e avisa quando ele não é `published`.
 
 `workflow_editar` muda a ESTRUTURA do workflow (cria, renomeia, move, duplica, apaga; troca uma
-referência ou uma tag, limpa steps inalcançáveis, altera um atributo de step, remove trigger).
-Como ler a resposta:
+referência ou uma tag, limpa steps inalcançáveis, altera um atributo de step, adiciona/remove
+trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler a resposta:
 
 - **`aplicado: false` com `diff` preenchido é PRÉVIA, não falha.** Sem `confirmo` a tool sempre
   roda a prévia: ela mostra o diff e não grava nada. Para gravar, repita com `confirmo=true`.
@@ -180,6 +180,13 @@ Como ler a resposta:
   alguma referência — extraia a subconta de novo se quiser a rede de proteção.
 - `validacao.pode_gravar: false` é recusa de verdade: a edição introduziria um ERROR novo, e
   nada foi gravado. `erros_resolvidos` é o contrário: achados que a edição conserta.
+- **Recusa de step não é bug.** `step-criar` recusa ancorar num container de N saídas e diz em
+  qual ramo ancorar; `step-remover` recusa nó de ramo (`transition`, `branch-yes`, `branch-no`),
+  porque ele é estrutura do container e não um passo do fluxo, e recusa container sem
+  `com_subarvore`, dizendo quantos steps sairiam junto. `step-mover` só move step simples.
+- **O `corpo` de `step-criar` é JSON cru, e os attributes não são validados.** Copie um step
+  existente do mesmo tipo (via `workflow(loc, id)`) como molde: um `attributes` errado vira caixa
+  que o editor do app não abre, e nenhuma das 18 regras acha isso estranho.
 - **`aviso` numa prévia de trigger quer dizer que a lista de triggers não pôde ser lida.** A
   prévia segue sem ela em vez de falhar inteira, e a validação cai na lista do dump — o que
   vier de achado de trigger ali vale para o snapshot, não para agora.

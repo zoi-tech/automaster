@@ -70,6 +70,7 @@ npm run agenda-acao -- -l <loc> --acao bloquear --dono <userId> --inicio <isoCom
 npm run workflows-ao-vivo -- -l <loc> -o dentro -i <workflowId> --json    # quem está dentro de um workflow, ao vivo
 npm run workflow-acao -- -l <loc> --acao inscrever -i <workflowId> --contato <contactId> --confirmo --json  # ESCREVE: publica/despublica, inscreve, remove ou retoma
 npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico); sem --confirmo é prévia; camada CRUA, grava sem as 18 regras
+npm run workflow-editar -- -l <loc> --acao step-criar -i <wid> --depois-de <stepId> --corpo '{"type":"sms",...}' --confirmo --json  # ESCREVE: monta o canvas (step-criar/step-remover/step-mover)
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
@@ -84,7 +85,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
-.venv/bin/python -m pytest -q                             # suíte (323 testes)
+.venv/bin/python -m pytest -q                             # suíte (328 testes)
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
 # Plugin (raiz do repo)
@@ -104,6 +105,15 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
 - **Workflow criado por API nasce invisível**: sem `status` e, sem pasta, com `parentId` vazio — a API o lista, a interface não. `criar`/`duplicar` exigem `--pasta` e rodam `nascerVisivel` depois. A URL do editor é `workflow` no SINGULAR (`/automation/workflow/<wid>`); com o plural o app dá 404 e a página fica branca.
 - **Lista de workflows:** `?type=workflow` (lista plana); `parentId=root` só traz pastas.
 - **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
+- **Os steps do canvas se montam por `step-criar`/`step-remover`/`step-mover`**, e nenhuma
+  estreia rota: as três mandam o corpo pelo mesmo save. O step novo vai em JSON cru (`--corpo`)
+  porque os `attributes` dos 41 tipos não são modelados — copie um step do mesmo tipo como
+  molde. A âncora (`--depois-de`) pode ser um nó de ramo (é assim que se põe ação dentro do
+  "sim"), nunca um container. Nó de ramo (`transition`, `branch-yes`, `branch-no`) não se
+  remove sozinho: é estrutura do container, indexada por `attributes.branches` e pelo
+  `sibling[]`. Container só sai com `--com-subarvore`. Step criado sem
+  `advanceCanvasMeta.position` aparece no lugar certo — o editor calcula o layout (provado ao
+  vivo em 2026-09-21).
 - **A validação pelas 18 regras mora acima do comando.** `npm run workflow-editar` é a camada crua e
   grava sem rodar regra nenhuma (avisa em stderr). As duas portas com guarda são a tool MCP
   `workflow_editar` e `automaster-audit workflow-editar`, que chamam o mesmo caminho: prévia sem
@@ -115,7 +125,7 @@ Subconta de validação: `Xb9gDxwxYhdqtprGcb5E` (Instaltech, 72 workflows). A se
 
 ## Fora de escopo (por enquanto)
 
-Desfazer uma edição de contato, um envio de mensagem ou um upload de anexo, clonagem/migração entre subcontas, multi-subconta em lote.
+Desfazer uma edição de contato, um envio de mensagem ou um upload de anexo, clonagem/migração entre subcontas, multi-subconta em lote. No canvas: mover um container (a cauda pende dos ramos, não dele) e remover um ramo isolado.
 
 Oportunidades **saíram** desta lista na 0.6.0: leitura, CRUD de card e gestão de pipeline estão implementados e validados ao vivo (`docs/endpoints.md` seção `## Oportunidades`). Segue fora: apagar cards em lote (`POST /bulk/delete`, destrutivo em lote sem guarda boa) e qualquer regra de auditoria sobre oportunidade.
 

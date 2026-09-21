@@ -267,7 +267,12 @@ def _run_extractor(*args: str) -> dict:
             + _head_tail(e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace"))
         ) from e
     if r.returncode != 0 or not r.stdout.strip():
-        dica = (" A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
+        # A dica de rastro só faz sentido quando havia escrita para ser aplicada. Numa prévia
+        # recusada ela dizia que produção podia ter mudado, e não podia. `contato-editar` é a
+        # exceção: grava direto, não tem prévia.
+        gravava = "--confirmo" in args or args[0] == "contato-editar"
+        dica = "" if not gravava else (
+               " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
                 if args[0].startswith("formulario-") else
                 " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool "
                 "`workflows_ao_vivo`, ou `workflow_editar` com acao='historico'."
@@ -1006,10 +1011,14 @@ def modelos_email(loc: str, o: str = "lista", id: str | None = None,
 WF_EDITAR_ACOES = (
     "criar", "renomear", "mover", "duplicar", "apagar",
     "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
+    "step-criar", "step-remover", "step-mover",
 )
 
 # ações que mexem no corpo do workflow e por isso passam pela validação das 18 regras
-_WF_EDITAR_COM_CORPO = {"trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger"}
+_WF_EDITAR_COM_CORPO = {
+    "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger",
+    "step-criar", "step-remover", "step-mover",
+}
 
 
 def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None = None,
@@ -1017,7 +1026,8 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
                     step: str | None = None, caminho: str | None = None, valor: str | None = None,
                     trigger_acao: str | None = None,
                     trigger_id: str | None = None, trigger_corpo: dict | str | None = None,
-                    confirmo: bool = False,
+                    corpo: dict | str | None = None, depois_de: str | None = None,
+                    com_subarvore: bool = False, confirmo: bool = False,
                     publicado: bool = False, snapshot: str | None = None) -> dict:
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
 
@@ -1042,6 +1052,8 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         )
     if trigger_corpo is not None and not isinstance(trigger_corpo, str):
         trigger_corpo = json.dumps(trigger_corpo, ensure_ascii=False)
+    if corpo is not None and not isinstance(corpo, str):
+        corpo = json.dumps(corpo, ensure_ascii=False)
 
     def _args(com_confirmo: bool, versao: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
@@ -1055,9 +1067,12 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
             ("--step", step), ("--caminho", caminho), ("--valor", valor),
             ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
             ("--trigger-corpo", trigger_corpo),
+            ("--corpo", corpo), ("--depois-de", depois_de),
         ):
             if valor_opcional is not None:
                 a += [flag, str(valor_opcional)]
+        if com_subarvore:
+            a.append("--com-subarvore")
         if com_confirmo:
             a.append("--confirmo")
         if publicado:
@@ -1490,10 +1505,12 @@ TOOLS = {
                         "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
                         "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
                         "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
-                        "(`trigger`). Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
+                        "(`trigger`). Monta o canvas: insere um step (`step-criar`), remove um step vivo "
+                        "recosturando os ponteiros (`step-remover`) e muda um step de lugar (`step-mover`). "
+                        "Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
                         "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
                         "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
-                        "`url`, o link do editor. Não reordena fluxo nem cria step do zero.",
+                        "`url`, o link do editor. Não move container nem remove ramo de container isolado.",
                         {"loc": _LOC,
                          "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
                          "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},
@@ -1503,7 +1520,7 @@ TOOLS = {
                                                   "(fora de pasta o app não mostra o workflow)"},
                          "de": {"type": "string", "description": "id (trocar-ref) ou nome de tag (trocar-tag) a substituir"},
                          "para": {"type": "string", "description": "id ou nome de tag novo"},
-                         "step": {"type": "string", "description": "id do step (atributo)"},
+                         "step": {"type": "string", "description": "id do step (atributo, step-remover, step-mover)"},
                          "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
                          "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
                          "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
@@ -1514,6 +1531,17 @@ TOOLS = {
                                                           "form_submission…), mais `name`, `conditions` e "
                                                           "`masterType: \"highlevel\"`. O `workflowId` é "
                                                           "preenchido pela tool"},
+                         "corpo": {"type": "object",
+                                   "description": "step que ENTRA (step-criar): `type` obrigatório, mais "
+                                                  "`name` e `attributes` no formato do tipo. Copie um step "
+                                                  "existente do mesmo tipo como molde — os attributes não "
+                                                  "são modelados. `id`, `parentKey` e `next` são ignorados"},
+                         "depois_de": {"type": "string",
+                                       "description": "id do step que fica logo ANTES (step-criar, step-mover); "
+                                                      "pode ser um nó de ramo, não pode ser um container"},
+                         "com_subarvore": {"type": "boolean",
+                                           "description": "step-remover: o container sai levando os ramos e "
+                                                          "tudo que pende deles"},
                          "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
                          "publicado": {"type": "boolean", "description": "obrigatório junto de confirmo se o workflow está publicado"},
                          "snapshot": _SNAP},

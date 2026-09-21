@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
+  criarStep, removerStep, moverStep,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -205,4 +206,126 @@ test("limpar-orfaos lê o `parent` legado quando é o único campo de ancestrali
     { id: "z", type: "sms", attributes: {}, parent: "a" },
   ]);
   assert.deepEqual(removerStepsInalcancaveis(d).mudancas, ["z"]);
+});
+
+// ---- steps do canvas (parte B) ----
+
+/** a → b → c, encadeado por parentKey e next, como o servidor grava. */
+const linha = () => doc([
+  { id: "a", type: "wait", order: 0, attributes: {}, next: "b" },
+  { id: "b", type: "sms", order: 1, attributes: {}, parentKey: "a", next: "c" },
+  { id: "c", type: "add_contact_tag", order: 2, attributes: {}, parentKey: "b" },
+]);
+
+/** container if_else com dois ramos; o ramo "sim" leva a um corpo. */
+const comRamos = () => doc([
+  { id: "a", type: "wait", order: 0, attributes: {}, next: "cond" },
+  { id: "cond", type: "if_else", nodeType: "condition-node", order: 1, parentKey: "a",
+    next: ["sim", "nao"], attributes: { branches: [{ id: "sim", name: "Sim" }] } },
+  { id: "sim", type: "if_else", nodeType: "branch-yes", order: 2, parentKey: "cond",
+    sibling: ["nao"], next: "corpo", attributes: { if: false, branches: [] } },
+  { id: "nao", type: "if_else", nodeType: "branch-no", order: 3, parentKey: "cond",
+    sibling: ["sim"], attributes: { else: true } },
+  { id: "corpo", type: "sms", order: 4, parentKey: "sim", attributes: {} },
+]);
+
+const acha = (d: Documento, id: string) => d.workflowData.templates.find((s: any) => s.id === id) as any;
+
+test("criarStep costura o step novo entre a âncora e o que ela apontava", () => {
+  const r = criarStep(linha(), { type: "webhook", name: "Avisa" }, "a");
+  const novo = r.doc.workflowData.templates.find((s: any) => s.type === "webhook") as any;
+  assert.equal(acha(r.doc, "a").next, novo.id);
+  assert.equal(novo.parentKey, "a");
+  assert.equal(novo.next, "b");
+  assert.equal(acha(r.doc, "b").parentKey, novo.id);
+  assert.equal(novo.order, 3);
+});
+
+test("criarStep no fim da linha não inventa next", () => {
+  const r = criarStep(linha(), { type: "webhook" }, "c");
+  const novo = r.doc.workflowData.templates.find((s: any) => s.type === "webhook") as any;
+  assert.equal(acha(r.doc, "c").next, novo.id);
+  assert.equal("next" in novo, false);
+});
+
+test("criarStep aceita ancorar num nó de ramo: é assim que se põe ação dentro do sim", () => {
+  const r = criarStep(comRamos(), { type: "sms", name: "Dentro do sim" }, "sim");
+  const novo = r.doc.workflowData.templates.find((s: any) => s.name === "Dentro do sim") as any;
+  assert.equal(acha(r.doc, "sim").next, novo.id);
+  assert.equal(novo.next, "corpo");
+  assert.equal(acha(r.doc, "corpo").parentKey, novo.id);
+});
+
+test("criarStep recusa ancorar num container e diz em qual ramo ancorar", () => {
+  assert.throws(() => criarStep(comRamos(), { type: "sms" }, "cond"), /ambíguo[\s\S]*sim, nao/);
+});
+
+test("criarStep ignora id/parentKey/next do corpo e avisa", () => {
+  const r = criarStep(linha(), { type: "sms", id: "forjado", next: "z" }, "a");
+  assert.equal(acha(r.doc, "forjado"), undefined);
+  assert.match(r.avisos![0], /id, next/);
+});
+
+test("criarStep exige type no corpo", () => {
+  assert.throws(() => criarStep(linha(), { name: "sem tipo" }, "a"), /precisa trazer `type`/);
+});
+
+test("criarStep não muta o documento original", () => {
+  const d = linha();
+  criarStep(d, { type: "sms" }, "a");
+  assert.equal(d.workflowData.templates.length, 3);
+  assert.equal(d.workflowData.templates[0].next, "b");
+});
+
+test("removerStep emenda o pai no filho do step que saiu", () => {
+  const r = removerStep(linha(), "b");
+  assert.deepEqual(r.mudancas, ["b"]);
+  assert.equal(r.doc.workflowData.templates.length, 2);
+  assert.equal(acha(r.doc, "a").next, "c");
+  assert.equal(acha(r.doc, "c").parentKey, "a");
+});
+
+test("removerStep na raiz deixa o filho virar raiz", () => {
+  const r = removerStep(linha(), "a");
+  assert.equal("parentKey" in acha(r.doc, "b"), false);
+  assert.equal("parent" in acha(r.doc, "b"), false);
+});
+
+test("removerStep no fim da linha tira o next do pai", () => {
+  const r = removerStep(linha(), "c");
+  assert.equal("next" in acha(r.doc, "b"), false);
+});
+
+test("removerStep recusa nó de ramo e manda remover o container", () => {
+  assert.throws(() => removerStep(comRamos(), "sim"), /é um ramo[\s\S]*remova o container \(cond\)/);
+});
+
+test("removerStep recusa container sem --com-subarvore e conta o que sairia", () => {
+  assert.throws(() => removerStep(comRamos(), "cond"), /tira também os 3 steps/);
+});
+
+test("removerStep com subárvore leva ramos e corpo, e o pai termina ali", () => {
+  const r = removerStep(comRamos(), "cond", true);
+  assert.deepEqual([...r.mudancas].sort(), ["cond", "corpo", "nao", "sim"]);
+  assert.deepEqual(r.doc.workflowData.templates.map((s: any) => s.id), ["a"]);
+  assert.equal("next" in acha(r.doc, "a"), false);
+});
+
+test("moverStep tira do lugar antigo e costura no novo", () => {
+  const r = moverStep(linha(), "b", "c");
+  assert.equal(acha(r.doc, "a").next, "c");
+  assert.equal(acha(r.doc, "c").parentKey, "a");
+  assert.equal(acha(r.doc, "c").next, "b");
+  assert.equal(acha(r.doc, "b").parentKey, "c");
+  assert.equal("next" in acha(r.doc, "b"), false);
+  assert.equal(r.doc.workflowData.templates.length, 3);
+});
+
+test("moverStep recusa a âncora igual ao próprio step", () => {
+  assert.throws(() => moverStep(linha(), "b", "b"), /mesmo step/);
+});
+
+test("moverStep recusa container e ramo", () => {
+  assert.throws(() => moverStep(comRamos(), "cond", "a"), /container de N saídas/);
+  assert.throws(() => moverStep(comRamos(), "sim", "a"), /ramo de container/);
 });
