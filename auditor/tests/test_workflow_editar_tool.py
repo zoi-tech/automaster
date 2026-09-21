@@ -373,6 +373,9 @@ _ARGS_POR_ACAO = {
     "duplicar": {"id": "W1", "nome": "Cópia", "pasta": "P1"},
     "apagar": {"id": "W1"},
     "historico": {"id": "W1"},
+    "step-criar": {"id": "W1", "corpo": {"type": "sms"}, "depois_de": "s1"},
+    "step-remover": {"id": "W1", "step": "s1", "com_subarvore": True},
+    "step-mover": {"id": "W1", "step": "s1", "depois_de": "s2"},
 }
 
 
@@ -407,8 +410,15 @@ def test_cada_acao_monta_a_linha_de_comando_e_valida_quando_deve(acao, monkeypat
     assert primeira[0] == "workflow-editar"
     assert "--acao" in primeira and acao in primeira
     assert "--json" in primeira
-    for valor in _ARGS_POR_ACAO[acao].values():
-        assert valor in primeira, f"{valor!r} não chegou na linha de comando"
+    for chave, valor in _ARGS_POR_ACAO[acao].items():
+        if valor is True:
+            # booleano vira flag sem valor: `com_subarvore=True` → `--com-subarvore`
+            assert f"--{chave.replace('_', '-')}" in primeira, f"{chave} virou flag nenhuma"
+        elif isinstance(valor, dict):
+            # dict é serializado pela tool, como `trigger_corpo` e `corpo`
+            assert json.dumps(valor, ensure_ascii=False) in primeira, f"{chave} não foi serializado"
+        else:
+            assert valor in primeira, f"{valor!r} não chegou na linha de comando"
 
     com_corpo = acao in mcp_server._WF_EDITAR_COM_CORPO
     assert bool(validou) is com_corpo, (

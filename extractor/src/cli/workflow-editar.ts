@@ -12,17 +12,20 @@ import {
 import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
+  criarStep, removerStep, moverStep,
   type Documento,
 } from "../api/workflow-edit.js";
 
 export const WF_EDITAR_ACOES = [
   "criar", "renomear", "mover", "duplicar", "apagar",
   "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
+  "step-criar", "step-remover", "step-mover",
 ] as const;
 
 export interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
   de?: string; para?: string; step?: string; caminho?: string; valor?: string;
+  corpo?: string; depoisDe?: string; comSubarvore?: boolean;
   triggerAcao?: string; triggerId?: string; triggerCorpo?: string; versaoEsperada?: string;
   usuario?: string; confirmo?: boolean; publicado?: boolean; json?: boolean;
 }
@@ -196,8 +199,29 @@ function aplicarOperacao(doc: Documento, o: Opts) {
         throw new Error("--acao atributo exige --step, --caminho e --valor");
       }
       return alterarAtributo(doc, o.step, o.caminho, parseValor(o.valor));
+    case "step-criar":
+      if (!o.corpo || !o.depoisDe) throw new Error("--acao step-criar exige --corpo (JSON do step) e --depois-de");
+      return criarStep(doc, parseCorpo(o.corpo), o.depoisDe);
+    case "step-remover":
+      if (!o.step) throw new Error("--acao step-remover exige --step (id do step que sai)");
+      return removerStep(doc, o.step, o.comSubarvore);
+    case "step-mover":
+      if (!o.step || !o.depoisDe) throw new Error("--acao step-mover exige --step e --depois-de");
+      return moverStep(doc, o.step, o.depoisDe);
     default:
       throw new Error(`ação sem corpo tratada no caminho errado: ${o.acao}`);
+  }
+}
+
+/**
+ * `--corpo` é o step inteiro: diferente de `--valor`, texto que não é JSON aqui é erro, não
+ * um valor de texto. Um step mal-formado só apareceria como caixa que o editor não abre.
+ */
+function parseCorpo(v: string): Record<string, unknown> {
+  try {
+    return JSON.parse(v);
+  } catch (e) {
+    throw new Error(`--corpo não é JSON válido (${e instanceof Error ? e.message : e})`);
   }
 }
 
@@ -436,6 +460,9 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--step <id>", "id do step (atributo)")
     .option("--caminho <c>", "campo dentro de attributes, aninhado com ponto (atributo)")
     .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
+    .option("--corpo <json>", "JSON do step que entra (step-criar)")
+    .option("--depois-de <id>", "id do step que fica logo ANTES (step-criar, step-mover)")
+    .option("--com-subarvore", "step-remover: container sai levando ramos e tudo que pende deles")
     .option("--trigger-acao <a>", TRIGGER_ACOES.join(" | "))
     .option("--trigger-id <id>", "id do trigger que sai (remover, substituir)")
     .option("--trigger-corpo <json>", "JSON do trigger que entra (adicionar, substituir)")

@@ -187,7 +187,8 @@ def run_workflow_editar(args: argparse.Namespace) -> int:
     from . import mcp_server
 
     campos = ("loc", "acao", "id", "nome", "pasta", "de", "para", "step", "caminho", "valor",
-              "trigger_acao", "trigger_id", "trigger_corpo", "confirmo", "publicado", "snapshot")
+              "trigger_acao", "trigger_id", "trigger_corpo", "corpo", "depois_de",
+              "com_subarvore", "confirmo", "publicado", "snapshot")
     try:
         r = mcp_server.workflow_editar(**{c: getattr(args, c) for c in campos})
     except mcp_server.ToolError as e:
@@ -261,13 +262,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_we.add_argument("--pasta", help="id da pasta (obrigatório em criar/duplicar)")
     p_we.add_argument("--de", help="id ou tag de origem (trocar-ref/trocar-tag)")
     p_we.add_argument("--para", help="id ou tag de destino (trocar-ref/trocar-tag)")
-    p_we.add_argument("--step", help="id do step (atributo)")
+    p_we.add_argument("--step", help="id do step (atributo, step-remover, step-mover)")
     p_we.add_argument("--caminho", help="caminho do campo dentro do step (atributo)")
     p_we.add_argument("--valor", help="valor novo do campo (atributo)")
     p_we.add_argument("--trigger-acao", choices=("adicionar", "remover", "substituir"),
                       help="operação de trigger (acao=trigger)")
     p_we.add_argument("--trigger-id", help="id do trigger (remover/substituir)")
     p_we.add_argument("--trigger-corpo", help="JSON do trigger novo (adicionar/substituir)")
+    p_we.add_argument("--corpo", help="JSON do step novo (step-criar)")
+    p_we.add_argument("--depois-de", help="id do step que fica logo antes (step-criar/step-mover)")
+    p_we.add_argument("--com-subarvore", action="store_true",
+                      help="step-remover: container sai levando ramos e tudo que pende deles")
     p_we.add_argument("--confirmo", action="store_true",
                       help="grava de verdade; sem ele devolve só a prévia com o diff")
     p_we.add_argument("--publicado", action="store_true",

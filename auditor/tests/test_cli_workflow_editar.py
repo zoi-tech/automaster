@@ -37,6 +37,7 @@ def test_repassa_todos_os_parametros(monkeypatch, capsys):
         "loc": "L1", "acao": "trocar-tag", "id": "W1", "nome": None, "pasta": None,
         "de": "a", "para": "b", "step": None, "caminho": None, "valor": None,
         "trigger_acao": None, "trigger_id": None, "trigger_corpo": None,
+        "corpo": None, "depois_de": None, "com_subarvore": False,
         "confirmo": True, "publicado": True, "snapshot": "2026-01-01_0000",
     }
     assert json.loads(saida.out) == {"aplicado": True}
