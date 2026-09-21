@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Auditor de workflows GHL extraídos pelo Automaster v2"
 requires-python = ">=3.12"
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [project.scripts]
 automaster-audit = "automaster_audit.cli:main"
 

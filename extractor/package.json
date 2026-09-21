@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Extrai workflows GHL de uma subconta via API interna",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "automaster-extract": "dist/cli.js"
   },
