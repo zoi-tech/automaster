@@ -191,6 +191,17 @@ apagados na hora. Detalhe e respostas verbatim em
 | **Criar trigger** | `POST .../workflow/<loc>/trigger` | o trigger, com **`workflowId`** (camelCase) | ✓ (`{"id":"…"}`, criou de verdade) |
 | Só triggers (`only-triggers`) | `PUT .../workflow/<loc>/only-triggers/<wid>` | o corpo INTEIRO do save | ✓ — **e não serve para nada** (ver abaixo) |
 
+**A URL do editor é `workflow` no singular.** `https://app.gohighlevel.com/v2/location/<loc>/automation/workflow/<wid>`.
+Com `workflows` (plural, que é a rota da LISTA) o app devolve 404 e a página fica branca —
+inclusive para workflow publicado e íntegro. As rotas saem do roteador do bundle do editor
+(`client-app-automation-workflows.leadconnectorhq.com/assets/index-*.js`, `path:` literais).
+
+**A lista da interface mostra pastas, não workflows.** A raiz da subconta só tem pastas; o
+workflow aparece ao entrar na pasta. A rota que o app usa é
+`GET .../workflow/<loc>/list?parentId=<pasta|root>&limit=&offset=&sortBy=name&sortOrder=asc`,
+que devolve `{rows, count}` com `type` `directory` ou `workflow` — diferente do
+`?type=workflow` que o extractor usa para a lista plana.
+
 **Workflow recém-criado nasce invisível no app.** O `POST` de criação devolve um documento
 **sem `status`**, e com `parentId: ""` quando não se manda pasta. Nesse estado a lista da
 interface não o mostra e o editor abre em página branca, embora o `GET` e a lista da API o
