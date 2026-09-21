@@ -237,15 +237,21 @@ async function acaoTrigger(
       `${triggers.map((t) => t?.id).join(", ") || "nenhum"})`,
     );
   }
+  const restantes = triggers.filter((t) => t?.id !== o.triggerId);
   const vazio = { workflowData: { templates: [] } } as unknown as Documento;
-  const diff = diffWorkflow(
-    { ...vazio, triggersData: triggers },
-    { ...vazio, triggersData: triggers.filter((t) => t?.id !== o.triggerId) },
-  );
-  Object.assign(saida, { diff, mudancas: [`trigger ${o.triggerId} removido`], triggers });
+  const diff = diffWorkflow({ ...vazio, triggersData: triggers }, { ...vazio, triggersData: restantes });
+  // `triggers` na saída é sempre a lista do DEPOIS, igual a `documento`: é ela que quem
+  // valida contra as 18 regras precisa. A lista de antes está no `diff`.
+  Object.assign(saida, { diff, mudancas: [`trigger ${o.triggerId} removido`], triggers: restantes });
 
   if (!o.confirmo) {
-    Object.assign(saida, { aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar" });
+    // O corpo não muda aqui, mas a prévia devolve o `documento` do mesmo jeito: sem ele
+    // quem chama não tem o que validar, e remover trigger é justo o caso que dispara
+    // `workflow_unreachable` — a validação não pode sumir aqui.
+    const documento = (await client.getJson(`${WF_WRITE}/${o.location}/${o.id}`)) as Documento;
+    Object.assign(saida, {
+      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar", documento,
+    });
     return imprimir(saida, o, log);
   }
 

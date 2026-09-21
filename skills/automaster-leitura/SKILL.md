@@ -176,7 +176,9 @@ Como ler a resposta:
 - `validacao.pode_gravar: false` é recusa de verdade: a edição introduziria um ERROR novo, e
   nada foi gravado. `erros_resolvidos` é o contrário: achados que a edição conserta.
 - **Trigger: só dá para REMOVER.** Criar e trocar trigger não têm rota conhecida e a tool recusa
-  — antes ela devolvia sucesso sem fazer nada.
+  — antes ela devolvia sucesso sem fazer nada. A remoção **passa pela mesma validação** das
+  ações de corpo: é justo ela que pode deixar o workflow sem entrada (`workflow_unreachable`).
+  Na saída de `trigger`, `triggers` é a lista de DEPOIS da remoção; a de antes está no `diff`.
 - `trocar-ref` troca o id, não o rótulo: o `title` humano do step continua o antigo e o comando
   avisa em `avisos`. Quem for abrir o editor do GHL vai ver o nome velho ao lado do id novo.
 

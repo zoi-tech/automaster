@@ -197,3 +197,64 @@ def test_schema_nao_oferece_mais_adicionar_nem_substituir_trigger():
     _, _, schema, _ = mcp_server.TOOLS["workflow_editar"]
     assert schema["trigger_acao"]["enum"] == ["remover"]
     assert "trigger" not in schema
+
+
+def _previa_trigger():
+    """Forma real da saída de `--acao trigger --trigger-acao remover` sem --confirmo:
+    documento lido (corpo intacto) + `triggers` já SEM o trigger removido."""
+    return {"aplicado": False, "motivo": "prévia: rode de novo com --confirmo para gravar",
+            "acao": "trigger", "id": "W1",
+            "diff": {"triggersRemovidos": [{"id": "T1", "nome": "Formulário Enviado"}]},
+            "mudancas": ["trigger T1 removido"],
+            "documento": {"name": "wf", "workflowData": {"templates": []}},
+            "triggers": []}
+
+
+def test_remover_trigger_passa_pela_validacao_das_18_regras(monkeypatch):
+    """Remover trigger é o caso mais provável de `workflow_unreachable`: não pode gravar
+    sem validar. A saída da ação não tem o mesmo formato das outras — daí o teste próprio."""
+    vistos, recebidos = [], {}
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return _previa_trigger()
+
+    def validar(ctx, wid, doc, triggers=None):
+        recebidos["triggers"] = triggers
+        return _ResultadoFalso(pode_gravar=False, erros_novos=["workflow_unreachable: sem entrada"])
+
+    monkeypatch.setattr(mcp_server, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao", validar)
+
+    r = mcp_server.workflow_editar(loc="L1", acao="trigger", id="W1",
+                                   trigger_acao="remover", trigger_id="T1", confirmo=True)
+    assert recebidos["triggers"] == []          # a lista DEPOIS da remoção
+    assert r["validacao"]["rodou"] is True
+    assert r["aplicado"] is False
+    assert "workflow_unreachable" in r["motivo"]
+    assert len(vistos) == 1                     # a gravação não aconteceu
+    assert not any("--confirmo" in v for v in vistos)
+
+
+def test_previa_de_trigger_sem_confirmo_traz_validacao(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_run_extractor", lambda *a: _previa_trigger())
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao",
+                        lambda *a, **k: _ResultadoFalso(pode_gravar=True))
+    r = mcp_server.workflow_editar(loc="L1", acao="trigger", id="W1",
+                                   trigger_acao="remover", trigger_id="T1")
+    assert r["validacao"]["rodou"] is True and r["validacao"]["pode_gravar"] is True
+
+
+def test_sem_documento_a_resposta_diz_que_nao_validou(monkeypatch):
+    """"nada a mudar": a chave `validacao` não pode simplesmente sumir."""
+    monkeypatch.setattr(mcp_server, "_run_extractor",
+                        lambda *a: {"aplicado": False, "motivo": "nada a mudar"})
+    monkeypatch.setattr(mcp_server, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_server, "validar_edicao", lambda *a, **k: pytest.fail("não há o que validar"))
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["validacao"]["rodou"] is False
+    assert "não devolveu documento" in r["validacao"]["motivo"]

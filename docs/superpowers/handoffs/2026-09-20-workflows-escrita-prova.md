@@ -321,6 +321,17 @@ existe é o único rastro no histórico, e sumiu junto com o workflow apagado.
 | §2.5 registro de `duplicar` | `criar` e `duplicar` arquivam sob o id NOVO (o da resposta), com `origem` dentro do registro |
 | §2.5 PUT sem `workflowData` | comentado no código e documentado; o comando relê e devolve `versaoDepois` |
 
+### Correção da revisão (mesmo dia)
+
+A primeira versão da correção deixou a ação `trigger` **fora da validação pelas 18 regras**: a
+prévia não devolvia `documento`, e a tool MCP lia isso como "nada a validar" e gravava direto,
+sem sequer dizer que não validou. Era o defeito que esta tarefa existia para matar,
+reencarnado — e no caso em que a validação mais vale, já que remover trigger é o que dispara
+`workflow_unreachable`. Agora a prévia de `trigger` devolve o documento lido (corpo intacto) e
+`triggers` = a lista **depois** da remoção; a tool valida esse caminho como os outros. O ramo
+"nada a validar" sobrou só para o caso real de nada a mudar, e mesmo ele responde
+`validacao.rodou: false` com motivo.
+
 ### Limitações conhecidas, deixadas de propósito
 
 - **`trocar-ref` deixa o `title` velho** (§2.4). Não há de onde tirar o rótulo novo sem

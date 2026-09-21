@@ -1073,10 +1073,18 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
 
     documento = previa.get("documento")
     if documento is None:
-        # nada a validar (ex: "nada a mudar: a operação não encontrou alvo")
+        # nada a validar (ex: "nada a mudar: a operação não encontrou alvo"). Mesmo aqui a
+        # resposta diz que as regras não rodaram: ausência silenciosa da chave `validacao`
+        # se lê como "validou e passou".
+        previa["validacao"] = {
+            "rodou": False,
+            "motivo": "a prévia não devolveu documento para validar (nada a mudar): as 18 regras não foram rodadas",
+        }
         if not confirmo:
             return previa
-        return _run_extractor(*_args(True))
+        resultado = _run_extractor(*_args(True))
+        resultado["validacao"] = previa["validacao"]
+        return resultado
 
     try:
         resultado_validacao = validar_edicao(ctx, id, documento, previa.get("triggers"))

@@ -31,6 +31,11 @@ comando `npm run workflow-editar`. Continuam 18 regras de auditoria.
   (antes tratava a lista como vazia e dava todo ERROR de trigger como "resolvido"); a tool MCP
   checa o dump ANTES de abrir o Chrome e devolve `validacao.rodou: false` para workflow fora do
   dump, em vez de estourar `ValueError`.
+- **A remoção de trigger passa pela validação das 18 regras**, como as ações de corpo: a prévia
+  devolve o documento e a lista de triggers de depois, e um ERROR novo (tipicamente
+  `workflow_unreachable`, quando o trigger removido era a única entrada) recusa a gravação.
+  Quando não há o que validar, a resposta traz `validacao.rodou: false` com o motivo — a chave
+  nunca some em silêncio.
 - **Fora, declarado:** remover step vivo e recosturar ponteiros, criar step do zero, reordenar
   fluxo, restaurar versão do histórico (não há rota) e criar/trocar trigger — tudo parte B.
 - **Limitações conhecidas** (deixadas de propósito, com motivo): `trocar-ref` troca o id e o
