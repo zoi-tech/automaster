@@ -36,6 +36,7 @@ import {
   editar as editarAnotacao, apagar as apagarAnotacao, concluir as concluirTarefa,
   buscarTarefas, deuCerto, type Tipo as TipoAnotacao,
 } from "./api/annotations.js";
+import { listarTags, criarTag, renomearTag, apagarTag, acharTag, type Tag } from "./api/tags.js";
 import { aplicar, type Op } from "./forms/doc.js";
 import { diferenca } from "./forms/diff.js";
 import {
@@ -2148,6 +2149,85 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
   });
 }
 
+const TAG_ACOES = ["criar", "renomear", "apagar"] as const;
+
+/** Lista as tags da subconta, ao vivo. O cruzamento com os workflows é da tool MCP. */
+async function runTags(o: { location: string; termo?: string; json?: boolean }): Promise<void> {
+  await withClient(o.location, (m) => { if (!o.json) console.log(m); }, async (client) => {
+    let tags = await listarTags(client, o.location);
+    if (o.termo) {
+      const alvo = o.termo.trim().toLowerCase();
+      tags = tags.filter((t) => t.name.toLowerCase().includes(alvo));
+    }
+    console.log(JSON.stringify({ total: tags.length, tags }, null, 2));
+  });
+}
+
+interface OptsTagAcao {
+  location: string; acao: string; tag?: string; nome?: string;
+  apagarCitada?: boolean; confirmo?: boolean; json?: boolean;
+}
+
+/**
+ * Escrita de tag da subconta.
+ *
+ * `renomear` é escrita comum: provado ao vivo que o servidor reescreve a referência nos
+ * workflows, inclusive no trigger.
+ *
+ * `apagar` é a operação perigosa: arranca a tag de todos os contatos que a têm, e não há
+ * prova de que isso não dispare os workflows com trigger de "tag removida". A guarda
+ * `--apagar-citada` mora na tool MCP, que sabe quais workflows citam a tag; aqui, camada
+ * crua, a prévia só declara o risco.
+ */
+async function runTagAcao(o: OptsTagAcao): Promise<void> {
+  if (!TAG_ACOES.includes(o.acao as never)) {
+    throw new Error(`--acao inválida: ${o.acao}. Aceitas: ${TAG_ACOES.join(", ")}`);
+  }
+  if (o.acao === "criar" && !o.nome) throw new Error("criar exige --nome");
+  if (o.acao === "renomear" && !(o.tag && o.nome)) throw new Error("renomear exige --tag e --nome");
+  if (o.acao === "apagar" && !o.tag) throw new Error("apagar exige --tag");
+
+  await withClient(o.location, (m) => { if (!o.json) console.log(m); }, async (client) => {
+    const tags = await listarTags(client, o.location);
+    const alvo = o.tag ? acharTag(tags, o.tag) : undefined;
+    if (o.acao !== "criar" && !alvo) {
+      throw new Error(`tag não encontrada na subconta: ${o.tag}`);
+    }
+    if (o.acao === "criar" && acharTag(tags, o.nome!)) {
+      throw new Error(`já existe uma tag chamada "${o.nome}" — nomes de tag não distinguem maiúscula`);
+    }
+
+    if (!o.confirmo) {
+      const previa: Record<string, unknown> = {
+        previa: true, aplicado: false, acao: o.acao,
+        tag: alvo ?? null, nome: o.nome ?? null,
+        aviso: "nada foi gravado. Repita com --confirmo para gravar.",
+      };
+      if (o.acao === "renomear") {
+        previa.efeito = "o servidor troca o nome também dentro dos workflows que citam a tag, " +
+          "inclusive no trigger (provado ao vivo em 2026-09-21)";
+      }
+      if (o.acao === "apagar") {
+        previa.efeito = "a tag sai de TODOS os contatos que a têm. Não há como saber quantos: o " +
+          "GHL não expõe contagem de contatos por tag. Pode disparar os workflows com trigger " +
+          "de tag removida — isso não tem prova, nem a favor nem contra.";
+      }
+      console.log(JSON.stringify(previa, null, 2));
+      return;
+    }
+
+    let resposta: unknown;
+    if (o.acao === "criar") resposta = await criarTag(client, o.location, o.nome!);
+    else if (o.acao === "renomear") resposta = await renomearTag(client, o.location, alvo!.id, o.nome!);
+    else resposta = await apagarTag(client, o.location, alvo!.id);
+
+    const registro = registroEscrita(o.location, "_tags", alvo?.id ?? "nova", {
+      acao: o.acao, antes: alvo ?? null, nome: o.nome ?? null, resposta,
+    });
+    console.log(JSON.stringify({ aplicado: true, acao: o.acao, resposta, registro }, null, 2));
+  });
+}
+
 program
   .command("formulario-estilo")
   .description("ESCREVE: aplica tokens visuais a um formulário, ou grava a paleta padrão da subconta")
@@ -2192,6 +2272,25 @@ program
   .option("--confirmo", "obrigatório: grava de verdade. Sem ele, só mostra a prévia")
   .option("--json", "imprime o resultado em JSON no stdout")
   .action((o) => runAnotacaoAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("tags")
+  .description("Leitura ao vivo das tags da subconta")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .option("--termo <texto>", "filtra as tags por parte do nome")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runTags(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+
+program
+  .command("tag-acao")
+  .description("ESCREVE: cria, renomeia ou apaga uma tag da subconta")
+  .requiredOption("-l, --location <id>", "locationId da subconta")
+  .requiredOption("--acao <a>", TAG_ACOES.join(" | "))
+  .option("--tag <nomeOuId>", "a tag alvo (renomear, apagar)")
+  .option("--nome <texto>", "nome novo (criar, renomear)")
+  .option("--confirmo", "obrigatório: grava de verdade. Sem ele, só mostra a prévia")
+  .option("--json", "imprime o resultado em JSON no stdout")
+  .action((o) => runTagAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
 
 program
   .command("agenda")
