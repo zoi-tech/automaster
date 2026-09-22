@@ -1,4 +1,5 @@
 """Estrutura de um achado de auditoria."""
+
 from dataclasses import dataclass
 
 # Severidades válidas, da mais crítica à informativa.

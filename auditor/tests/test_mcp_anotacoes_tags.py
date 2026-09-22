@@ -81,12 +81,21 @@ def test_contrato_das_tools_de_anotacao():
 
 
 def test_tags_cruza_com_o_indice_reverso(monkeypatch):
-    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {
-        "total": 2, "tags": [{"id": "T1", "name": "Alfa"}, {"id": "T2", "name": "beta"}]})
+    monkeypatch.setattr(
+        mcp_base,
+        "_run_extractor",
+        lambda *a: {"total": 2, "tags": [{"id": "T1", "name": "Alfa"}, {"id": "T2", "name": "beta"}]},
+    )
     monkeypatch.setattr(mcp_base, "_load", lambda loc, snap=None: (_CtxFalso(), {"snapshot": "S"}))
-    monkeypatch.setattr(mcp_base, "_dash", lambda p: {"tags": [
-        {"name": "alfa", "used_by": ["WF um", "WF dois"], "papeis": ["adiciona", "dispara"], "orphan": False},
-    ]})
+    monkeypatch.setattr(
+        mcp_base,
+        "_dash",
+        lambda p: {
+            "tags": [
+                {"name": "alfa", "used_by": ["WF um", "WF dois"], "papeis": ["adiciona", "dispara"], "orphan": False},
+            ]
+        },
+    )
     r = srv.tags("L1")
     por_nome = {t["name"]: t for t in r["tags"]}
     # o cruzamento ignora maiúscula: "Alfa" ao vivo casa com "alfa" do índice
@@ -97,8 +106,7 @@ def test_tags_cruza_com_o_indice_reverso(monkeypatch):
 
 
 def test_tags_degrada_sem_dump(monkeypatch):
-    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {
-        "total": 1, "tags": [{"id": "T1", "name": "alfa"}]})
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {"total": 1, "tags": [{"id": "T1", "name": "alfa"}]})
 
     def sem_dump(loc, snap=None):
         raise ToolError("nenhum dump para L1")
@@ -112,8 +120,11 @@ def test_tags_degrada_sem_dump(monkeypatch):
 def test_tag_acao_apagar_citada_exige_a_guarda(monkeypatch):
     chamadas = []
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: chamadas.append(a) or {"ok": True})
-    monkeypatch.setattr(mcp_tags, "_impacto_tags", lambda loc, snap=None: (
-        {"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None))
+    monkeypatch.setattr(
+        mcp_tags,
+        "_impacto_tags",
+        lambda loc, snap=None: ({"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None),
+    )
     with pytest.raises(ToolError) as e:
         srv.tag_acao("L1", acao="apagar", tag="alfa", confirmo=True)
     assert "WF um" in str(e.value)
@@ -125,8 +136,11 @@ def test_tag_acao_apagar_citada_exige_a_guarda(monkeypatch):
 def test_tag_acao_renomear_nao_exige_guarda(monkeypatch):
     chamadas = []
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: chamadas.append(a) or {"ok": True})
-    monkeypatch.setattr(mcp_tags, "_impacto_tags", lambda loc, snap=None: (
-        {"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None))
+    monkeypatch.setattr(
+        mcp_tags,
+        "_impacto_tags",
+        lambda loc, snap=None: ({"alfa": {"workflows": ["WF um"], "papeis": ["dispara"]}}, None),
+    )
     srv.tag_acao("L1", acao="renomear", tag="alfa", nome="gama", confirmo=True)
     assert "--confirmo" in chamadas[0]
 

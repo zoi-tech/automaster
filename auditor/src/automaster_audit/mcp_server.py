@@ -4,6 +4,7 @@ As tools moram em `mcp/`, um módulo por domínio; aqui fica só o transporte.
 Importa o auditor como biblioteca: nunca lê os JSON do dump por conta própria.
 Raiz dos dumps vem de AUTOMASTER_DUMPS (default ~/.automaster/dumps).
 """
+
 from __future__ import annotations
 
 import json
@@ -83,9 +84,10 @@ from .mcp.workflows import (  # noqa: F401  # noqa: E402,F401
 
 
 def _tool_list() -> list[dict]:
-    return [{"name": n, "description": d,
-             "inputSchema": {"type": "object", "properties": p, "required": r}}
-            for n, (_, d, p, r) in TOOLS.items()]
+    return [
+        {"name": n, "description": d, "inputSchema": {"type": "object", "properties": p, "required": r}}
+        for n, (_, d, p, r) in TOOLS.items()
+    ]
 
 
 def _version() -> str:
@@ -102,8 +104,11 @@ def _version() -> str:
 def handle(req: dict) -> dict | None:
     rid, method, params = req.get("id"), req.get("method"), req.get("params") or {}
     if method == "initialize":
-        result = {"protocolVersion": PROTOCOL, "capabilities": {"tools": {}},
-                  "serverInfo": {"name": "automaster", "version": _version()}}
+        result = {
+            "protocolVersion": PROTOCOL,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "automaster", "version": _version()},
+        }
     elif method == "tools/list":
         result = {"tools": _tool_list()}
     elif method == "tools/call":

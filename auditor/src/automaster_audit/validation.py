@@ -4,6 +4,7 @@ Camada 1 = regras de auditoria (rules.run_all); Camada 2 = enumeração de
 caminhos (flow.enumerate_paths, árvore com semântica do paths.md);
 Camada 3 = contratos declarados (opcional — sem diretório → indisponível).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -46,8 +47,7 @@ def _camada1(ctx: DumpContext) -> dict:
     findings = sorted(rules.run_all(ctx), key=lambda f: (_SEV_ORDER.get(f.severity, 9), f.rule))
     return {
         "achados": [
-            {"rule": f.rule, "severity": f.severity,
-             "workflow_name": f.workflow_name or "", "detail": f.detail}
+            {"rule": f.rule, "severity": f.severity, "workflow_name": f.workflow_name or "", "detail": f.detail}
             for f in findings
         ],
         "counts": {s: sum(1 for f in findings if f.severity == s) for s in (ERROR, WARN, INFO)},
@@ -63,14 +63,16 @@ def _camada2(ctx: DumpContext) -> dict:
         total += len(paths)
         n_trunc += 1 if truncated else 0
         by_id = index_steps(wf)
-        wfs.append({
-            "id": wf.id,
-            "name": wf.name or wf.id,
-            "status": wf.status,
-            "n_paths": len(paths),
-            "truncated": truncated,
-            "tree": _tree(_trie(paths), [], by_id, ctx) if paths else [],
-        })
+        wfs.append(
+            {
+                "id": wf.id,
+                "name": wf.name or wf.id,
+                "status": wf.status,
+                "n_paths": len(paths),
+                "truncated": truncated,
+                "tree": _tree(_trie(paths), [], by_id, ctx) if paths else [],
+            }
+        )
     return {"workflows": wfs, "total_paths": total, "truncated": n_trunc}
 
 
@@ -83,10 +85,7 @@ def _camada3(ctx: DumpContext, contracts_dir: Path | None) -> dict:
         return {"disponivel": False, "erro": str(e)}
     return {
         "disponivel": True,
-        "casos": [
-            {"workflow": r.workflow, "caso": r.caso, "status": r.status, "motivo": r.motivo}
-            for r in results
-        ],
+        "casos": [{"workflow": r.workflow, "caso": r.caso, "status": r.status, "motivo": r.motivo} for r in results],
         "counts": {s: sum(1 for r in results if r.status == s) for s in ("PASS", "FAIL", "AMBIGUOUS")},
     }
 

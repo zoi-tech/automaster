@@ -4,6 +4,7 @@ Shell compartilhado (topbar + sidebar) vem de theme.py. Canvas claro (#f4f4f4)
 ocupando o main inteiro; card de controles flutua no canto superior esquerdo.
 Única exceção ao "zero requests externos": vis-network via CDN com SRI.
 """
+
 from __future__ import annotations
 
 import html as _html

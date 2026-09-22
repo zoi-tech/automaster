@@ -17,6 +17,7 @@ Acento azul #0f62fe só em link/ativo/foco. Severidade só em status
 (#da1e28 / #f1c21b / #24a148). #da1e28 e #f1c21b ficam FORA de GRAPH_COLORS:
 são reservados para referência quebrada (MISSING) e aresta em ciclo no grafo.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -267,10 +268,7 @@ def topbar(loc: str, extracted: str = "", schema=None) -> str:
         label = f"dump {extracted}"
         if schema is not None:
             label += f" · schema v{schema}"
-        right = (
-            '<span class="tb-extract"><span class="ok-dot"></span>'
-            f"{_html.escape(label)}</span>"
-        )
+        right = f'<span class="tb-extract"><span class="ok-dot"></span>{_html.escape(label)}</span>'
     return (
         '<header class="topbar">'
         '<span class="tb-brand">automaster<span>/audit</span></span>'
@@ -321,20 +319,26 @@ def shell_meta(dump_dir) -> dict:
 # (chave, rótulo, href relativo na pasta do dump, chave em counts ou None)
 _SIDEBAR_GROUPS: list[tuple[str, list[tuple[str, str, str, str | None]]]] = [
     ("Conta", [("overview", "Visão geral", "dashboard.html", None)]),
-    ("Inventário", [
-        ("workflows", "Workflows", "dashboard.html#workflows", "workflows"),
-        ("tags", "Tags", "dashboard.html#tags", "tags"),
-        ("fields", "Custom fields", "dashboard.html#fields", "fields"),
-        ("pipelines", "Pipelines", "dashboard.html#pipelines", "pipelines"),
-        ("users", "Usuários", "dashboard.html#users", "users"),
-        ("custom_values", "Custom values", "dashboard.html#custom_values", "custom_values"),
-        ("calendars", "Calendários", "dashboard.html#calendars", "calendars"),
-    ]),
-    ("Análise", [
-        ("graph", "Grafo de conexões", "graph.html", None),
-        ("journey", "Jornada do contato", "journey.html", None),
-        ("validation", "Validação", "validation.html", None),
-    ]),
+    (
+        "Inventário",
+        [
+            ("workflows", "Workflows", "dashboard.html#workflows", "workflows"),
+            ("tags", "Tags", "dashboard.html#tags", "tags"),
+            ("fields", "Custom fields", "dashboard.html#fields", "fields"),
+            ("pipelines", "Pipelines", "dashboard.html#pipelines", "pipelines"),
+            ("users", "Usuários", "dashboard.html#users", "users"),
+            ("custom_values", "Custom values", "dashboard.html#custom_values", "custom_values"),
+            ("calendars", "Calendários", "dashboard.html#calendars", "calendars"),
+        ],
+    ),
+    (
+        "Análise",
+        [
+            ("graph", "Grafo de conexões", "graph.html", None),
+            ("journey", "Jornada do contato", "journey.html", None),
+            ("validation", "Validação", "validation.html", None),
+        ],
+    ),
 ]
 
 
@@ -353,10 +357,7 @@ def sidebar(active: str, counts: dict | None = None) -> str:
             ct = ""
             if counts is not None and ckey is not None and ckey in counts:
                 ct = f'<span class="ct">{_html.escape(str(counts[ckey]))}</span>'
-            parts.append(
-                f'<a{cls} data-nav="{key}" href="{href}">'
-                f"<span>{_html.escape(label)}</span>{ct}</a>"
-            )
+            parts.append(f'<a{cls} data-nav="{key}" href="{href}"><span>{_html.escape(label)}</span>{ct}</a>')
         parts.append("</nav>")
     parts.append("</aside>")
     return "".join(parts)
@@ -367,11 +368,11 @@ def sidebar(active: str, counts: dict | None = None) -> str:
 # Vermelho #da1e28 (referência quebrada) e âmbar #f1c21b (aresta em ciclo)
 # ficam fora de propósito: são exclusivos de status no JS do grafo.
 GRAPH_COLORS = {
-    "workflow": "#161616",   # ink (quadrado)
-    "trigger": "#1192e8",    # cyan 50
-    "tag": "#0f62fe",        # blue 60
-    "pipeline": "#0043ce",   # blue 70
-    "stage": "#007d79",      # teal 60
-    "field": "#009d9a",      # teal 50
-    "user": "#005d5d",       # teal 70
+    "workflow": "#161616",  # ink (quadrado)
+    "trigger": "#1192e8",  # cyan 50
+    "tag": "#0f62fe",  # blue 60
+    "pipeline": "#0043ce",  # blue 70
+    "stage": "#007d79",  # teal 60
+    "field": "#009d9a",  # teal 50
+    "user": "#005d5d",  # teal 70
 }

@@ -7,6 +7,7 @@ opcionais — sem lista, sem achado, senão toda subconta com dump antigo virari
 Id começado por `fb-` é o pseudo-formulário do lead gen do Facebook: ele nunca aparece
 na lista de formulários e não é referência quebrada.
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding
@@ -54,7 +55,7 @@ def check(ctx: DumpContext) -> list[Finding]:
                             workflow_id=wf.id,
                             workflow_name=wf.name,
                             detail=f"trigger '{trigger.get('name', trigger.get('type'))}' "
-                                   f"dispara por {rotulo} inexistente: {fid}",
+                            f"dispara por {rotulo} inexistente: {fid}",
                         )
                     )
 
@@ -70,8 +71,7 @@ def check(ctx: DumpContext) -> list[Finding]:
                     severity=ERROR,
                     workflow_id="",
                     workflow_name="",
-                    detail=f"calendário '{cal.get('name', cal.get('id'))}' usa formulário "
-                           f"inexistente: {fid}",
+                    detail=f"calendário '{cal.get('name', cal.get('id'))}' usa formulário inexistente: {fid}",
                 )
             )
     return findings

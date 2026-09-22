@@ -1,4 +1,5 @@
 """Builder de dumps sintéticos para testes."""
+
 from __future__ import annotations
 
 import json
@@ -37,11 +38,21 @@ def make_dump(tmp_path):
 
     contador = count()
 
-    def _build(workflows=None, tags=None, pipelines=None, fields=None,
-               users=None, custom_values=None, calendars=None,
-               message_templates=None, whatsapp_templates=None, email_templates=None,
-               forms=None, surveys=None,
-               extracted_at="2026-06-10T00:00:00+00:00"):
+    def _build(
+        workflows=None,
+        tags=None,
+        pipelines=None,
+        fields=None,
+        users=None,
+        custom_values=None,
+        calendars=None,
+        message_templates=None,
+        whatsapp_templates=None,
+        email_templates=None,
+        forms=None,
+        surveys=None,
+        extracted_at="2026-06-10T00:00:00+00:00",
+    ):
         # sufixo por chamada: o diff precisa de dois dumps no mesmo tmp_path
         n = next(contador)
         root = tmp_path / ("dump" if n == 0 else f"dump{n}")
@@ -87,7 +98,11 @@ def make_dump(tmp_path):
 def trig(ttype, target_wf, name="T", conditions=None, active=True, deleted=False, tid="tr1"):
     """Trigger com o shape real do dump (actions = add_to_workflow)."""
     return {
-        "id": tid, "type": ttype, "name": name, "active": active, "deleted": deleted,
+        "id": tid,
+        "type": ttype,
+        "name": name,
+        "active": active,
+        "deleted": deleted,
         "workflow_id": target_wf,
         "actions": [{"workflow_id": target_wf, "type": "add_to_workflow"}],
         "conditions": conditions or [],
@@ -95,8 +110,14 @@ def trig(ttype, target_wf, name="T", conditions=None, active=True, deleted=False
 
 
 def tag_cond(value):
-    return {"operator": "index-of-true", "id": "tag-added", "value": value,
-            "title": "Tag Added", "type": "select", "field": "tagsAdded"}
+    return {
+        "operator": "index-of-true",
+        "id": "tag-added",
+        "value": value,
+        "title": "Tag Added",
+        "type": "select",
+        "field": "tagsAdded",
+    }
 
 
 def wf(id="wf1", name="[Solar] Compra → Boas-vindas", status="published", steps=None, triggers=None, updated_at=None):

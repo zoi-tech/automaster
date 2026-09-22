@@ -3,6 +3,7 @@
 Tags em GHL são referenciadas por nome (em add_contact_tag/remove_contact_tag,
 campo attributes.tags = lista de nomes).
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding

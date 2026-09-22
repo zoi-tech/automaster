@@ -1,4 +1,5 @@
 """Testes da Camada 2: enumeração de caminhos de execução."""
+
 from conftest import wf
 
 from automaster_audit.flow import enumerate_paths
@@ -25,8 +26,13 @@ def test_linear_three_steps_one_path(make_dump):
 
 def test_if_else_two_branches_two_labeled_paths(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond",
-         "attributes": {"branches": [{"id": "b1", "name": "VIP"}]}, "next": ["b1", "b2"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": "b1", "name": "VIP"}]},
+            "next": ["b1", "b2"],
+        },
         {"id": "b1", "type": "if_else", "name": "VIP", "parent": "c", "attributes": {"if": []}, "next": "a1"},
         {"id": "b2", "type": "if_else", "name": "Else", "parent": "c", "attributes": {"else": []}, "next": "a2"},
         {"id": "a1", "type": "sms", "name": "SMS VIP", "parent": "b1"},
@@ -55,8 +61,7 @@ def test_find_opportunity_transitions_labeled(make_dump):
 def test_goto_loop_cuts_without_infinite_recursion(make_dump):
     steps = [
         {"id": "root", "type": "sms", "name": "Root", "next": "g"},
-        {"id": "g", "type": "goto", "name": "Go To", "parent": "root",
-         "attributes": {"targetNodeId": "root"}},
+        {"id": "g", "type": "goto", "name": "Go To", "parent": "root", "attributes": {"targetNodeId": "root"}},
     ]
     paths, truncated = enumerate_paths(_wf(make_dump, steps))
     assert truncated is False
@@ -67,9 +72,13 @@ def test_goto_loop_cuts_without_infinite_recursion(make_dump):
 
 def test_cap_truncates(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond",
-         "attributes": {"branches": [{"id": f"b{i}", "name": f"R{i}"} for i in (1, 2, 3)]},
-         "next": ["b1", "b2", "b3"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": f"b{i}", "name": f"R{i}"} for i in (1, 2, 3)]},
+            "next": ["b1", "b2", "b3"],
+        },
         {"id": "b1", "type": "if_else", "name": "R1", "parent": "c", "attributes": {"if": []}},
         {"id": "b2", "type": "if_else", "name": "R2", "parent": "c", "attributes": {"if": []}},
         {"id": "b3", "type": "if_else", "name": "R3", "parent": "c", "attributes": {"if": []}},
@@ -81,8 +90,13 @@ def test_cap_truncates(make_dump):
 
 def test_empty_branch_exits_without_exception(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond",
-         "attributes": {"branches": [{"id": "b1", "name": "X"}]}, "next": ["b1"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": "b1", "name": "X"}]},
+            "next": ["b1"],
+        },
         {"id": "b1", "type": "if_else", "name": "X", "parent": "c", "attributes": {"if": []}, "next": None},
     ]
     paths, truncated = enumerate_paths(_wf(make_dump, steps))

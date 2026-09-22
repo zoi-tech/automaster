@@ -7,6 +7,7 @@ uma entrada legítima — por isso "sem entrada" nunca é ERROR.
 - sem trigger, sem chamada, 0 steps  → WARN  (vazio/morto: não faz nada e ninguém chama)
 - sem trigger, sem chamada, com steps → INFO  (provável execução manual; confirmar)
 """
+
 from __future__ import annotations
 
 from ..finding import INFO, WARN, Finding

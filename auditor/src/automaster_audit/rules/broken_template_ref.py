@@ -11,6 +11,7 @@ template está no `previewUrl` do step, não no `template_id`, e um e-mail cujo
 template sumiu do builder continua sendo enviado. `proposals_estimates_send_document`
 fica de fora por falta de lista contra a qual cruzar.
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding
@@ -48,8 +49,7 @@ def check(ctx: DumpContext) -> list[Finding]:
                     severity=ERROR,
                     workflow_id=wf.id,
                     workflow_name=wf.name,
-                    detail=f"step '{step.get('name', step.get('type'))}' usa template "
-                           f"{canal} inexistente: {tid}",
+                    detail=f"step '{step.get('name', step.get('type'))}' usa template {canal} inexistente: {tid}",
                 )
             )
     return findings

@@ -5,28 +5,52 @@ from automaster_audit.loader import load_dump
 from automaster_audit.mcp import base as mcp_base
 from automaster_audit.mcp import emails as mcp_emails
 
-PREVIEW = ("https://firebasestorage.googleapis.com/v0/b/highlevel-backend.appspot.com/o/"
-           "location%2FLOC%2Femails%2F{id}%2Findex.html?alt=media&token=t")
+PREVIEW = (
+    "https://firebasestorage.googleapis.com/v0/b/highlevel-backend.appspot.com/o/"
+    "location%2FLOC%2Femails%2F{id}%2Findex.html?alt=media&token=t"
+)
 
 
 def _wf(preview_id: str) -> dict:
     return {
-        "id": "wf1", "name": "Boas-vindas",
-        "raw": {"list_entry": {"id": "wf1", "name": "Boas-vindas", "status": "published"},
-                "steps": {"templates": [{"id": "s1", "type": "email", "name": "manda",
-                                         "attributes": {"template_id": "copia", "subject": "Oi",
-                                                        "previewUrl": PREVIEW.format(id=preview_id)}}]},
-                "triggers": []},
+        "id": "wf1",
+        "name": "Boas-vindas",
+        "raw": {
+            "list_entry": {"id": "wf1", "name": "Boas-vindas", "status": "published"},
+            "steps": {
+                "templates": [
+                    {
+                        "id": "s1",
+                        "type": "email",
+                        "name": "manda",
+                        "attributes": {
+                            "template_id": "copia",
+                            "subject": "Oi",
+                            "previewUrl": PREVIEW.format(id=preview_id),
+                        },
+                    }
+                ]
+            },
+            "triggers": [],
+        },
     }
 
 
 @pytest.fixture
 def dump(make_dump, monkeypatch):
-    path = make_dump(workflows=[_wf("usado")], email_templates=[
-        {"id": "usado", "name": "Em uso", "templateType": "html", "parentId": "f1",
-         "lastUpdated": "2026-09-01T00:00:00Z"},
-        {"id": "parado", "name": "Esquecido", "templateType": "html"},
-    ])
+    path = make_dump(
+        workflows=[_wf("usado")],
+        email_templates=[
+            {
+                "id": "usado",
+                "name": "Em uso",
+                "templateType": "html",
+                "parentId": "f1",
+                "lastUpdated": "2026-09-01T00:00:00Z",
+            },
+            {"id": "parado", "name": "Esquecido", "templateType": "html"},
+        ],
+    )
     monkeypatch.setattr(mcp_base, "_load", lambda loc, snapshot=None: (load_dump(path), {"loc": loc}))
     return path
 

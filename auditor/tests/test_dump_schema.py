@@ -1,4 +1,5 @@
 """O contrato de formato do dump, o mesmo arquivo que o extractor confere."""
+
 import json
 
 import pytest
@@ -15,6 +16,7 @@ def test_schema_e_o_mesmo_que_o_extractor_le():
     from pathlib import Path
 
     import automaster_audit
+
     esperado = Path(automaster_audit.__file__).with_name("dump_schema.json")
     assert esperado.is_file(), "o extractor procura o schema exatamente neste caminho"
     assert carregar_schema()["schemaVersion"] == json.loads(esperado.read_text())["schemaVersion"]

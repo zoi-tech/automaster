@@ -3,6 +3,7 @@
 Padrão: prefixo entre colchetes + seta U+2192 separando gatilho e ação.
 Regra leve — sinaliza ausência do colchete de produto ou da seta.
 """
+
 from __future__ import annotations
 
 import re

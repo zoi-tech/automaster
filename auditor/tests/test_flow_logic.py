@@ -1,4 +1,5 @@
 """Testes da camada 1 (lógica sã): flow graph + regras estruturais."""
+
 from types import SimpleNamespace
 
 from conftest import wf
@@ -77,8 +78,13 @@ def test_no_cycle_clean(make_dump):
 # --- uncovered_condition ---
 def test_uncovered_condition_flags_missing_else(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond", "attributes": {"branches": [{"id": "b1", "name": "X"}]},
-         "next": ["b1"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": "b1", "name": "X"}]},
+            "next": ["b1"],
+        },
         {"id": "b1", "type": "if_else", "name": "X", "parent": "c", "attributes": {"if": []}},
     ]
     path = make_dump(workflows=[wf(steps=steps)])
@@ -88,8 +94,13 @@ def test_uncovered_condition_flags_missing_else(make_dump):
 
 def test_covered_condition_clean(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond", "attributes": {"branches": [{"id": "b1", "name": "X"}]},
-         "next": ["b1", "b2"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": "b1", "name": "X"}]},
+            "next": ["b1", "b2"],
+        },
         {"id": "b1", "type": "if_else", "name": "X", "parent": "c", "attributes": {"if": []}},
         {"id": "b2", "type": "if_else", "name": "Else", "parent": "c", "attributes": {"else": []}},
     ]
@@ -99,11 +110,13 @@ def test_covered_condition_clean(make_dump):
 
 def test_roots_usa_parentkey_o_campo_do_servidor():
     """O servidor grava parentKey; com `parent` todo step virava entrada."""
-    doc = SimpleNamespace(steps=[
-        {"id": "a", "next": "b"},
-        {"id": "b", "parentKey": "a", "next": "c"},
-        {"id": "c", "parentKey": "b"},
-        {"id": "d", "parent": "a"},  # campo legado ainda conta como pai
-    ])
+    doc = SimpleNamespace(
+        steps=[
+            {"id": "a", "next": "b"},
+            {"id": "b", "parentKey": "a", "next": "c"},
+            {"id": "c", "parentKey": "b"},
+            {"id": "d", "parent": "a"},  # campo legado ainda conta como pai
+        ]
+    )
     assert roots(doc) == ["a"]
     assert reachable(doc) == {"a", "b", "c"}

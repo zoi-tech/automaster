@@ -6,6 +6,7 @@ Fontes de referência a usuário:
 
 Se a lista de usuários não foi extraída (dump antigo), a regra não roda.
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding

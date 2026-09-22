@@ -5,6 +5,7 @@ memória — nada é escrito em disco. A edição é recusada só se INTRODUZIR 
 achado ERROR novo; ERROR que já existia não bloqueia, senão nenhum workflow
 com achado poderia ser corrigido.
 """
+
 from __future__ import annotations
 
 import copy
@@ -35,9 +36,7 @@ class ResultadoValidacao:
 #: por outra palavra tem de entrar aqui; `test_validacao_escrita` recusa as que não entram.
 ROTULOS_DE_NO = ("step", "if/else")
 
-_RE_ROTULO = re.compile(
-    "(" + "|".join(re.escape(r) for r in ROTULOS_DE_NO) + r") '[^']*'"
-)
+_RE_ROTULO = re.compile("(" + "|".join(re.escape(r) for r in ROTULOS_DE_NO) + r") '[^']*'")
 
 
 def _normalizar_detalhe(detail: str) -> str:

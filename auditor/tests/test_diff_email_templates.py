@@ -4,10 +4,14 @@ from automaster_audit.loader import load_dump
 
 def test_template_de_email_novo_aparece_no_diff(make_dump):
     antes = load_dump(make_dump(email_templates=[{"id": "t1", "name": "Um", "templateType": "html"}]))
-    depois = load_dump(make_dump(email_templates=[
-        {"id": "t1", "name": "Um", "templateType": "html"},
-        {"id": "t2", "name": "Dois", "templateType": "html"},
-    ]))
+    depois = load_dump(
+        make_dump(
+            email_templates=[
+                {"id": "t1", "name": "Um", "templateType": "html"},
+                {"id": "t2", "name": "Dois", "templateType": "html"},
+            ]
+        )
+    )
     d = build_diff(antes, depois)
     assert "templates de e-mail" in str(d)
     assert "Dois" in str(d)

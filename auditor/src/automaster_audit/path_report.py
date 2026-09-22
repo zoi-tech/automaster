@@ -2,6 +2,7 @@
 
 Rotula ações com os nomes legíveis do DumpContext; não avalia condições.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -90,13 +91,14 @@ def _fmt_terminal(t: str, by_id: dict[str, dict]) -> str:
     if t == "exit":
         return "[fim]"
     if t.startswith("loop → "):
-        sid = t[len("loop → "):]
+        sid = t[len("loop → ") :]
         return f"(loop → {(by_id.get(sid) or {}).get('name') or sid})"
     return f"({t})"
 
 
-def _render(node: _Trie, seg: list[str], indent: int, lines: list[str],
-            by_id: dict[str, dict], ctx: DumpContext) -> None:
+def _render(
+    node: _Trie, seg: list[str], indent: int, lines: list[str], by_id: dict[str, dict], ctx: DumpContext
+) -> None:
     while True:
         for t in node.terminals:
             lines.append("    " * indent + "- " + " → ".join(seg + [_fmt_terminal(t, by_id)]))

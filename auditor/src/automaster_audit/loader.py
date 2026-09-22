@@ -15,6 +15,7 @@ Contrato do dump (gerado pelo extractor):
 
 As actions de cada workflow vivem em raw.steps.templates (baixadas do Firebase).
 """
+
 from __future__ import annotations
 
 import json
@@ -171,7 +172,7 @@ def load_dump(path: Path) -> DumpContext:
         uid = u.get("id") or u.get("_id")
         if uid:
             ctx.user_ids.add(uid)
-            ctx.user_names[uid] = u.get("name") or f"{u.get('firstName','')} {u.get('lastName','')}".strip() or uid
+            ctx.user_names[uid] = u.get("name") or f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or uid
             if u.get("deleted"):
                 ctx.user_deleted.add(uid)
 

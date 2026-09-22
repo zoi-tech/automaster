@@ -1,4 +1,5 @@
 """Testes da Camada 3: simulação de cenário contra o grafo (simulate.py)."""
+
 from conftest import wf
 
 from automaster_audit.loader import load_dump
@@ -24,12 +25,16 @@ def seg(conditions, operator="and"):
 def container(cid, branches, nxt, parent=None):
     """Container if_else: condições vivem AQUI (attributes.branches), shape da Fase 0."""
     s = {
-        "id": cid, "type": "if_else", "name": "Cond",
+        "id": cid,
+        "type": "if_else",
+        "name": "Cond",
         "attributes": {
-            "operator": "and", "if": True, "version": 2, "noneBranchName": "None",
+            "operator": "and",
+            "if": True,
+            "version": 2,
+            "noneBranchName": "None",
             "branches": [
-                {"id": bid, "name": name, "operator": op, "segments": segs}
-                for bid, name, op, segs in branches
+                {"id": bid, "name": name, "operator": op, "segments": segs} for bid, name, op, segs in branches
             ],
         },
         "next": nxt,
@@ -41,16 +46,14 @@ def container(cid, branches, nxt, parent=None):
 
 def branch_yes(bid, name, parent, nxt=None):
     """Nó-branch filho: attributes.if é BOOLEANO false (nunca condição)."""
-    s = {"id": bid, "type": "if_else", "name": name, "parent": parent,
-         "attributes": {"if": False}}
+    s = {"id": bid, "type": "if_else", "name": name, "parent": parent, "attributes": {"if": False}}
     if nxt:
         s["next"] = nxt
     return s
 
 
 def else_node(eid, parent, nxt=None):
-    s = {"id": eid, "type": "if_else", "name": "None", "parent": parent,
-         "attributes": {"else": True}}
+    s = {"id": eid, "type": "if_else", "name": "None", "parent": parent, "attributes": {"else": True}}
     if nxt:
         s["next"] = nxt
     return s
@@ -108,10 +111,12 @@ def test_time_maior_que(make_dump):
 
 # 3. Kleene: and(False, None) = False — short-circuit sem ambiguidade
 def test_kleene_and_short_circuit(make_dump):
-    steps = _tag_steps(conditions=[
-        cond("date_time", "day_week", "==", "6"),
-        cond("date_time", "time", ">", "11"),
-    ])
+    steps = _tag_steps(
+        conditions=[
+            cond("date_time", "day_week", "==", "6"),
+            cond("date_time", "time", ">", "11"),
+        ]
+    )
     w = _wf(make_dump, steps)
     # day_week False; 'hora' ausente (None) → branch False → else, NÃO ambiguous
     res = simulate(w, {"dia_semana": 0})
@@ -165,8 +170,7 @@ def test_find_opportunity(make_dump):
 def test_ciclo_goto_ok(make_dump):
     steps = [
         {"id": "root", "type": "sms", "name": "Root", "next": "g"},
-        {"id": "g", "type": "goto", "name": "Go To", "parent": "root",
-         "attributes": {"targetNodeId": "root"}},
+        {"id": "g", "type": "goto", "name": "Go To", "parent": "root", "attributes": {"targetNodeId": "root"}},
     ]
     w = _wf(make_dump, steps)
     res = simulate(w, {})
@@ -189,10 +193,15 @@ def test_ordem_primeiro_true_vence(make_dump):
 def test_wait_reply_timeout(make_dump):
     steps = [
         {"id": "w", "type": "wait", "name": "Wait", "attributes": {}, "next": ["tr", "tt"]},
-        {"id": "tr", "type": "transition", "name": "wait", "parent": "w",
-         "attributes": {"type": "wait_reply"}, "next": "a1"},
-        {"id": "tt", "type": "transition", "name": "timeout", "parent": "w",
-         "attributes": {"type": "wait_timeout"}},
+        {
+            "id": "tr",
+            "type": "transition",
+            "name": "wait",
+            "parent": "w",
+            "attributes": {"type": "wait_reply"},
+            "next": "a1",
+        },
+        {"id": "tt", "type": "transition", "name": "timeout", "parent": "w", "attributes": {"type": "wait_timeout"}},
         {"id": "a1", "type": "sms", "name": "SMS", "parent": "tr"},
     ]
     w = _wf(make_dump, steps)

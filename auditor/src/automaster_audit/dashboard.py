@@ -4,6 +4,7 @@ Reusa a varredura de refs: para cada workflow lista canais, tags/fields tocados,
 chamadas a outros fluxos e quem o chama. Para cada entidade, o índice reverso de
 quais workflows a usam (e flag de órfã = existe mas ninguém referencia).
 """
+
 from __future__ import annotations
 
 import json
@@ -48,7 +49,7 @@ def _wf_refs(wf: Workflow) -> dict:
                 tag(c["value"], "dispara")
             elif c.get("field") == "contact.tags":
                 v = c.get("value")
-                for x in (v if isinstance(v, list) else [v]):
+                for x in v if isinstance(v, list) else [v]:
                     if isinstance(x, str):
                         tag(x, "condicao")
     fields: set[str] = set()
@@ -88,8 +89,15 @@ def _wf_refs(wf: Workflow) -> dict:
         elif t == "internal_notification":
             users.update((a.get("sms") or {}).get("selectedUser", []) or [])
         cvs.update(m.lower() for m in _CV_TOKEN.findall(json.dumps(a, ensure_ascii=False)))
-    return {"tags": tags, "fields": fields, "pipelines": pipelines, "calls": calls,
-            "users": users, "cvs": cvs, "channels": channels}
+    return {
+        "tags": tags,
+        "fields": fields,
+        "pipelines": pipelines,
+        "calls": calls,
+        "users": users,
+        "cvs": cvs,
+        "channels": channels,
+    }
 
 
 def build_dashboard(ctx: DumpContext) -> dict:
@@ -124,28 +132,38 @@ def build_dashboard(ctx: DumpContext) -> dict:
     workflows = []
     for wf in ctx.workflows:
         r = refs[wf.id]
-        workflows.append({
-            "id": wf.id,
-            "name": wf.name,
-            "status": wf.status,
-            "n_steps": len(wf.steps),
-            "triggers": [t.get("name", "?") for t in wf.triggers],
-            "channels": dict(r["channels"]),
-            "n_tags": len(r["tags"]),
-            "n_fields": len(r["fields"]),
-            "calls": sorted(ctx.workflow_names.get(c, f"(externo) {c}") for c in r["calls"]),
-            "called_by": sorted(called_by.get(wf.id, [])),
-            "has_entry": bool(wf.triggers) or wf.id in called,
-        })
+        workflows.append(
+            {
+                "id": wf.id,
+                "name": wf.name,
+                "status": wf.status,
+                "n_steps": len(wf.steps),
+                "triggers": [t.get("name", "?") for t in wf.triggers],
+                "channels": dict(r["channels"]),
+                "n_tags": len(r["tags"]),
+                "n_fields": len(r["fields"]),
+                "calls": sorted(ctx.workflow_names.get(c, f"(externo) {c}") for c in r["calls"]),
+                "called_by": sorted(called_by.get(wf.id, [])),
+                "has_entry": bool(wf.triggers) or wf.id in called,
+            }
+        )
 
     # entidades: todas as existentes + flag órfã
     tags = [
-        {"name": name, "used_by": sorted(tag_users.get(name, [])), "orphan": name not in tag_users,
-         "papeis": sorted(tag_papeis.get(name, ()))}
+        {
+            "name": name,
+            "used_by": sorted(tag_users.get(name, [])),
+            "orphan": name not in tag_users,
+            "papeis": sorted(tag_papeis.get(name, ())),
+        }
         for name in sorted(ctx.tag_names)
     ]
     fields = [
-        {"name": ctx.field_names.get(fid, fid), "used_by": sorted(field_users.get(fid, [])), "orphan": fid not in field_users}
+        {
+            "name": ctx.field_names.get(fid, fid),
+            "used_by": sorted(field_users.get(fid, [])),
+            "orphan": fid not in field_users,
+        }
         for fid in sorted(ctx.field_ids, key=lambda x: ctx.field_names.get(x, x).lower())
     ]
     pipelines = [
@@ -158,13 +176,15 @@ def build_dashboard(ctx: DumpContext) -> dict:
     for u in ctx.users:
         uid = u.get("id") or u.get("_id")
         used = sorted(user_users.get(uid, []))
-        users.append({
-            "name": u.get("name") or f"{u.get('firstName','')} {u.get('lastName','')}".strip() or uid,
-            "email": u.get("email", ""),
-            "deleted": bool(u.get("deleted")),
-            "used_by": used,
-            "orphan": not used,
-        })
+        users.append(
+            {
+                "name": u.get("name") or f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or uid,
+                "email": u.get("email", ""),
+                "deleted": bool(u.get("deleted")),
+                "used_by": used,
+                "orphan": not used,
+            }
+        )
     users.sort(key=lambda x: x["name"].lower())
 
     # custom values (chave -> usado por)
@@ -173,18 +193,26 @@ def build_dashboard(ctx: DumpContext) -> dict:
         keys = _CV_TOKEN.findall(cv.get("fieldKey", "") or "")
         keyset = {k.lower() for k in keys} or {(cv.get("name", "")).strip().lower()}
         used = sorted({w for k in keyset for w in cv_users.get(k, [])})
-        custom_values.append({
-            "name": cv.get("name", "") or next(iter(keyset), ""),
-            "token": next(iter(keyset), ""),
-            "used_by": used,
-            "orphan": not used,
-        })
+        custom_values.append(
+            {
+                "name": cv.get("name", "") or next(iter(keyset), ""),
+                "token": next(iter(keyset), ""),
+                "used_by": used,
+                "orphan": not used,
+            }
+        )
     custom_values.sort(key=lambda x: x["name"].lower())
 
     # calendários (backup; sem refs de workflow)
     calendars = sorted(
-        ({"name": c.get("name", c.get("id", "")), "active": bool(c.get("isActive", True)),
-          "type": c.get("eventType", "")} for c in ctx.calendars),
+        (
+            {
+                "name": c.get("name", c.get("id", "")),
+                "active": bool(c.get("isActive", True)),
+                "type": c.get("eventType", ""),
+            }
+            for c in ctx.calendars
+        ),
         key=lambda x: x["name"].lower(),
     )
 
@@ -203,5 +231,13 @@ def build_dashboard(ctx: DumpContext) -> dict:
         "cv_orphan": sum(1 for c in custom_values if c["orphan"]),
     }
 
-    return {"summary": summary, "workflows": workflows, "tags": tags, "fields": fields,
-            "pipelines": pipelines, "users": users, "calendars": calendars, "custom_values": custom_values}
+    return {
+        "summary": summary,
+        "workflows": workflows,
+        "tags": tags,
+        "fields": fields,
+        "pipelines": pipelines,
+        "users": users,
+        "calendars": calendars,
+        "custom_values": custom_values,
+    }

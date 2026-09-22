@@ -11,6 +11,7 @@ demos em constantes separadas (_JS_FLUX/_JS_METRO) injetadas como VALOR no
 template (chaves de JS nunca passam pelo str.format). XSS: server-side tudo via
 html.escape; client-side todo dado de CRM entra via textContent/setAttribute.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -102,8 +103,9 @@ def _node_html(n: dict) -> str:
         return f'<div class="jleaf jk-{n["kind"]}">{head}</div>'
     kids = "".join(_node_html(c) for c in n["children"])
     op = "" if n["kind"] == "neutral_group" else " open"
-    return (f'<details class="jnode jk-{n["kind"]}"{op}><summary>{head}</summary>'
-            f'<div class="jkids">{kids}</div></details>')
+    return (
+        f'<details class="jnode jk-{n["kind"]}"{op}><summary>{head}</summary><div class="jkids">{kids}</div></details>'
+    )
 
 
 # CSS da página (chaves NÃO passam pelo str.format — injetado como valor)
@@ -1350,8 +1352,11 @@ const JOURNEY = {journey_json};
 
 
 def _tree_section(title: str, nodes: list[dict], empty: str) -> str:
-    body = "".join(_node_html(n) for n in nodes) if nodes else \
-        f'<div class="jleaf"><span class="jdet">{_esc(empty)}</span></div>'
+    body = (
+        "".join(_node_html(n) for n in nodes)
+        if nodes
+        else f'<div class="jleaf"><span class="jdet">{_esc(empty)}</span></div>'
+    )
     return f'<section class="jtree"><div class="jroot">{_esc(title)}</div>{body}</section>'
 
 
@@ -1371,19 +1376,18 @@ def write_journey_html(data: dict, out: Path, title: str = "") -> Path:
     if ign:
         sub_parts.append("ignorados: " + ", ".join(f"{k}×{v}" for k, v in sorted(ign.items())))
     sm = shell_meta(out.parent)
-    trees = (
-        _tree_section("Contato criado", data["criacao"],
-                      "nenhum trigger de criação de contato no dump")
-        + _tree_section("A qualquer momento", data["anytime"],
-                        "nenhum evento sem âncora interna")
-    )
+    trees = _tree_section(
+        "Contato criado", data["criacao"], "nenhum trigger de criação de contato no dump"
+    ) + _tree_section("A qualquer momento", data["anytime"], "nenhum evento sem âncora interna")
     html = _TEMPLATE.format(
         title=_esc(title or meta.get("locationId") or "dump"),
         head_assets=head_assets(),
         page_css=_PAGE_CSS,
-        topbar=topbar(meta.get("locationId", ""),
-                      _extracted_from_path(out) or str(meta.get("extractedAt") or ""),
-                      schema=sm.get("schema")),
+        topbar=topbar(
+            meta.get("locationId", ""),
+            _extracted_from_path(out) or str(meta.get("extractedAt") or ""),
+            schema=sm.get("schema"),
+        ),
         sidebar=sidebar("journey", sm.get("counts")),
         loc=_esc(meta.get("locationId", "")),
         sub=_esc(" · ".join(sub_parts)),

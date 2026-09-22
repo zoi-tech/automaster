@@ -1,4 +1,5 @@
 """Workflows ao vivo e edição de workflow."""
+
 from __future__ import annotations
 
 import json
@@ -13,9 +14,15 @@ WF_ACOES = ("publicar", "inscrever", "remover", "retomar")
 
 WF_STATUS = ("published", "draft", "locked", "paused")
 
-def workflows_ao_vivo(loc: str, o: str = "lista", id: str | None = None,
-                      contato: str | None = None, limite: int | None = None,
-                      nomes: bool = False) -> dict:
+
+def workflows_ao_vivo(
+    loc: str,
+    o: str = "lista",
+    id: str | None = None,
+    contato: str | None = None,
+    limite: int | None = None,
+    nomes: bool = False,
+) -> dict:
     """Leitura ao vivo de workflows e inscrições. Não usa o dump."""
     if o not in WF_LEITURA:
         raise ToolError(f"o inválido: {o}. Aceitos: {', '.join(WF_LEITURA)}")
@@ -24,18 +31,25 @@ def workflows_ao_vivo(loc: str, o: str = "lista", id: str | None = None,
     if o == "contato" and not contato:
         raise ToolError("o=contato exige o contato")
     args = ["workflows-ao-vivo", "-l", loc, "-o", o]
-    for flag, val in (("-i", id), ("--contato", contato),
-                      ("--limite", str(limite) if limite else None)):
+    for flag, val in (("-i", id), ("--contato", contato), ("--limite", str(limite) if limite else None)):
         if val:
             args += [flag, val]
     if nomes:
         args += ["--nomes"]
     return base._run_extractor(*args, "--json")
 
-def workflow_acao(loc: str, acao: str, id: str, contato: str | None = None,
-                  inscricao: str | None = None, status: str | None = None,
-                  usuario: str | None = None, inicio: str | None = None,
-                  confirmo: bool = False) -> dict:
+
+def workflow_acao(
+    loc: str,
+    acao: str,
+    id: str,
+    contato: str | None = None,
+    inscricao: str | None = None,
+    status: str | None = None,
+    usuario: str | None = None,
+    inicio: str | None = None,
+    confirmo: bool = False,
+) -> dict:
     """ESCREVE: publica/despublica um workflow, inscreve, remove ou retoma um contato."""
     if acao not in WF_ACOES:
         raise ToolError(f"acao inválida: {acao}. Aceitas: {', '.join(WF_ACOES)}")
@@ -51,33 +65,70 @@ def workflow_acao(loc: str, acao: str, id: str, contato: str | None = None,
     elif acao == "retomar" and not (contato or inscricao):
         raise ToolError("retomar exige inscricao ou contato")
     args = ["workflow-acao", "-l", loc, "--acao", acao, "--confirmo", "-i", id]
-    for flag, val in (("--contato", contato), ("--inscricao", inscricao),
-                      ("--status", status), ("--usuario", usuario), ("--inicio", inicio)):
+    for flag, val in (
+        ("--contato", contato),
+        ("--inscricao", inscricao),
+        ("--status", status),
+        ("--usuario", usuario),
+        ("--inicio", inicio),
+    ):
         if val:
             args += [flag, val]
     return base._run_extractor(*args, "--json")
 
+
 WF_EDITAR_ACOES = (
-    "criar", "renomear", "mover", "duplicar", "apagar",
-    "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
-    "step-criar", "step-remover", "step-mover",
+    "criar",
+    "renomear",
+    "mover",
+    "duplicar",
+    "apagar",
+    "trocar-ref",
+    "trocar-tag",
+    "limpar-orfaos",
+    "atributo",
+    "trigger",
+    "historico",
+    "step-criar",
+    "step-remover",
+    "step-mover",
 )
 
 # ações que mexem no corpo do workflow e por isso passam pela validação das 18 regras
 _WF_EDITAR_COM_CORPO = {
-    "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger",
-    "step-criar", "step-remover", "step-mover",
+    "trocar-ref",
+    "trocar-tag",
+    "limpar-orfaos",
+    "atributo",
+    "trigger",
+    "step-criar",
+    "step-remover",
+    "step-mover",
 }
 
-def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None = None,
-                    pasta: str | None = None, de: str | None = None, para: str | None = None,
-                    step: str | None = None, caminho: str | None = None, valor: str | None = None,
-                    trigger_acao: str | None = None,
-                    trigger_id: str | None = None, trigger_corpo: dict | str | None = None,
-                    corpo: dict | str | None = None, depois_de: str | None = None,
-                    ramos: list | str | None = None,
-                    com_subarvore: bool = False, confirmo: bool = False,
-                    publicado: bool = False, snapshot: str | None = None) -> dict:
+
+def workflow_editar(
+    loc: str,
+    acao: str,
+    id: str | None = None,
+    nome: str | None = None,
+    pasta: str | None = None,
+    de: str | None = None,
+    para: str | None = None,
+    step: str | None = None,
+    caminho: str | None = None,
+    valor: str | None = None,
+    trigger_acao: str | None = None,
+    trigger_id: str | None = None,
+    trigger_corpo: dict | str | None = None,
+    corpo: dict | str | None = None,
+    depois_de: str | None = None,
+    ramos: list | str | None = None,
+    com_subarvore: bool = False,
+    confirmo: bool = False,
+    publicado: bool = False,
+    snapshot: str | None = None,
+) -> dict:
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
 
     Para ação que mexe no corpo, roda SEMPRE a prévia primeiro e valida o documento
@@ -122,11 +173,20 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         if versao is not None:
             a += ["--versao-esperada", str(versao)]
         for flag, valor_opcional in (
-            ("-i", id), ("--nome", nome), ("--pasta", pasta), ("--de", de), ("--para", para),
-            ("--step", step), ("--caminho", caminho), ("--valor", valor),
-            ("--trigger-acao", trigger_acao), ("--trigger-id", trigger_id),
+            ("-i", id),
+            ("--nome", nome),
+            ("--pasta", pasta),
+            ("--de", de),
+            ("--para", para),
+            ("--step", step),
+            ("--caminho", caminho),
+            ("--valor", valor),
+            ("--trigger-acao", trigger_acao),
+            ("--trigger-id", trigger_id),
             ("--trigger-corpo", trigger_corpo),
-            ("--corpo", corpo), ("--depois-de", depois_de), ("--ramos", ramos),
+            ("--corpo", corpo),
+            ("--depois-de", depois_de),
+            ("--ramos", ramos),
         ):
             if valor_opcional is not None:
                 a += [flag, str(valor_opcional)]
@@ -151,9 +211,7 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
         ctx, meta = base._load(loc, snapshot)
     except ToolError:
         sem_validacao = "sem dump desta subconta em disco: as 18 regras não foram rodadas"
-    if ctx is not None and not any(
-        getattr(w, "id", None) == id for w in getattr(ctx, "workflows", [])
-    ):
+    if ctx is not None and not any(getattr(w, "id", None) == id for w in getattr(ctx, "workflows", [])):
         sem_validacao = (
             f"workflow {id} não está no dump {meta['snapshot']} (criado ou duplicado depois da "
             "última extração): as 18 regras não foram rodadas. Extraia a subconta de novo para validar."
@@ -220,9 +278,8 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
 
     if not resultado_validacao.pode_gravar:
         previa["aplicado"] = False
-        previa["motivo"] = (
-            "gravação recusada: a validação contra as 18 regras encontrou erro novo — "
-            + "; ".join(resultado_validacao.erros_novos)
+        previa["motivo"] = "gravação recusada: a validação contra as 18 regras encontrou erro novo — " + "; ".join(
+            resultado_validacao.erros_novos
         )
         return previa
 
@@ -232,89 +289,124 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
 
 
 TOOLS = {
-    "workflows_ao_vivo": (workflows_ao_vivo, ("Leitura AO VIVO de workflows (abre Chrome, não usa o "
-                          "dump e não exige extração prévia): `lista` (todos os workflows com o status "
-                          "corrente), `dentro` (quem está dentro de um workflow agora, com o passo em "
-                          "que cada um parou, desde quando e por que entrou), `contato` (em que "
-                          "workflows um contato está agora). Teto de 500 inscritos, ajustável por "
-                          "`limite`; a resposta declara se cortou. `nomes=true` resolve o nome de cada "
-                          "contato, uma chamada por contato — lento em lista grande."),
-                          {"loc": _LOC, "o": {"type": "string", "enum": list(WF_LEITURA), "default": "lista"},
-                           "id": {"type": "string", "description": "id do workflow (com o=dentro)"},
-                           "contato": {"type": "string", "description": "id do contato (com o=contato)"},
-                           "limite": {"type": "integer", "description": "teto de inscritos (padrão 500)"},
-                           "nomes": {"type": "boolean", "default": False}},
-                          ["loc"]),
-    "workflow_acao": (workflow_acao, ("ESCREVE EM PRODUÇÃO: publica ou despublica um workflow "
-                      "(`publicar` com o status desejado), inscreve um contato, remove um contato ou "
-                      "retoma uma inscrição parada. Exige confirmo=true; registro em "
-                      "<dumps>/_workflows/<locationId>/<workflowId>/. Despublicar NÃO remove ninguém: quem está "
-                      "dentro congela no passo em que está e volta a andar, todo mundo de uma vez, "
-                      "quando o workflow for republicado. Inscrever é enfileirado pelo servidor — ler "
-                      "logo depois pode não mostrar o contato ainda. A ação é carimbada com o usuário "
-                      "logado no histórico do GHL; `usuario` sobrescreve."),
-                      {"loc": _LOC, "acao": {"type": "string", "enum": list(WF_ACOES)},
-                       "id": {"type": "string", "description": "id do workflow"},
-                       "contato": {"type": "string", "description": "inscrever, remover, retomar"},
-                       "inscricao": {"type": "string", "description": "id da inscrição (retomar)"},
-                       "status": {"type": "string", "enum": list(WF_STATUS),
-                                  "description": "com acao=publicar"},
-                       "usuario": {"type": "string", "description": "autor; sem ele, sai do token"},
-                       "inicio": {"type": "string", "description": "início programado (inscrever), ISO com fuso"},
-                       "confirmo": {"type": "boolean", "default": False}},
-                      ["loc", "acao", "id"]),
-    "workflow_editar": (workflow_editar,
-                        ("ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
-                        "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
-                        "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
-                        "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
-                        "(`trigger`). Monta o canvas: insere um step (`step-criar`), remove um step vivo "
-                        "recosturando os ponteiros (`step-remover`) e muda um step de lugar (`step-mover`). "
-                        "Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
-                        "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
-                        "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
-                        "`url`, o link do editor. Não move container nem remove ramo de container isolado."),
-                        {"loc": _LOC,
-                         "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
-                         "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},
-                         "nome": {"type": "string", "description": "criar, renomear, duplicar"},
-                         "pasta": {"type": "string",
-                                   "description": "id da pasta; OBRIGATÓRIO em criar e duplicar "
-                                                  "(fora de pasta o app não mostra o workflow)"},
-                         "de": {"type": "string", "description": "id (trocar-ref) ou nome de tag (trocar-tag) a substituir"},
-                         "para": {"type": "string", "description": "id ou nome de tag novo"},
-                         "step": {"type": "string", "description": "id do step (atributo, step-remover, step-mover)"},
-                         "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
-                         "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
-                         "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
-                         "trigger_id": {"type": "string", "description": "id do trigger que SAI (remover, substituir)"},
-                         "trigger_corpo": {"type": "object",
-                                           "description": "trigger que ENTRA (adicionar, substituir): "
-                                                          "`type` obrigatório (appointment, contact_tag, "
-                                                          "form_submission…), mais `name`, `conditions` e "
-                                                          "`masterType: \"highlevel\"`. O `workflowId` é "
-                                                          "preenchido pela tool"},
-                         "corpo": {"type": "object",
-                                   "description": "step que ENTRA (step-criar): `type` obrigatório, mais "
-                                                  "`name` e `attributes` no formato do tipo. Copie um step "
-                                                  "existente do mesmo tipo como molde — os attributes não "
-                                                  "são modelados. `id`, `parentKey` e `next` são ignorados"},
-                         "depois_de": {"type": "string",
-                                       "description": "id do step que fica logo ANTES (step-criar, step-mover); "
-                                                      "pode ser um nó de ramo, não pode ser um container. Em "
-                                                      "step-criar, sem ele o step entra no INÍCIO do fluxo — é "
-                                                      "assim que nasce o primeiro step de um workflow do zero"},
-                         "ramos": {"type": "array",
-                                   "description": "step-criar: lista de ramos, e o step nasce container de N "
-                                                  "saídas. Cada ramo é {name, branch?, else?}; `branch` é a "
-                                                  "condição do if_else (segments/operator) e `else` marca o "
-                                                  "ramo None. Sem if_else os ramos viram `transition`",
-                                   "items": {"type": "object"}},
-                         "com_subarvore": {"type": "boolean",
-                                           "description": "step-remover: o container sai levando os ramos e "
-                                                          "tudo que pende deles"},
-                         "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
-                         "publicado": {"type": "boolean", "description": "obrigatório junto de confirmo se o workflow está publicado"},
-                         "snapshot": _SNAP},
-                        ["loc", "acao"]),
+    "workflows_ao_vivo": (
+        workflows_ao_vivo,
+        (
+            "Leitura AO VIVO de workflows (abre Chrome, não usa o "
+            "dump e não exige extração prévia): `lista` (todos os workflows com o status "
+            "corrente), `dentro` (quem está dentro de um workflow agora, com o passo em "
+            "que cada um parou, desde quando e por que entrou), `contato` (em que "
+            "workflows um contato está agora). Teto de 500 inscritos, ajustável por "
+            "`limite`; a resposta declara se cortou. `nomes=true` resolve o nome de cada "
+            "contato, uma chamada por contato — lento em lista grande."
+        ),
+        {
+            "loc": _LOC,
+            "o": {"type": "string", "enum": list(WF_LEITURA), "default": "lista"},
+            "id": {"type": "string", "description": "id do workflow (com o=dentro)"},
+            "contato": {"type": "string", "description": "id do contato (com o=contato)"},
+            "limite": {"type": "integer", "description": "teto de inscritos (padrão 500)"},
+            "nomes": {"type": "boolean", "default": False},
+        },
+        ["loc"],
+    ),
+    "workflow_acao": (
+        workflow_acao,
+        (
+            "ESCREVE EM PRODUÇÃO: publica ou despublica um workflow "
+            "(`publicar` com o status desejado), inscreve um contato, remove um contato ou "
+            "retoma uma inscrição parada. Exige confirmo=true; registro em "
+            "<dumps>/_workflows/<locationId>/<workflowId>/. Despublicar NÃO remove ninguém: quem está "
+            "dentro congela no passo em que está e volta a andar, todo mundo de uma vez, "
+            "quando o workflow for republicado. Inscrever é enfileirado pelo servidor — ler "
+            "logo depois pode não mostrar o contato ainda. A ação é carimbada com o usuário "
+            "logado no histórico do GHL; `usuario` sobrescreve."
+        ),
+        {
+            "loc": _LOC,
+            "acao": {"type": "string", "enum": list(WF_ACOES)},
+            "id": {"type": "string", "description": "id do workflow"},
+            "contato": {"type": "string", "description": "inscrever, remover, retomar"},
+            "inscricao": {"type": "string", "description": "id da inscrição (retomar)"},
+            "status": {"type": "string", "enum": list(WF_STATUS), "description": "com acao=publicar"},
+            "usuario": {"type": "string", "description": "autor; sem ele, sai do token"},
+            "inicio": {"type": "string", "description": "início programado (inscrever), ISO com fuso"},
+            "confirmo": {"type": "boolean", "default": False},
+        },
+        ["loc", "acao", "id"],
+    ),
+    "workflow_editar": (
+        workflow_editar,
+        (
+            "ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
+            "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
+            "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
+            "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
+            "(`trigger`). Monta o canvas: insere um step (`step-criar`), remove um step vivo "
+            "recosturando os ponteiros (`step-remover`) e muda um step de lugar (`step-mover`). "
+            "Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
+            "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
+            "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
+            "`url`, o link do editor. Não move container nem remove ramo de container isolado."
+        ),
+        {
+            "loc": _LOC,
+            "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
+            "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},
+            "nome": {"type": "string", "description": "criar, renomear, duplicar"},
+            "pasta": {
+                "type": "string",
+                "description": "id da pasta; OBRIGATÓRIO em criar e duplicar "
+                "(fora de pasta o app não mostra o workflow)",
+            },
+            "de": {"type": "string", "description": "id (trocar-ref) ou nome de tag (trocar-tag) a substituir"},
+            "para": {"type": "string", "description": "id ou nome de tag novo"},
+            "step": {"type": "string", "description": "id do step (atributo, step-remover, step-mover)"},
+            "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
+            "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
+            "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
+            "trigger_id": {"type": "string", "description": "id do trigger que SAI (remover, substituir)"},
+            "trigger_corpo": {
+                "type": "object",
+                "description": "trigger que ENTRA (adicionar, substituir): "
+                "`type` obrigatório (appointment, contact_tag, "
+                "form_submission…), mais `name`, `conditions` e "
+                '`masterType: "highlevel"`. O `workflowId` é '
+                "preenchido pela tool",
+            },
+            "corpo": {
+                "type": "object",
+                "description": "step que ENTRA (step-criar): `type` obrigatório, mais "
+                "`name` e `attributes` no formato do tipo. Copie um step "
+                "existente do mesmo tipo como molde — os attributes não "
+                "são modelados. `id`, `parentKey` e `next` são ignorados",
+            },
+            "depois_de": {
+                "type": "string",
+                "description": "id do step que fica logo ANTES (step-criar, step-mover); "
+                "pode ser um nó de ramo, não pode ser um container. Em "
+                "step-criar, sem ele o step entra no INÍCIO do fluxo — é "
+                "assim que nasce o primeiro step de um workflow do zero",
+            },
+            "ramos": {
+                "type": "array",
+                "description": "step-criar: lista de ramos, e o step nasce container de N "
+                "saídas. Cada ramo é {name, branch?, else?}; `branch` é a "
+                "condição do if_else (segments/operator) e `else` marca o "
+                "ramo None. Sem if_else os ramos viram `transition`",
+                "items": {"type": "object"},
+            },
+            "com_subarvore": {
+                "type": "boolean",
+                "description": "step-remover: o container sai levando os ramos e tudo que pende deles",
+            },
+            "confirmo": {"type": "boolean", "description": "obrigatório para gravar"},
+            "publicado": {
+                "type": "boolean",
+                "description": "obrigatório junto de confirmo se o workflow está publicado",
+            },
+            "snapshot": _SNAP,
+        },
+        ["loc", "acao"],
+    ),
 }

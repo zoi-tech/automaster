@@ -5,6 +5,7 @@ Workflow alterado é detectado por nome, status e pela impressão digital dos
 steps e dos triggers (JSON canônico com chaves ordenadas). Entidades comparam
 por id (ou por nome, nas tags e nas chaves de custom value).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -16,9 +17,7 @@ from .loader import DumpContext
 
 def _fp(value) -> str:
     """Impressão digital estável de um pedaço do dump."""
-    return hashlib.sha1(
-        json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha1(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()
 
 
 def _esc(text: str) -> str:
@@ -39,9 +38,7 @@ def _entities(ctx: DumpContext) -> dict[str, dict[str, str] | None]:
         "tags": {t: t for t in ctx.tag_names},
         "custom fields": dict(ctx.field_names),
         "usuários": dict(ctx.user_names),
-        "calendários": {
-            c.get("id"): c.get("name", c.get("id", "")) for c in ctx.calendars if c.get("id")
-        },
+        "calendários": {c.get("id"): c.get("name", c.get("id", "")) for c in ctx.calendars if c.get("id")},
         "custom values": {k: k for k in ctx.cv_keys},
         # None = canal ausente do dump (extração anterior aos templates); comparar
         # contra ele diria "81 templates novos" quando nada mudou.
@@ -56,12 +53,8 @@ def build_diff(antes: DumpContext, depois: DumpContext) -> dict:
     a_wf = {w.id: w for w in antes.workflows}
     d_wf = {w.id: w for w in depois.workflows}
 
-    adicionados = [
-        {"id": i, "nome": d_wf[i].name, "status": d_wf[i].status} for i in d_wf.keys() - a_wf.keys()
-    ]
-    removidos = [
-        {"id": i, "nome": a_wf[i].name, "status": a_wf[i].status} for i in a_wf.keys() - d_wf.keys()
-    ]
+    adicionados = [{"id": i, "nome": d_wf[i].name, "status": d_wf[i].status} for i in d_wf.keys() - a_wf.keys()]
+    removidos = [{"id": i, "nome": a_wf[i].name, "status": a_wf[i].status} for i in a_wf.keys() - d_wf.keys()]
 
     alterados = []
     for wid in a_wf.keys() & d_wf.keys():

@@ -5,6 +5,7 @@ uma mudança de formato do extractor só aparecia quando alguma regra quebrava t
 adiante, com mensagem que não apontava para a causa. O mesmo arquivo é lido pelo extractor
 no fim da extração (`extractor/src/dump/schema.ts`), então as duas pontas conferem o mesmo.
 """
+
 from __future__ import annotations
 
 import json

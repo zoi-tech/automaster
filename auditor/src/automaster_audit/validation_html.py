@@ -4,6 +4,7 @@ Shell compartilhado (topbar + sidebar) vem de theme.py; tudo renderizado
 server-side com html.escape (nomes vêm do CRM = input externo); colapso via
 <details> nativo — zero JavaScript, zero requests externos.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -117,10 +118,7 @@ def _bar(segs: list[tuple[int, str]], empty: str = "var(--green)") -> str:
     total = sum(n for n, _ in segs)
     if total <= 0:
         return f'<div class="vbar"><i style="width:100%;background:{empty}"></i></div>'
-    parts = "".join(
-        f'<i style="width:{n / total * 100:.1f}%;background:{color}"></i>'
-        for n, color in segs if n > 0
-    )
+    parts = "".join(f'<i style="width:{n / total * 100:.1f}%;background:{color}"></i>' for n, color in segs if n > 0)
     return f'<div class="vbar">{parts}</div>'
 
 
@@ -148,12 +146,13 @@ def _tile(href: str, kicker: str, num, label: str, body: str, sev: str) -> str:
 def _tiles(data: dict) -> str:
     c1, c2, c3 = data["camada1"]["counts"], data["camada2"], data["camada3"]
     sev1 = "sev-err" if c1["ERROR"] else ("sev-warn" if c1["WARN"] else "sev-ok")
-    body1 = _bar([(c1["ERROR"], "var(--red)"), (c1["WARN"], "var(--amber)"),
-                  (c1["INFO"], _GRAY_SEG)]) + _stats([
-        ("var(--red)", c1["ERROR"], "ERROR"),
-        ("var(--amber)", c1["WARN"], "WARN"),
-        (_GRAY_SEG, c1["INFO"], "INFO"),
-    ])
+    body1 = _bar([(c1["ERROR"], "var(--red)"), (c1["WARN"], "var(--amber)"), (c1["INFO"], _GRAY_SEG)]) + _stats(
+        [
+            ("var(--red)", c1["ERROR"], "ERROR"),
+            ("var(--amber)", c1["WARN"], "WARN"),
+            (_GRAY_SEG, c1["INFO"], "INFO"),
+        ]
+    )
     t1 = _tile("#camada1", "Camada 1", sum(c1.values()), "Auditoria estática", body1, sev1)
 
     sev2 = "sev-warn" if c2["truncated"] else "sev-ok"
@@ -161,27 +160,31 @@ def _tiles(data: dict) -> str:
     stats2 = [(None, c2["total_paths"], "caminhos mapeados"), (None, n_wf2, "workflows")]
     if c2["truncated"]:
         stats2.append(("var(--amber)", c2["truncated"], "truncados"))
-    body2 = _bar([(c2["truncated"], "var(--amber)"),
-                  (max(n_wf2 - c2["truncated"], 0), "var(--green)")]) + _stats(stats2)
+    body2 = _bar([(c2["truncated"], "var(--amber)"), (max(n_wf2 - c2["truncated"], 0), "var(--green)")]) + _stats(
+        stats2
+    )
     t2 = _tile("#camada2", "Camada 2", c2["total_paths"], "Caminhos de execução", body2, sev2)
 
     if c3.get("disponivel"):
         n3 = c3["counts"]
         sev3 = "sev-err" if n3["FAIL"] else ("sev-warn" if n3["AMBIGUOUS"] else "sev-ok")
-        body3 = _bar([(n3["FAIL"], "var(--red)"), (n3["AMBIGUOUS"], "var(--amber)"),
-                      (n3["PASS"], "var(--green)")]) + _stats([
-            ("var(--green)", n3["PASS"], "PASS"),
-            ("var(--red)", n3["FAIL"], "FAIL"),
-            ("var(--amber)", n3["AMBIGUOUS"], "AMBIGUOUS"),
-        ])
+        body3 = _bar(
+            [(n3["FAIL"], "var(--red)"), (n3["AMBIGUOUS"], "var(--amber)"), (n3["PASS"], "var(--green)")]
+        ) + _stats(
+            [
+                ("var(--green)", n3["PASS"], "PASS"),
+                ("var(--red)", n3["FAIL"], "FAIL"),
+                ("var(--amber)", n3["AMBIGUOUS"], "AMBIGUOUS"),
+            ]
+        )
         t3 = _tile("#camada3", "Camada 3", sum(n3.values()), "Testes de contrato", body3, sev3)
     else:
-        t3 = _tile("#camada3", "Camada 3", "—", "Testes de contrato",
-                   _esc("nenhum contrato disponível"), "")
+        t3 = _tile("#camada3", "Camada 3", "—", "Testes de contrato", _esc("nenhum contrato disponível"), "")
     return t1 + t2 + t3
 
 
 # ---------------------------------------------------------------- seções ----
+
 
 def _section(num: str, anchor: str, label: str, title: str, body: str) -> str:
     return (
@@ -193,6 +196,7 @@ def _section(num: str, anchor: str, label: str, title: str, body: str) -> str:
 
 # -------------------------------------------------------------- camada 1 ----
 
+
 def _sec_camada1(c1: dict) -> str:
     if not c1["achados"]:
         body = '<div class="tbl-card"><div class="empty">nenhum achado</div></div>'
@@ -201,7 +205,7 @@ def _sec_camada1(c1: dict) -> str:
             "<tr>"
             f'<td><span class="tag {_SEV_CLS.get(a["severity"], "info")}">{_esc(a["severity"])}</span></td>'
             f'<td class="cell-mono">{_esc(a["rule"])}</td>'
-            f'<td>{_esc(a["workflow_name"]) or "—"}</td>'
+            f"<td>{_esc(a['workflow_name']) or '—'}</td>"
             f'<td class="fdet">{_esc(a["detail"])}</td>'
             "</tr>"
             for a in c1["achados"]
@@ -213,11 +217,11 @@ def _sec_camada1(c1: dict) -> str:
             "<th>Detalhe</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></div></div>"
         )
-    return _section("01", "camada1", "CAMADA 1 — AUDITORIA ESTÁTICA",
-                    "Auditoria estática", body)
+    return _section("01", "camada1", "CAMADA 1 — AUDITORIA ESTÁTICA", "Auditoria estática", body)
 
 
 # -------------------------------------------------------------- camada 2 ----
+
 
 def _split_terminal(text: str) -> tuple[str, str]:
     """Separa o terminal embutido no fim do texto de um caminho ("[fim]", "(loop → X)", "(x)")."""
@@ -227,7 +231,7 @@ def _split_terminal(text: str) -> tuple[str, str]:
         return text[: -len(" → [fim]")], "[fim]"
     i = text.rfind(" → (")
     if i >= 0 and text.endswith(")"):
-        return text[:i], text[i + len(" → "):]
+        return text[:i], text[i + len(" → ") :]
     return text, ""
 
 
@@ -253,7 +257,8 @@ def _tree_html(nodes: list[dict]) -> str:
         return ""
     items = "".join(
         f'<li><span class="bl">{_esc(n["text"])}</span>{_tree_html(n["children"])}</li>'
-        if n["children"] else f"<li>{_leaf_html(n['text'])}</li>"
+        if n["children"]
+        else f"<li>{_leaf_html(n['text'])}</li>"
         for n in nodes
     )
     return f"<ul>{items}</ul>"
@@ -276,17 +281,20 @@ def _sec_camada2(c2: dict) -> str:
             f'{"".join(meta)}<span class="wf-caret"></span>'
             f'</summary><div class="tree">{tree}</div></details>'
         )
-    body = (f'<div class="wflist">{"".join(parts)}</div>' if parts
-            else '<div class="tbl-card"><div class="empty">nenhum workflow no dump</div></div>')
-    return _section("02", "camada2", "CAMADA 2 — CAMINHOS DE EXECUÇÃO",
-                    "Caminhos de execução", body)
+    body = (
+        f'<div class="wflist">{"".join(parts)}</div>'
+        if parts
+        else '<div class="tbl-card"><div class="empty">nenhum workflow no dump</div></div>'
+    )
+    return _section("02", "camada2", "CAMADA 2 — CAMINHOS DE EXECUÇÃO", "Caminhos de execução", body)
 
 
 # -------------------------------------------------------------- camada 3 ----
 
+
 def _sec_camada3(c3: dict) -> str:
     if not c3.get("disponivel"):
-        motivo = f' ({_esc(c3["erro"])})' if c3.get("erro") else ""
+        motivo = f" ({_esc(c3['erro'])})" if c3.get("erro") else ""
         body = f'<div class="tbl-card"><div class="empty">nenhum contrato disponível{motivo}</div></div>'
     elif not c3["casos"]:
         body = '<div class="tbl-card"><div class="empty">nenhum caso declarado</div></div>'
@@ -294,7 +302,7 @@ def _sec_camada3(c3: dict) -> str:
         rows = "".join(
             "<tr>"
             f'<td><span class="tag {_CASE_CLS.get(c["status"], "warn")}">{_esc(c["status"])}</span></td>'
-            f'<td>{_esc(c["caso"])}</td>'
+            f"<td>{_esc(c['caso'])}</td>"
             f'<td class="cell-mono">{_esc(c["workflow"])}</td>'
             f'<td class="fdet">{_esc(c["motivo"])}</td>'
             "</tr>"
@@ -307,11 +315,11 @@ def _sec_camada3(c3: dict) -> str:
             "<th>Motivo</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></div></div>"
         )
-    return _section("03", "camada3", "CAMADA 3 — TESTE DE CONTRATO",
-                    "Contratos", body)
+    return _section("03", "camada3", "CAMADA 3 — TESTE DE CONTRATO", "Contratos", body)
 
 
 # ------------------------------------------------------------------ main ----
+
 
 def write_validation_html(data: dict, out: Path, title: str = "") -> Path:
     out = Path(out)

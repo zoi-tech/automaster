@@ -9,26 +9,47 @@ from automaster_audit.loader import load_dump
 
 
 def test_journey_html_selfcontained_and_xss_safe(make_dump, tmp_path):
-    evil = '</script><img src=x onerror=alert(1)>'
-    a = wf(id="a", name=evil, steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+    evil = "</script><img src=x onerror=alert(1)>"
+    a = wf(id="a", name=evil, steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     data = build_journey(load_dump(make_dump(workflows=[a])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
     assert "</script><img" not in html
-    assert 'src="http' not in html and 'href="http' not in html.replace(
-        'href="dashboard.html', "").replace('href="graph.html', "").replace(
-        'href="validation.html', "").replace('href="journey.html', "")
+    assert 'src="http' not in html and 'href="http' not in html.replace('href="dashboard.html', "").replace(
+        'href="graph.html', ""
+    ).replace('href="validation.html', "").replace('href="journey.html', "")
     assert "unpkg" not in html
 
 
 def test_journey_html_renders_tree_and_stats(make_dump, tmp_path):
-    a = wf(id="a", name="A", steps=[step("s1", "add_contact_tag", attrs={"tags": ["q"]})],
-           triggers=[trig("contact_created", "a")])
-    b = wf(id="b", name="B", steps=[step("s2", "sms")],
-           triggers=[trig("contact_tag", "b", conditions=[
-               {"operator": "index-of-true", "id": "tag-added", "value": "q",
-                "title": "Tag Added", "type": "select", "field": "tagsAdded"}], tid="tb")])
+    a = wf(
+        id="a",
+        name="A",
+        steps=[step("s1", "add_contact_tag", attrs={"tags": ["q"]})],
+        triggers=[trig("contact_created", "a")],
+    )
+    b = wf(
+        id="b",
+        name="B",
+        steps=[step("s2", "sms")],
+        triggers=[
+            trig(
+                "contact_tag",
+                "b",
+                conditions=[
+                    {
+                        "operator": "index-of-true",
+                        "id": "tag-added",
+                        "value": "q",
+                        "title": "Tag Added",
+                        "type": "select",
+                        "field": "tagsAdded",
+                    }
+                ],
+                tid="tb",
+            )
+        ],
+    )
     data = build_journey(load_dump(make_dump(workflows=[a, b], tags=["q"])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
@@ -38,8 +59,7 @@ def test_journey_html_renders_tree_and_stats(make_dump, tmp_path):
 
 
 def test_view_switcher_present(make_dump, tmp_path):
-    a = wf(id="a", name="A", steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     data = build_journey(load_dump(make_dump(workflows=[a])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
@@ -49,29 +69,29 @@ def test_view_switcher_present(make_dump, tmp_path):
 
 
 def test_journey_json_embed_is_safe(make_dump, tmp_path):
-    evil = '</script><img src=x>'
-    a = wf(id="a", name=evil, steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+    evil = "</script><img src=x>"
+    a = wf(id="a", name=evil, steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     data = build_journey(load_dump(make_dump(workflows=[a])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
     m = re.search(r"const JOURNEY = (.+);", html)
     assert m, "bloco JSON embutido ausente"
     blob = m.group(1)
-    assert "</script" not in blob          # fechamento escapado
-    assert "<\\/script" in blob            # ...com <\/
+    assert "</script" not in blob  # fechamento escapado
+    assert "<\\/script" in blob  # ...com <\/
     # auto-contido: nenhum recurso externo além dos 4 links relativos do sidebar
-    stripped = (html.replace('href="dashboard.html', "")
-                    .replace('href="graph.html', "")
-                    .replace('href="validation.html', "")
-                    .replace('href="journey.html', ""))
+    stripped = (
+        html.replace('href="dashboard.html', "")
+        .replace('href="graph.html', "")
+        .replace('href="validation.html', "")
+        .replace('href="journey.html', "")
+    )
     assert 'src="http' not in stripped and 'href="http' not in stripped
     assert "unpkg" not in html and "fonts.googleapis" not in html
 
 
 def test_views_lazy_containers(make_dump, tmp_path):
-    a = wf(id="a", name="A", steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     data = build_journey(load_dump(make_dump(workflows=[a])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
@@ -82,8 +102,7 @@ def test_views_lazy_containers(make_dump, tmp_path):
 def test_metro_js_classifies_by_structured_fields_not_labels(make_dump, tmp_path):
     # review: loop real vs ref e badge DECAY eram parse de string pt-BR do
     # label (acoplamento oculto com journey.py + falso positivo com tag "decay")
-    a = wf(id="a", name="A", steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     data = build_journey(load_dump(make_dump(workflows=[a])))
     out = write_journey_html(data, tmp_path / "j.html", title="T")
     html = out.read_text(encoding="utf-8")
@@ -97,8 +116,8 @@ def test_metro_js_classifies_by_structured_fields_not_labels(make_dump, tmp_path
 
 def test_cli_journey_subcommand(make_dump, capsys):
     from automaster_audit.cli import main
-    a = wf(id="a", name="A", steps=[step("s1", "sms")],
-           triggers=[trig("contact_created", "a")])
+
+    a = wf(id="a", name="A", steps=[step("s1", "sms")], triggers=[trig("contact_created", "a")])
     path = make_dump(workflows=[a])
     rc = main(["journey", str(path)])
     assert rc == 0
@@ -109,9 +128,11 @@ def test_cli_journey_subcommand(make_dump, capsys):
 
 def test_cli_journey_cap_flags(make_dump, capsys):
     from automaster_audit.cli import main
-    steps = [step(f"s{i}", "sms",
-                  next=f"s{i+1}" if i < 20 else None,
-                  parent=f"s{i-1}" if i > 0 else None) for i in range(21)]
+
+    steps = [
+        step(f"s{i}", "sms", next=f"s{i + 1}" if i < 20 else None, parent=f"s{i - 1}" if i > 0 else None)
+        for i in range(21)
+    ]
     a = wf(id="a", name="A", steps=steps, triggers=[trig("contact_created", "a")])
     path = make_dump(workflows=[a])
     rc = main(["journey", str(path), "--max-nodes", "5"])

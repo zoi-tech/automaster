@@ -20,6 +20,7 @@ Nós de decisão não-condicionais (cenário declara):
 - find_opportunity → `oportunidade_encontrada: bool` (Found/Not Found).
 - wait com transitions → `resposta: bool` (True=reply/primary, False=timeout).
 """
+
 from __future__ import annotations
 
 import operator
@@ -28,14 +29,24 @@ from dataclasses import dataclass
 from .flow import Path, _branch_label, index_steps, roots, successors
 from .loader import Workflow
 
-_DIAS = {"domingo": 0, "segunda": 1, "terca": 2, "terça": 2, "quarta": 3,
-         "quinta": 4, "sexta": 5, "sabado": 6, "sábado": 6}
+_DIAS = {
+    "domingo": 0,
+    "segunda": 1,
+    "terca": 2,
+    "terça": 2,
+    "quarta": 3,
+    "quinta": 4,
+    "sexta": 5,
+    "sabado": 6,
+    "sábado": 6,
+}
 _OPS = {">": operator.gt, "<": operator.lt, ">=": operator.ge, "<=": operator.le}
 
 
 @dataclass
 class SimResult:
     """Resultado da simulação: caminho escolhido ou ambiguidade com motivo."""
+
     path: Path | None
     status: str  # "ok" | "ambiguous"
     motivo: str | None = None
@@ -116,8 +127,7 @@ def _motivo_branch(branch: dict, dado: dict, triggers: list[dict] | None) -> str
     for seg in branch.get("segments") or []:
         for c in seg.get("conditions") or []:
             if _eval_condition(c, dado, triggers) is None:
-                return (f"{c.get('conditionType')}/{c.get('conditionSubType')}"
-                        f"/{c.get('conditionOperator')}")
+                return f"{c.get('conditionType')}/{c.get('conditionSubType')}/{c.get('conditionOperator')}"
     return "sem condições"
 
 
@@ -132,8 +142,10 @@ def _decide(step: dict, dado: dict, wf: Workflow, by_id: dict[str, dict]):
                 node = by_id.get(b.get("id"), {})
                 return b.get("id"), _branch_label(step, node) or b.get("name")
             if v is None:
-                return (f"step {sid}: condição não avaliável no ramo "
-                        f"\"{b.get('name')}\" ({_motivo_branch(b, dado, wf.triggers)})")
+                return (
+                    f"step {sid}: condição não avaliável no ramo "
+                    f'"{b.get("name")}" ({_motivo_branch(b, dado, wf.triggers)})'
+                )
         for nid in successors(step):  # todos False → nó else
             node = by_id.get(nid) or {}
             if "else" in (node.get("attributes") or {}):
@@ -147,7 +159,7 @@ def _decide(step: dict, dado: dict, wf: Workflow, by_id: dict[str, dict]):
             node = by_id.get(nid) or {}
             if node.get("name") == wanted:
                 return nid, wanted
-        return f"step {sid}: transition \"{wanted}\" não encontrada"
+        return f'step {sid}: transition "{wanted}" não encontrada'
     if step.get("type") == "wait":
         if "resposta" not in dado:
             return f"step {sid}: cenário não declara 'resposta'"
@@ -159,7 +171,7 @@ def _decide(step: dict, dado: dict, wf: Workflow, by_id: dict[str, dict]):
             if any(m in wanted for m in marks if m):
                 return nid, _branch_label(step, node)
         return f"step {sid}: transition de resposta não encontrada"
-    return f"step {sid}: nó de decisão \"{step.get('type')}\" não suportado"
+    return f'step {sid}: nó de decisão "{step.get("type")}" não suportado'
 
 
 def simulate(wf: Workflow, dado: dict) -> SimResult:

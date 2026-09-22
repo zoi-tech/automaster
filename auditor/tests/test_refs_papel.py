@@ -1,4 +1,5 @@
 """Índice reverso com papel: tag citada só em trigger não é órfã."""
+
 from conftest import wf
 
 from automaster_audit.dashboard import build_dashboard
@@ -6,8 +7,12 @@ from automaster_audit.loader import load_dump
 
 
 def _trigger_tag(tag):
-    return {"id": "t1", "name": "Contact Tag", "type": "contact_tag",
-            "conditions": [{"field": "tagsAdded", "operator": "index-of-true", "value": tag}]}
+    return {
+        "id": "t1",
+        "name": "Contact Tag",
+        "type": "contact_tag",
+        "conditions": [{"field": "tagsAdded", "operator": "index-of-true", "value": tag}],
+    }
 
 
 def _tags(d):
@@ -26,12 +31,35 @@ def test_papeis_add_remove_condicao(make_dump):
     steps = [
         {"type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["a"]}},
         {"type": "remove_contact_tag", "name": "Rm", "attributes": {"tags": ["b"]}},
-        {"type": "if_else", "name": "If", "attributes": {"branches": [{"segments": [{"conditions": [
-            {"conditionType": "contact_detail", "conditionSubType": "tags",
-             "conditionOperator": "index-of-true", "conditionValue": ["c"]}]}]}]}},
+        {
+            "type": "if_else",
+            "name": "If",
+            "attributes": {
+                "branches": [
+                    {
+                        "segments": [
+                            {
+                                "conditions": [
+                                    {
+                                        "conditionType": "contact_detail",
+                                        "conditionSubType": "tags",
+                                        "conditionOperator": "index-of-true",
+                                        "conditionValue": ["c"],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+        },
     ]
-    trig = {"id": "t1", "name": "Reply", "type": "customer_reply",
-            "conditions": [{"field": "contact.tags", "operator": "index-of-true", "value": "d"}]}
+    trig = {
+        "id": "t1",
+        "name": "Reply",
+        "type": "customer_reply",
+        "conditions": [{"field": "contact.tags", "operator": "index-of-true", "value": "d"}],
+    }
     path = make_dump(workflows=[wf(steps=steps, triggers=[trig])], tags=["a", "b", "c", "d", "e"])
     tags = _tags(build_dashboard(load_dump(path)))
     assert tags["a"]["papeis"] == ["adiciona"]

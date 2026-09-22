@@ -42,10 +42,12 @@ def test_erro_que_ja_existia_nao_bloqueia(make_dump):
     ctx = load_dump(caminho)
     # muda só o nome de um step: os dois ERROR de tag continuam iguais
     editado = {
-        "workflowData": {"templates": [
-            {**_passo_tag("s1", ["sumida"]), "name": "Outro nome"},
-            _passo_tag("s2", ["sumida"]),
-        ]},
+        "workflowData": {
+            "templates": [
+                {**_passo_tag("s1", ["sumida"]), "name": "Outro nome"},
+                _passo_tag("s2", ["sumida"]),
+            ]
+        },
         "triggersData": [],
     }
     r = validar_edicao(ctx, "w1", editado)
@@ -68,16 +70,21 @@ def test_validacao_nao_altera_o_contexto_carregado(make_dump):
 
 
 def _trigger_form_morto():
-    return {"id": "tr1", "type": "form_submission", "name": "Formulário Enviado",
-            "active": True, "deleted": False, "workflow_id": "w1",
-            "actions": [{"workflow_id": "w1", "type": "add_to_workflow"}],
-            "conditions": [{"field": "form.id", "value": "formQueSumiu"}]}
+    return {
+        "id": "tr1",
+        "type": "form_submission",
+        "name": "Formulário Enviado",
+        "active": True,
+        "deleted": False,
+        "workflow_id": "w1",
+        "actions": [{"workflow_id": "w1", "type": "add_to_workflow"}],
+        "conditions": [{"field": "form.id", "value": "formQueSumiu"}],
+    }
 
 
 def _dump_com_trigger_quebrado(make_dump):
     return make_dump(
-        workflows=[wf(id="w1", steps=[_passo_tag("s1", ["tag-boa"])],
-                      triggers=[_trigger_form_morto()])],
+        workflows=[wf(id="w1", steps=[_passo_tag("s1", ["tag-boa"])], triggers=[_trigger_form_morto()])],
         tags=["tag-boa"],
         forms=[{"id": "formVivo", "name": "Vivo"}],
     )
@@ -110,19 +117,48 @@ def test_triggers_passados_pelo_chamador_mandam(make_dump):
 # fraseologia: o primeiro prova o efeito, o segundo falha quando nasce uma regra que cita
 # nome de step de outro jeito — o caso que traria o falso positivo de volta.
 
+
 def _steps_com_erro_de_cada_tipo(sufixo=""):
     """Um step por regra ERROR que cita nome de step, todos com referência quebrada."""
     return [
-        {"id": "s1", "type": "add_contact_tag", "name": f"Marca{sufixo}",
-         "attributes": {"tags": ["tag-fantasma"]}, "next": "s2"},
-        {"id": "s2", "type": "update_contact_field", "name": f"Atualiza{sufixo}",
-         "attributes": {"fields": [{"field": "GHOST", "title": "Campo X"}]}, "parentKey": "s1", "next": "s3"},
-        {"id": "s3", "type": "sms", "name": f"SMS{sufixo}",
-         "attributes": {"body": "{{custom_values.fantasma}}"}, "parentKey": "s2", "next": "s4"},
-        {"id": "s4", "type": "add_to_workflow", "name": f"Encaminha{sufixo}",
-         "attributes": {"workflow_id": "GHOST"}, "parentKey": "s3", "next": "s5"},
-        {"id": "s5", "type": "goto", "name": f"Salta{sufixo}",
-         "attributes": {"targetNodeId": "NAO-EXISTE"}, "parentKey": "s4"},
+        {
+            "id": "s1",
+            "type": "add_contact_tag",
+            "name": f"Marca{sufixo}",
+            "attributes": {"tags": ["tag-fantasma"]},
+            "next": "s2",
+        },
+        {
+            "id": "s2",
+            "type": "update_contact_field",
+            "name": f"Atualiza{sufixo}",
+            "attributes": {"fields": [{"field": "GHOST", "title": "Campo X"}]},
+            "parentKey": "s1",
+            "next": "s3",
+        },
+        {
+            "id": "s3",
+            "type": "sms",
+            "name": f"SMS{sufixo}",
+            "attributes": {"body": "{{custom_values.fantasma}}"},
+            "parentKey": "s2",
+            "next": "s4",
+        },
+        {
+            "id": "s4",
+            "type": "add_to_workflow",
+            "name": f"Encaminha{sufixo}",
+            "attributes": {"workflow_id": "GHOST"},
+            "parentKey": "s3",
+            "next": "s5",
+        },
+        {
+            "id": "s5",
+            "type": "goto",
+            "name": f"Salta{sufixo}",
+            "attributes": {"targetNodeId": "NAO-EXISTE"},
+            "parentKey": "s4",
+        },
     ]
 
 

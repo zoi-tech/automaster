@@ -10,8 +10,10 @@ def _step(preview: str | None, template_id: str = "copia123") -> dict:
 
 
 def test_id_sai_do_preview_url_percent_encoded():
-    url = ("https://firebasestorage.googleapis.com/v0/b/highlevel-backend.appspot.com/o/"
-           "location%2FLOC%2Femails%2Fabc123%2Findex.html?alt=media&token=x")
+    url = (
+        "https://firebasestorage.googleapis.com/v0/b/highlevel-backend.appspot.com/o/"
+        "location%2FLOC%2Femails%2Fabc123%2Findex.html?alt=media&token=x"
+    )
     assert email_template_id(_step(url)) == "abc123"
 
 
@@ -29,10 +31,12 @@ def test_template_id_nunca_e_usado():
 
 
 def test_loader_le_builders_ignorando_pasta(make_dump):
-    path = make_dump(email_templates=[
-        {"id": "t1", "name": "Bem-vindo", "templateType": "html"},
-        {"id": "f1", "name": "Pasta", "templateType": "folder"},
-    ])
+    path = make_dump(
+        email_templates=[
+            {"id": "t1", "name": "Bem-vindo", "templateType": "html"},
+            {"id": "f1", "name": "Pasta", "templateType": "folder"},
+        ]
+    )
     ctx = load_dump(path)
     assert ctx.template_ids["email"] == {"t1"}
     assert ctx.template_names["t1"] == "Bem-vindo"

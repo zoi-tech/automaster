@@ -8,6 +8,7 @@ Modelo (reverso-engenheirado do GHL):
 - goto: attributes.targetNodeId = salto para outro step do mesmo workflow.
 - next vazio/ausente → terminal (contato sai do workflow).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -72,6 +73,7 @@ def is_branch_node(step: dict) -> bool:
 @dataclass
 class Path:
     """Um caminho de execução: (step_id, rótulo do ramo tomado; None se linear) + terminal."""
+
     steps: list[tuple[str, str | None]]
     terminal: str  # "exit" | "loop → <step_id>"
 

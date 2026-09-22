@@ -3,6 +3,7 @@
 Cada módulo nesta pasta expõe `check(ctx: DumpContext) -> list[Finding]`.
 A descoberta é dinâmica via pkgutil — basta adicionar um arquivo novo.
 """
+
 from __future__ import annotations
 
 import importlib

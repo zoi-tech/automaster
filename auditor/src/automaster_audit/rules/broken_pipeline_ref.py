@@ -5,6 +5,7 @@ Fontes de referência a pipeline/stage:
 - internal_create_opportunity: attributes.pipelineId; e __customInputFields__[] com
   filterField=='pipelineStageId' → value (stage id)
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding

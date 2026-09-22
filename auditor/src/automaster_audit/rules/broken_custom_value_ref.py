@@ -3,6 +3,7 @@
 Varre o corpo de cada step procurando tokens custom_values.X e compara com as
 custom values definidas. Se a lista não foi extraída (dump antigo), não roda.
 """
+
 from __future__ import annotations
 
 import re

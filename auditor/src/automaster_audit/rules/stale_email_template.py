@@ -10,6 +10,7 @@ existente, o GHL guarda uma cópia dentro do step e o `template_id` passa a ser 
 cópia, que por construção não aparece na lista do builder. Detalhes em `docs/endpoints.md`,
 seção `## Templates de e-mail`.
 """
+
 from __future__ import annotations
 
 from ..finding import WARN, Finding
@@ -34,8 +35,8 @@ def check(ctx: DumpContext) -> list[Finding]:
                 workflow_id=wf.id,
                 workflow_name=wf.name,
                 detail=f"step '{step.get('name', step.get('type'))}' (assunto {assunto!r}) usa "
-                       f"template de e-mail que não está mais no builder: {tid} — o e-mail "
-                       f"ainda é enviado, mas não dá para editá-lo pelo app",
+                f"template de e-mail que não está mais no builder: {tid} — o e-mail "
+                f"ainda é enviado, mas não dá para editá-lo pelo app",
             )
         )
     return findings

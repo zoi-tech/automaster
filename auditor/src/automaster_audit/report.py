@@ -1,4 +1,5 @@
 """Gera report.md + report.json na pasta do dump."""
+
 from __future__ import annotations
 
 import json
@@ -33,12 +34,17 @@ def _counts(findings: list[Finding]) -> dict[str, int]:
 
 # lista opcional que falta no dump -> (arquivo, regras que ficam no-op)
 _CEGAS = [
-    (lambda ctx: "message" not in ctx.template_ids and "whatsapp" not in ctx.template_ids,
-     "message_templates.json / whatsapp_templates.json", "broken_template_ref"),
-    (lambda ctx: not ctx.form_ids,
-     "forms.json / surveys.json", "broken_form_ref, unused_form"),
-    (lambda ctx: "email" not in ctx.template_ids,
-     "email_templates.json", "stale_email_template, unused_email_template"),
+    (
+        lambda ctx: "message" not in ctx.template_ids and "whatsapp" not in ctx.template_ids,
+        "message_templates.json / whatsapp_templates.json",
+        "broken_template_ref",
+    ),
+    (lambda ctx: not ctx.form_ids, "forms.json / surveys.json", "broken_form_ref, unused_form"),
+    (
+        lambda ctx: "email" not in ctx.template_ids,
+        "email_templates.json",
+        "stale_email_template, unused_email_template",
+    ),
 ]
 
 
@@ -68,9 +74,11 @@ def _render_md(ctx: DumpContext, findings: list[Finding]) -> str:
         lines += [
             "## Regras cegas",
             "",
-            ("O dump é anterior a estas listas, então as regras abaixo não rodaram. "
-            "Ausência de achado aqui não é prova de que está tudo certo — re-extraia a "
-            "subconta para valer."),
+            (
+                "O dump é anterior a estas listas, então as regras abaixo não rodaram. "
+                "Ausência de achado aqui não é prova de que está tudo certo — re-extraia a "
+                "subconta para valer."
+            ),
             "",
             "| Lista ausente | Regra sem efeito |",
             "|---|---|",

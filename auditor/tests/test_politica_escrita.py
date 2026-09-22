@@ -5,6 +5,7 @@ As 18 regras rodam em Python e o efeito acontece em TypeScript: o que mantém os
 flag, ou chamar `workflow-editar --confirmo` de outro módulo, a guarda deixa de valer sem
 que nada quebre. Estes testes falham nesse dia.
 """
+
 from pathlib import Path
 
 from automaster_audit import mcp_server
@@ -14,8 +15,7 @@ PORTA = "mcp/workflows.py"  # o único módulo autorizado a gravar workflow
 
 
 def _fontes():
-    return {p.relative_to(PACOTE).as_posix(): p.read_text(encoding="utf-8")
-            for p in PACOTE.rglob("*.py")}
+    return {p.relative_to(PACOTE).as_posix(): p.read_text(encoding="utf-8") for p in PACOTE.rglob("*.py")}
 
 
 def test_so_a_porta_com_guarda_emite_sem_regras():
@@ -28,8 +28,9 @@ def test_so_a_porta_com_guarda_emite_sem_regras():
 
 def test_nenhum_outro_modulo_chama_o_comando_de_escrita_de_workflow():
     """`cli.py` cita o nome como subcomando, o que vale; rodar o comando é que não."""
-    culpados = sorted(nome for nome, src in _fontes().items()
-                      if '_run_extractor("workflow-editar"' in src and nome != PORTA)
+    culpados = sorted(
+        nome for nome, src in _fontes().items() if '_run_extractor("workflow-editar"' in src and nome != PORTA
+    )
     assert culpados == [], f"escrita de workflow fora da porta com guarda: {culpados}"
 
 

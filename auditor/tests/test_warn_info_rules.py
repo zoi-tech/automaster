@@ -83,8 +83,12 @@ def test_ciclo_de_chamadas_ancora_sempre_no_mesmo_workflow(make_dump):
     from automaster_audit.rules import workflow_call_cycle
 
     def chama(destino):
-        return {"id": f"s-{destino}", "type": "add_to_workflow", "name": "Manda",
-                "attributes": {"workflow_id": destino}}
+        return {
+            "id": f"s-{destino}",
+            "type": "add_to_workflow",
+            "name": "Manda",
+            "attributes": {"workflow_id": destino},
+        }
 
     anel = [("wfA", "wfB"), ("wfB", "wfC"), ("wfC", "wfA")]
     ancoras = set()

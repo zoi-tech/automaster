@@ -5,6 +5,7 @@ Raiz dupla ("Contato criado" + "A qualquer momento"); eventos externos
 ancorados inline no step que pode causá-los; condensação nativa; ciclos
 cortados com nó loop; caps explícitos (nunca silenciosos).
 """
+
 from __future__ import annotations
 
 from collections import Counter
@@ -14,9 +15,15 @@ from .loader import DumpContext
 
 # Tipos de trigger que o motor entende (demais → stats.triggers_ignorados)
 KNOWN_TRIGGERS = {
-    "contact_created", "contact_tag", "customer_reply", "call_status",
-    "opportunity_created", "opportunity_decay", "contact_changed",
-    "birthday_reminder", "appointment",
+    "contact_created",
+    "contact_tag",
+    "customer_reply",
+    "call_status",
+    "opportunity_created",
+    "opportunity_decay",
+    "contact_changed",
+    "birthday_reminder",
+    "appointment",
 }
 # Steps que mandam mensagem ao contato (âncora de customer_reply)
 MESSAGE_TYPES = {"sms", "email", "whatsapp"}
@@ -27,10 +34,22 @@ DEFAULT_MAX_DEPTH = 8
 DEFAULT_MAX_NODES = 4000  # por raiz (spec): criação e "a qualquer momento" independentes
 
 
-def _node(kind: str, label: str, detail: str = "", flags: list[str] | None = None,
-          conds: list[str] | None = None, children: list | None = None) -> dict:
-    return {"kind": kind, "label": label, "detail": detail,
-            "flags": flags or [], "conds": conds or [], "children": children or []}
+def _node(
+    kind: str,
+    label: str,
+    detail: str = "",
+    flags: list[str] | None = None,
+    conds: list[str] | None = None,
+    children: list | None = None,
+) -> dict:
+    return {
+        "kind": kind,
+        "label": label,
+        "detail": detail,
+        "flags": flags or [],
+        "conds": conds or [],
+        "children": children or [],
+    }
 
 
 def _cond_summary(c: dict) -> str:
@@ -72,14 +91,16 @@ class TriggerIndex:
                     if a.get("type") == "add_to_workflow" and a.get("workflow_id"):
                         target = a["workflow_id"]
                         break
-                self.by_type.setdefault(ttype, []).append({
-                    "id": t.get("id") or "",
-                    "type": ttype,
-                    "name": t.get("name") or ttype,
-                    "target": target,
-                    "active": bool(t.get("active", True)),
-                    "conditions": t.get("conditions") or [],
-                })
+                self.by_type.setdefault(ttype, []).append(
+                    {
+                        "id": t.get("id") or "",
+                        "type": ttype,
+                        "name": t.get("name") or ttype,
+                        "target": target,
+                        "active": bool(t.get("active", True)),
+                        "conditions": t.get("conditions") or [],
+                    }
+                )
 
     def of_type(self, ttype: str) -> list[dict]:
         return self.by_type.get(ttype, [])
@@ -187,9 +208,15 @@ def _effect_label(ctx: DumpContext, s: dict) -> tuple[str, str]:
 
 
 EFFECT_TYPES = {
-    "add_contact_tag", "remove_contact_tag", "update_contact_field",
-    "internal_create_opportunity", "internal_update_opportunity",
-    "assign_user", "webhook", "internal_notification", "manual-call",
+    "add_contact_tag",
+    "remove_contact_tag",
+    "update_contact_field",
+    "internal_create_opportunity",
+    "internal_update_opportunity",
+    "assign_user",
+    "webhook",
+    "internal_notification",
+    "manual-call",
 } | MESSAGE_TYPES
 
 
@@ -228,8 +255,7 @@ def _branch_label_of(container: dict, node: dict) -> str:
 
 
 class _Walker:
-    def __init__(self, ctx: DumpContext, idx: TriggerIndex,
-                 max_depth: int, budget: _Budget, stats: dict):
+    def __init__(self, ctx: DumpContext, idx: TriggerIndex, max_depth: int, budget: _Budget, stats: dict):
         self.ctx = ctx
         self.idx = idx
         self.max_depth = max_depth
@@ -243,8 +269,7 @@ class _Walker:
         self.stats["terminais"] += 1
         return _node("terminal", label, detail=detail)
 
-    def workflow_node(self, wf_id: str, wf_stack: frozenset, depth: int,
-                      anchored: set | None = None) -> dict:
+    def workflow_node(self, wf_id: str, wf_stack: frozenset, depth: int, anchored: set | None = None) -> dict:
         """Nó de entrada num workflow + corpo condensado (ou loop/truncado/missing)."""
         if not self.budget.take():
             return _node("truncated", _TRUNC_LABEL)
@@ -259,13 +284,10 @@ class _Walker:
             return _node("truncated", f"✂ profundidade máx ({self.max_depth})")
         self.stats["_wf_seen"].add(wf_id)
         flags = ["draft"] if str(w.status or "").lower() != "published" else []
-        children = self._walk_steps_from_roots(
-            w, wf_stack | {wf_id}, depth, set() if anchored is None else anchored)
-        return _node("workflow", w.name or wf_id, detail=f"{len(w.steps)} steps",
-                     flags=flags, children=children)
+        children = self._walk_steps_from_roots(w, wf_stack | {wf_id}, depth, set() if anchored is None else anchored)
+        return _node("workflow", w.name or wf_id, detail=f"{len(w.steps)} steps", flags=flags, children=children)
 
-    def _walk_steps_from_roots(self, w, wf_stack: frozenset, depth: int,
-                               anchored: set) -> list[dict]:
+    def _walk_steps_from_roots(self, w, wf_stack: frozenset, depth: int, anchored: set) -> list[dict]:
         by_id = index_steps(w)
         out: list[dict] = []
         for rid in roots(w):
@@ -274,16 +296,14 @@ class _Walker:
             out.append(self._terminal_node(detail="workflow vazio"))
         return out
 
-    def _walk(self, nid: str, by_id: dict, w, seen: set, wf_stack: frozenset,
-              depth: int, anchored: set) -> list[dict]:
+    def _walk(self, nid: str, by_id: dict, w, seen: set, wf_stack: frozenset, depth: int, anchored: set) -> list[dict]:
         """Sequência condensada de nós a partir do step nid (dentro do workflow)."""
         out: list[dict] = []
         neutrals: list[dict] = []
 
         def flush_neutrals():
             if neutrals:
-                grp = _node("neutral_group", f"+{len(neutrals)} steps neutros",
-                            children=list(neutrals))
+                grp = _node("neutral_group", f"+{len(neutrals)} steps neutros", children=list(neutrals))
                 out.append(grp)
                 neutrals.clear()
 
@@ -317,8 +337,7 @@ class _Walker:
                     label = _branch_label_of(s, bnode)
                     body_next = bnode.get("next")
                     if isinstance(body_next, str) and body_next:
-                        kids = self._walk(body_next, by_id, w, seen, wf_stack,
-                                          depth, anchored)
+                        kids = self._walk(body_next, by_id, w, seen, wf_stack, depth, anchored)
                     else:
                         kids = [self._terminal_node()]
                     out.append(_node("branch", label, children=kids))
@@ -339,15 +358,12 @@ class _Walker:
                     out.append(_node("truncated", _TRUNC_LABEL))
                     return out
                 target = (s.get("attributes") or {}).get("workflow_id") or ""
-                eff = _node("effect", "envia para workflow",
-                            detail=self.ctx.workflow_names.get(target, target))
-                eff["children"] = [self.workflow_node(target, wf_stack, depth + 1,
-                                                      anchored)]
+                eff = _node("effect", "envia para workflow", detail=self.ctx.workflow_names.get(target, target))
+                eff["children"] = [self.workflow_node(target, wf_stack, depth + 1, anchored)]
                 out.append(eff)
             elif stype in NEUTRAL_TYPES:
                 if self.budget.take():
-                    neutrals.append(_node("effect", str(s.get("name") or stype),
-                                          detail=str(stype)))
+                    neutrals.append(_node("effect", str(s.get("name") or stype), detail=str(stype)))
                 else:
                     flush_neutrals()
                     out.append(_node("truncated", _TRUNC_LABEL))
@@ -366,8 +382,7 @@ class _Walker:
                         return out
                     tgt = by_id.get(sid, {})
                     kids = self._walk(sid, by_id, w, seen, wf_stack, depth, anchored)
-                    out.append(_node("branch", f"caminho → {tgt.get('name') or sid}",
-                                     children=kids))
+                    out.append(_node("branch", f"caminho → {tgt.get('name') or sid}", children=kids))
                 return out
             cur = succ[0] if succ else None
 
@@ -375,8 +390,7 @@ class _Walker:
         out.append(self._terminal_node())
         return out
 
-    def _events_for_effect(self, s: dict, w, wf_stack: frozenset, depth: int,
-                           anchored: set) -> list[dict]:
+    def _events_for_effect(self, s: dict, w, wf_stack: frozenset, depth: int, anchored: set) -> list[dict]:
         """Eventos externos ancorados neste efeito (regra de ancoragem da spec)."""
         out: list[dict] = []
         stype = s.get("type")
@@ -385,8 +399,7 @@ class _Walker:
         if stype == "add_contact_tag":
             for tag in a.get("tags") or []:
                 for t in self.idx.for_tag(tag):
-                    out.append(self._event_node(
-                        f"tag “{tag}” adicionada dispara", t, wf_stack, depth, anchored))
+                    out.append(self._event_node(f"tag “{tag}” adicionada dispara", t, wf_stack, depth, anchored))
 
         elif stype in MESSAGE_TYPES:
             for t in self.idx.for_reply(w.id):
@@ -404,27 +417,22 @@ class _Walker:
                     label = "ligação: " + ", ".join(str(v) for v in vals)
                 else:
                     label = "após a ligação"
-                out.append(self._event_node(label, {**t, "rest": rest}, wf_stack,
-                                            depth, anchored))
+                out.append(self._event_node(label, {**t, "rest": rest}, wf_stack, depth, anchored))
 
         elif stype == "internal_create_opportunity":
             pid = a.get("pipelineId") or ""
             for t in self.idx.for_opportunity_created(pid):
-                out.append(self._event_node("oportunidade criada dispara", t,
-                                            wf_stack, depth, anchored))
+                out.append(self._event_node("oportunidade criada dispara", t, wf_stack, depth, anchored))
             for t in self.idx.for_decay(pid):
-                out.append(self._event_node("se a oportunidade estagnar (decay)", t,
-                                            wf_stack, depth, anchored))
+                out.append(self._event_node("se a oportunidade estagnar (decay)", t, wf_stack, depth, anchored))
 
         elif stype == "update_contact_field":
             for t in self.idx.for_field_change():
-                out.append(self._event_node("campo alterado dispara", t, wf_stack,
-                                            depth, anchored))
+                out.append(self._event_node("campo alterado dispara", t, wf_stack, depth, anchored))
 
         return out
 
-    def _event_node(self, label: str, t: dict, wf_stack: frozenset, depth: int,
-                    anchored: set | None = None) -> dict:
+    def _event_node(self, label: str, t: dict, wf_stack: frozenset, depth: int, anchored: set | None = None) -> dict:
         """Nó de evento → workflow alvo do trigger. Conds restantes viram chips.
 
         Mesmo trigger já expandido nesta árvore de raiz (anchored, compartilhado
@@ -449,8 +457,7 @@ class _Walker:
                 # flag "ref": discriminador estrutural (referência a cascata já
                 # expandida, NÃO loop real) — as vistas client-side dependem
                 # disso; nunca classificar pelo texto do label
-                ev["children"] = [_node("loop", f"já expandido acima → {tname}",
-                                        flags=["ref"])]
+                ev["children"] = [_node("loop", f"já expandido acima → {tname}", flags=["ref"])]
             else:
                 ev["children"] = [_node("truncated", _TRUNC_LABEL)]
             return ev
@@ -503,8 +510,7 @@ def _build_anytime(ctx: DumpContext, idx: TriggerIndex, walker: _Walker) -> list
 
     def add(label: str, t: dict):
         # anchored novo por evento-raiz: dedup de âncoras vale dentro da cascata
-        out.append(walker._event_node(label, {**t, "rest": t["conditions"]},
-                                      frozenset(), 1, set()))
+        out.append(walker._event_node(label, {**t, "rest": t["conditions"]}, frozenset(), 1, set()))
 
     for t in idx.of_type("contact_tag"):
         tag_conds = [c for c in t["conditions"] if _cond_field(c) == "tagsAdded"]
@@ -555,8 +561,7 @@ def _build_anytime(ctx: DumpContext, idx: TriggerIndex, walker: _Walker) -> list
     return out
 
 
-def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH,
-                  max_nodes: int = DEFAULT_MAX_NODES) -> dict:
+def build_journey(ctx: DumpContext, max_depth: int = DEFAULT_MAX_DEPTH, max_nodes: int = DEFAULT_MAX_NODES) -> dict:
     idx = TriggerIndex(ctx)
     # um budget POR RAIZ (spec: "cap de nós por raiz") — a raiz "A qualquer
     # momento" não morre de inanição se a de criação estourar

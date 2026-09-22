@@ -2,6 +2,7 @@
 
 attributes.fields[] = [{field: <id>, value, title, ...}]. `field` é o id do custom field.
 """
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding

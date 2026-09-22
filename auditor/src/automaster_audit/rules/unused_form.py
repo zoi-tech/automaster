@@ -4,6 +4,7 @@
 landing page não aparece em lugar nenhum do dump, e seria acusado à toa. O achado
 serve para revisão humana, não para conserto automático.
 """
+
 from __future__ import annotations
 
 from ..finding import INFO, Finding
@@ -43,8 +44,8 @@ def check(ctx: DumpContext) -> list[Finding]:
                     workflow_id="",
                     workflow_name="",
                     detail=f"{rotulo} '{ctx.form_names.get(fid, fid)}' não é citado por nenhum "
-                           f"trigger nem calendário — pode estar embutido num site externo, "
-                           f"que o dump não enxerga",
+                    f"trigger nem calendário — pode estar embutido num site externo, "
+                    f"que o dump não enxerga",
                 )
             )
     return findings

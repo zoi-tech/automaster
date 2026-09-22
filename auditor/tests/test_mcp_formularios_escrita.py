@@ -19,14 +19,12 @@ def espiao(monkeypatch):
 
 def test_acao_exige_confirmo(espiao):
     with pytest.raises(srv.ToolError, match="confirmo=true"):
-        srv.formulario_acao(loc="L1", acao="editar", id="F1",
-                            ops=[{"op": "remover-campo", "alvo": "email"}])
+        srv.formulario_acao(loc="L1", acao="editar", id="F1", ops=[{"op": "remover-campo", "alvo": "email"}])
     assert espiao == []
 
 
 def test_previa_nao_exige_confirmo(espiao):
-    srv.formulario_acao(loc="L1", acao="previa", id="F1",
-                        ops=[{"op": "remover-campo", "alvo": "email"}])
+    srv.formulario_acao(loc="L1", acao="previa", id="F1", ops=[{"op": "remover-campo", "alvo": "email"}])
     args = espiao[0]
     assert "--confirmo" not in args
     assert args[:5] == ("formulario-acao", "-l", "L1", "--acao", "editar")
@@ -45,8 +43,7 @@ def test_editar_sem_ops(espiao):
 
 
 def test_ops_viram_json_no_argumento(espiao):
-    srv.formulario_acao(loc="L1", acao="editar", id="F1", confirmo=True,
-                        ops=[{"op": "remover-campo", "alvo": "email"}])
+    srv.formulario_acao(loc="L1", acao="editar", id="F1", confirmo=True, ops=[{"op": "remover-campo", "alvo": "email"}])
     args = espiao[0]
     assert "--confirmo" in args
     assert '"remover-campo"' in args[args.index("--ops") + 1]

@@ -19,6 +19,7 @@ normalização). Status por caso: PASS | FAIL | AMBIGUOUS — simulação ambíg
 NUNCA vira PASS/FAIL silencioso. Erros de formato → ContractError (estilo
 loader.DumpError: mensagem clara com o nome do arquivo, sem traceback cru).
 """
+
 from __future__ import annotations
 
 import json
@@ -54,10 +55,13 @@ def load_contracts(dir: Path) -> list[dict]:
         if not isinstance(data["casos"], list):
             raise ContractError(f"contrato {f.name}: 'casos' deve ser uma lista")
         for c in data["casos"]:
-            if (not isinstance(c, dict) or not {"nome", "dado", "espera"} <= c.keys()
-                    or not isinstance(c["dado"], dict) or not isinstance(c["espera"], dict)):
-                raise ContractError(
-                    f"contrato {f.name}: caso inválido — exige 'nome', 'dado' e 'espera' (dicts)")
+            if (
+                not isinstance(c, dict)
+                or not {"nome", "dado", "espera"} <= c.keys()
+                or not isinstance(c["dado"], dict)
+                or not isinstance(c["espera"], dict)
+            ):
+                raise ContractError(f"contrato {f.name}: caso inválido — exige 'nome', 'dado' e 'espera' (dicts)")
         contracts.append(data)
     return contracts
 
@@ -65,6 +69,7 @@ def load_contracts(dir: Path) -> list[dict]:
 @dataclass
 class CaseResult:
     """Resultado de um caso de contrato. `motivo` vazio em PASS."""
+
     workflow: str
     caso: str
     status: str  # "PASS" | "FAIL" | "AMBIGUOUS"
@@ -104,8 +109,7 @@ def run_contracts(ctx: DumpContext, contracts_dir: Path) -> list[CaseResult]:
         casos = contract["casos"] or []
         w = _find_wf(ctx, key)
         if w is None:
-            results += [CaseResult(key, c.get("nome", "?"), "FAIL", "workflow não encontrado")
-                        for c in casos]
+            results += [CaseResult(key, c.get("nome", "?"), "FAIL", "workflow não encontrado") for c in casos]
             continue
         by_id = index_steps(w)
         for c in casos:

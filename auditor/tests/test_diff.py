@@ -1,4 +1,5 @@
 """Diff entre dois snapshots da mesma subconta."""
+
 from conftest import wf
 
 from automaster_audit.diff import build_diff, render_md
@@ -18,17 +19,21 @@ def test_dump_identico_nao_acusa_mudanca(make_dump):
 
 
 def test_pega_workflow_adicionado_removido_e_alterado(make_dump):
-    a = load_dump(make_dump(
-        workflows=[wf(id="w1", name="A", steps=[_step()]), wf(id="w2", name="Sai")],
-        tags=["x"],
-    ))
-    b = load_dump(make_dump(
-        workflows=[
-            wf(id="w1", name="A renomeado", status="draft", steps=[_step(tags=("y",))]),
-            wf(id="w3", name="Entra"),
-        ],
-        tags=["x", "y"],
-    ))
+    a = load_dump(
+        make_dump(
+            workflows=[wf(id="w1", name="A", steps=[_step()]), wf(id="w2", name="Sai")],
+            tags=["x"],
+        )
+    )
+    b = load_dump(
+        make_dump(
+            workflows=[
+                wf(id="w1", name="A renomeado", status="draft", steps=[_step(tags=("y",))]),
+                wf(id="w3", name="Entra"),
+            ],
+            tags=["x", "y"],
+        )
+    )
     d = build_diff(a, b)
     assert [x["nome"] for x in d["workflows"]["adicionados"]] == ["Entra"]
     assert [x["nome"] for x in d["workflows"]["removidos"]] == ["Sai"]
@@ -51,6 +56,7 @@ def test_avisa_subcontas_diferentes(make_dump, monkeypatch):
     a_path = make_dump(workflows=[])
     b_path = make_dump(workflows=[])
     import json
+
     m = json.loads((b_path / "manifest.json").read_text())
     m["locationId"] = "OUTRA"
     (b_path / "manifest.json").write_text(json.dumps(m))

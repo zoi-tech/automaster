@@ -19,8 +19,11 @@ def test_flags_missing_user_in_assign(make_dump):
 
 
 def test_flags_deleted_user_in_notification(make_dump):
-    step = {"type": "internal_notification", "name": "Notify",
-            "attributes": {"sms": {"userType": "user", "selectedUser": ["u2"]}}}
+    step = {
+        "type": "internal_notification",
+        "name": "Notify",
+        "attributes": {"sms": {"userType": "user", "selectedUser": ["u2"]}},
+    }
     path = make_dump(workflows=[wf(steps=[step])], users=USERS)
     findings = broken_user_ref.check(load_dump(path))
     assert len(findings) == 1
@@ -28,8 +31,11 @@ def test_flags_deleted_user_in_notification(make_dump):
 
 
 def test_clean_when_user_active(make_dump):
-    step = {"type": "assign_user", "name": "Assign",
-            "attributes": {"traffic_weightage": {"u1": 1}, "traffic_index": [{"id": "u1", "indexes": [1]}]}}
+    step = {
+        "type": "assign_user",
+        "name": "Assign",
+        "attributes": {"traffic_weightage": {"u1": 1}, "traffic_index": [{"id": "u1", "indexes": [1]}]},
+    }
     path = make_dump(workflows=[wf(steps=[step])], users=USERS)
     assert broken_user_ref.check(load_dump(path)) == []
 

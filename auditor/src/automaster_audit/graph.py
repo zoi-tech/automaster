@@ -6,6 +6,7 @@ Arestas: cada referência de um workflow a uma entidade (via steps/triggers).
 Entidades só entram no grafo se forem referenciadas ao menos uma vez (evita
 poluir com tags/fields órfãos); workflows entram sempre.
 """
+
 from __future__ import annotations
 
 from .loader import DumpContext, Workflow

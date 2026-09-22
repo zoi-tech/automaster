@@ -3,6 +3,7 @@
 Dead code no canvas — normalmente sobra de edição. Se o workflow não tem raiz
 identificável (nenhum step sem parent), a checagem é pulada para esse workflow.
 """
+
 from __future__ import annotations
 
 from ..finding import WARN, Finding

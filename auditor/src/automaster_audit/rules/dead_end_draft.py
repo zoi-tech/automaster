@@ -3,6 +3,7 @@
 Determinístico: compara workflow.updatedAt com manifest.extractedAt (data da
 extração), não com o relógio atual. Assim a auditoria do mesmo dump é reprodutível.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

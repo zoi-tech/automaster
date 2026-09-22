@@ -3,6 +3,7 @@
 É INFO, nunca ERROR: um template pode ser usado em campanha de e-mail, disparo manual ou
 outra parte do CRM que o dump não enxerga. O achado serve para revisão humana.
 """
+
 from __future__ import annotations
 
 from ..finding import INFO, Finding
@@ -22,8 +23,8 @@ def check(ctx: DumpContext) -> list[Finding]:
             workflow_id="",
             workflow_name="",
             detail=f"template de e-mail '{ctx.template_names.get(tid, tid)}' não é usado por "
-                   f"nenhum workflow — pode estar em campanha ou disparo manual, que o dump "
-                   f"não enxerga",
+            f"nenhum workflow — pode estar em campanha ou disparo manual, que o dump "
+            f"não enxerga",
         )
         for tid in sorted(conhecidos - usados)
     ]

@@ -5,6 +5,7 @@ de abas (rota por hash: sem hash = visão geral; #workflows/#tags/... = inventá
 Sem CDN: fontes embutidas como data-URI; nomes do CRM escapados no JS (esc) e o
 JSON embutido passa por _safe_json.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -382,15 +383,20 @@ def _audit_from_dump(dump_dir: Path) -> dict | None:
     try:
         from . import rules
         from .loader import load_dump
+
         findings = rules.run_all(load_dump(dump_dir))
     except Exception:  # noqa: BLE001 - pasta ilegível degrada para inventário puro, nunca quebra o painel
         return None
     return {
-        "counts": {s: sum(1 for f in findings if f.severity == s)
-                   for s in ("ERROR", "WARN", "INFO")},
+        "counts": {s: sum(1 for f in findings if f.severity == s) for s in ("ERROR", "WARN", "INFO")},
         "items": [
-            {"rule": f.rule, "severity": f.severity, "workflow_id": f.workflow_id or "",
-             "workflow_name": f.workflow_name or "", "detail": f.detail}
+            {
+                "rule": f.rule,
+                "severity": f.severity,
+                "workflow_id": f.workflow_id or "",
+                "workflow_name": f.workflow_name or "",
+                "detail": f.detail,
+            }
             for f in findings
         ],
     }

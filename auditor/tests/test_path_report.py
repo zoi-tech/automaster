@@ -1,4 +1,5 @@
 """Testes da Camada 2: rótulos de ação e relatório Markdown de caminhos."""
+
 from conftest import wf
 
 from automaster_audit.loader import load_dump
@@ -34,8 +35,13 @@ def test_describe_unknown_type_falls_back_to_type(make_dump):
 
 
 _IF_ELSE_STEPS = [
-    {"id": "c", "type": "if_else", "name": "Cond",
-     "attributes": {"branches": [{"id": "b1", "name": "VIP"}]}, "next": ["b1", "b2"]},
+    {
+        "id": "c",
+        "type": "if_else",
+        "name": "Cond",
+        "attributes": {"branches": [{"id": "b1", "name": "VIP"}]},
+        "next": ["b1", "b2"],
+    },
     {"id": "b1", "type": "if_else", "name": "VIP", "parent": "c", "attributes": {"if": []}, "next": "a1"},
     {"id": "b2", "type": "if_else", "name": "Else", "parent": "c", "attributes": {"else": []}, "next": "a2"},
     {"id": "a1", "type": "sms", "name": "SMS VIP", "parent": "b1"},
@@ -54,9 +60,13 @@ def test_build_paths_report_if_else_two_branches(make_dump):
 
 def test_build_paths_report_truncation_line(make_dump):
     steps = [
-        {"id": "c", "type": "if_else", "name": "Cond",
-         "attributes": {"branches": [{"id": f"b{i}", "name": f"R{i}"} for i in (1, 2, 3)]},
-         "next": ["b1", "b2", "b3"]},
+        {
+            "id": "c",
+            "type": "if_else",
+            "name": "Cond",
+            "attributes": {"branches": [{"id": f"b{i}", "name": f"R{i}"} for i in (1, 2, 3)]},
+            "next": ["b1", "b2", "b3"],
+        },
         {"id": "b1", "type": "if_else", "name": "R1", "parent": "c", "attributes": {"if": []}},
         {"id": "b2", "type": "if_else", "name": "R2", "parent": "c", "attributes": {"if": []}},
         {"id": "b3", "type": "if_else", "name": "R3", "parent": "c", "attributes": {"if": []}},

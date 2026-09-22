@@ -14,8 +14,9 @@ def espiao(monkeypatch):
 
     monkeypatch.setattr(mcp_base, "_run_extractor", falso)
     # nenhum _load aqui de propósito: estas tools não podem depender de dump
-    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap=None: pytest.fail(
-        "tool ao vivo de workflow não pode chamar o loader"))
+    monkeypatch.setattr(
+        mcp_base, "_load", lambda loc, snap=None: pytest.fail("tool ao vivo de workflow não pode chamar o loader")
+    )
     return chamadas
 
 

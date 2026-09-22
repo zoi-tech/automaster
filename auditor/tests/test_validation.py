@@ -1,4 +1,5 @@
 """Testes do validation.html: agregação das 3 camadas + render Tron auto-contido."""
+
 import json
 
 from conftest import wf
@@ -10,12 +11,16 @@ from automaster_audit.validation_html import write_validation_html
 
 # if_else com 2 ramos (shape de test_enumerate_paths) + tag quebrada (ERROR camada 1)
 BRANCH_STEPS = [
-    {"id": "c", "type": "if_else", "name": "Cond",
-     "attributes": {"branches": [{"id": "b1", "name": "VIP"}]}, "next": ["b1", "b2"]},
+    {
+        "id": "c",
+        "type": "if_else",
+        "name": "Cond",
+        "attributes": {"branches": [{"id": "b1", "name": "VIP"}]},
+        "next": ["b1", "b2"],
+    },
     {"id": "b1", "type": "if_else", "name": "VIP", "parent": "c", "attributes": {"if": []}, "next": "a1"},
     {"id": "b2", "type": "if_else", "name": "Else", "parent": "c", "attributes": {"else": []}, "next": "a2"},
-    {"id": "a1", "type": "add_contact_tag", "name": "Add", "parent": "b1",
-     "attributes": {"tags": ["fantasma"]}},
+    {"id": "a1", "type": "add_contact_tag", "name": "Add", "parent": "b1", "attributes": {"tags": ["fantasma"]}},
     {"id": "a2", "type": "sms", "name": "SMS Else", "parent": "b2"},
 ]
 
@@ -58,12 +63,22 @@ def test_build_validation_camada3_com_contratos(make_dump, tmp_path):
     ctx = load_dump(make_dump(workflows=[wf(steps=OPP_STEPS)]))
     cdir = tmp_path / "contracts"
     cdir.mkdir()
-    (cdir / "c1.json").write_text(json.dumps({
-        "workflow": "wf1",
-        "casos": [{"nome": "sem oportunidade → cria",
-                   "dado": {"oportunidade_encontrada": False},
-                   "espera": {"acoes_contem": ["criar oportunidade"], "termina_em": "exit"}}],
-    }, ensure_ascii=False), encoding="utf-8")
+    (cdir / "c1.json").write_text(
+        json.dumps(
+            {
+                "workflow": "wf1",
+                "casos": [
+                    {
+                        "nome": "sem oportunidade → cria",
+                        "dado": {"oportunidade_encontrada": False},
+                        "espera": {"acoes_contem": ["criar oportunidade"], "termina_em": "exit"},
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     c3 = build_validation(ctx, contracts_dir=cdir)["camada3"]
     assert c3["disponivel"] is True
     assert c3["counts"] == {"PASS": 1, "FAIL": 0, "AMBIGUOUS": 0}
@@ -99,7 +114,8 @@ def test_cli_validation_subcommand(make_dump, tmp_path, capsys):
     out = tmp_path / "validation.html"
     assert build_parser().parse_args(["validation", str(path)]).contracts.name == "contracts"  # default
     args = build_parser().parse_args(
-        ["validation", str(path), "-o", str(out), "--contracts", str(tmp_path / "nao-existe")])
+        ["validation", str(path), "-o", str(out), "--contracts", str(tmp_path / "nao-existe")]
+    )
     assert args.func is run_validation
     assert run_validation(args) == 0  # relatório, não gate
     assert out.exists()

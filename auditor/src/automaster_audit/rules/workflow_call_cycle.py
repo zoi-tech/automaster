@@ -3,6 +3,7 @@
 Ex.: A chama B e B chama A. Pode ser handoff intencional (com condição de saída)
 ou loop infinito. Reportado uma vez por ciclo para revisão.
 """
+
 from __future__ import annotations
 
 from ..finding import WARN, Finding

@@ -1,4 +1,5 @@
 """CLI do auditor: `automaster-audit <pasta-do-dump>`."""
+
 from __future__ import annotations
 
 import argparse
@@ -71,8 +72,10 @@ def run_dashboard(args: argparse.Namespace) -> int:
     out = args.output or (Path(args.dump_path) / "dashboard.html")
     write_dashboard_html(data, out, title=ctx.manifest.get("locationId", ""))
     s = data["summary"]
-    print(f"painel: {s['workflows']} workflows, {s['tags']} tags ({s['tags_orphan']} órfãs), "
-          f"{s['fields']} fields ({s['fields_orphan']} órfãos)")
+    print(
+        f"painel: {s['workflows']} workflows, {s['tags']} tags ({s['tags_orphan']} órfãs), "
+        f"{s['fields']} fields ({s['fields_orphan']} órfãos)"
+    )
     print(f"abra no browser: {out}")
     return 0
 
@@ -146,9 +149,11 @@ def run_journey(args: argparse.Namespace) -> int:
     out = args.output or (Path(args.dump_path) / "journey.html")
     write_journey_html(data, out, title=ctx.manifest.get("locationId", ""))
     s = data["stats"]
-    print(f"jornada: {len(data['criacao'])} entradas na criação, "
-          f"{len(data['anytime'])} eventos avulsos, "
-          f"{s['workflows_alcancaveis']} workflows alcançáveis, {s['loops']} loops")
+    print(
+        f"jornada: {len(data['criacao'])} entradas na criação, "
+        f"{len(data['anytime'])} eventos avulsos, "
+        f"{s['workflows_alcancaveis']} workflows alcançáveis, {s['loops']} loops"
+    )
     if data["truncated"]:
         print("atenção: árvore truncada (caps de profundidade/nós)", file=sys.stderr)
     print(f"abra no browser: {out}")
@@ -168,8 +173,7 @@ def run_diff(args: argparse.Namespace) -> int:
     w = diff["workflows"]
     if not diff["mesma_subconta"]:
         print("atenção: os dois dumps são de subcontas diferentes", file=sys.stderr)
-    print(f"workflows: +{len(w['adicionados'])} -{len(w['removidos'])} "
-          f"~{len(w['alterados'])} alterados")
+    print(f"workflows: +{len(w['adicionados'])} -{len(w['removidos'])} ~{len(w['alterados'])} alterados")
     for tipo, e in diff["entidades"].items():
         print(f"{tipo}: +{len(e['adicionados'])} -{len(e['removidos'])}")
     print(f"relatório: {out}")
@@ -186,9 +190,28 @@ def run_workflow_editar(args: argparse.Namespace) -> int:
     # lazy de propósito: deixa o teste trocar `mcp_server.workflow_editar` por um dublê.
     from . import mcp_server
 
-    campos = ("loc", "acao", "id", "nome", "pasta", "de", "para", "step", "caminho", "valor",
-              "trigger_acao", "trigger_id", "trigger_corpo", "corpo", "depois_de", "ramos",
-              "com_subarvore", "confirmo", "publicado", "snapshot")
+    campos = (
+        "loc",
+        "acao",
+        "id",
+        "nome",
+        "pasta",
+        "de",
+        "para",
+        "step",
+        "caminho",
+        "valor",
+        "trigger_acao",
+        "trigger_id",
+        "trigger_corpo",
+        "corpo",
+        "depois_de",
+        "ramos",
+        "com_subarvore",
+        "confirmo",
+        "publicado",
+        "snapshot",
+    )
     try:
         r = mcp_server.workflow_editar(**{c: getattr(args, c) for c in campos})
     except mcp_server.ToolError as e:
@@ -227,24 +250,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_vc = sub.add_parser("verify-contracts", help="roda contratos de teste contra o dump (PASS/FAIL/AMBIGUOUS)")
     p_vc.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
-    p_vc.add_argument("--contracts", type=Path, default=Path("contracts"), help="dir dos contratos *.json (default: contracts/)")
+    p_vc.add_argument(
+        "--contracts", type=Path, default=Path("contracts"), help="dir dos contratos *.json (default: contracts/)"
+    )
     p_vc.set_defaults(func=run_verify_contracts)
 
     p_val = sub.add_parser("validation", help="gera página HTML das 3 camadas de validação")
     p_val.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_val.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/validation.html)")
-    p_val.add_argument("--contracts", type=Path, default=Path("contracts"),
-                       help="dir dos contratos *.json (default: contracts/; ausente → camada 3 indisponível)")
+    p_val.add_argument(
+        "--contracts",
+        type=Path,
+        default=Path("contracts"),
+        help="dir dos contratos *.json (default: contracts/; ausente → camada 3 indisponível)",
+    )
     p_val.set_defaults(func=run_validation)
 
     p_journey = sub.add_parser("journey", help="gera árvore de jornada do contato (HTML)")
     p_journey.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
-    p_journey.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH,
-                           help=f"níveis máx. de cascata entre workflows (default: {DEFAULT_MAX_DEPTH})")
-    p_journey.add_argument("--max-nodes", type=int, default=DEFAULT_MAX_NODES,
-                           help=f"nós máx. por raiz antes de truncar (default: {DEFAULT_MAX_NODES})")
-    p_journey.add_argument("-o", "--output", type=Path,
-                           help="arquivo HTML de saída (default: <dump>/journey.html)")
+    p_journey.add_argument(
+        "--max-depth",
+        type=int,
+        default=DEFAULT_MAX_DEPTH,
+        help=f"níveis máx. de cascata entre workflows (default: {DEFAULT_MAX_DEPTH})",
+    )
+    p_journey.add_argument(
+        "--max-nodes",
+        type=int,
+        default=DEFAULT_MAX_NODES,
+        help=f"nós máx. por raiz antes de truncar (default: {DEFAULT_MAX_NODES})",
+    )
+    p_journey.add_argument("-o", "--output", type=Path, help="arquivo HTML de saída (default: <dump>/journey.html)")
     p_journey.set_defaults(func=run_journey)
 
     p_diff = sub.add_parser("diff", help="compara dois dumps da mesma subconta (Markdown)")
@@ -253,8 +289,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <depois>/diff.md)")
     p_diff.set_defaults(func=run_diff)
 
-    p_we = sub.add_parser("workflow-editar",
-                          help="ESCREVE workflow ao vivo com a validação das 18 regras (a guarda da tool MCP)")
+    p_we = sub.add_parser(
+        "workflow-editar", help="ESCREVE workflow ao vivo com a validação das 18 regras (a guarda da tool MCP)"
+    )
     p_we.add_argument("-l", "--loc", required=True, help="locationId da subconta")
     p_we.add_argument("--acao", required=True, choices=WF_EDITAR_ACOES, help="operação a aplicar")
     p_we.add_argument("-i", "--id", help="id do workflow (obrigatório fora de 'criar')")
@@ -265,19 +302,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_we.add_argument("--step", help="id do step (atributo, step-remover, step-mover)")
     p_we.add_argument("--caminho", help="caminho do campo dentro do step (atributo)")
     p_we.add_argument("--valor", help="valor novo do campo (atributo)")
-    p_we.add_argument("--trigger-acao", choices=("adicionar", "remover", "substituir"),
-                      help="operação de trigger (acao=trigger)")
+    p_we.add_argument(
+        "--trigger-acao", choices=("adicionar", "remover", "substituir"), help="operação de trigger (acao=trigger)"
+    )
     p_we.add_argument("--trigger-id", help="id do trigger (remover/substituir)")
     p_we.add_argument("--trigger-corpo", help="JSON do trigger novo (adicionar/substituir)")
     p_we.add_argument("--corpo", help="JSON do step novo (step-criar)")
     p_we.add_argument("--depois-de", help="id do step que fica logo antes; sem ele step-criar põe no início")
     p_we.add_argument("--ramos", help="lista JSON de ramos: o step nasce container (step-criar)")
-    p_we.add_argument("--com-subarvore", action="store_true",
-                      help="step-remover: container sai levando ramos e tudo que pende deles")
-    p_we.add_argument("--confirmo", action="store_true",
-                      help="grava de verdade; sem ele devolve só a prévia com o diff")
-    p_we.add_argument("--publicado", action="store_true",
-                      help="obrigatório junto de --confirmo em workflow publicado")
+    p_we.add_argument(
+        "--com-subarvore", action="store_true", help="step-remover: container sai levando ramos e tudo que pende deles"
+    )
+    p_we.add_argument(
+        "--confirmo", action="store_true", help="grava de verdade; sem ele devolve só a prévia com o diff"
+    )
+    p_we.add_argument("--publicado", action="store_true", help="obrigatório junto de --confirmo em workflow publicado")
     p_we.add_argument("--snapshot", help="snapshot do dump usado na validação (default: o último)")
     p_we.set_defaults(func=run_workflow_editar)
     return parser
@@ -287,7 +326,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     # atalho: se o 1º argumento for um caminho existente, assume subcomando 'audit'
     raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] not in ("audit", "graph", "dashboard", "paths", "verify-contracts", "validation", "journey", "diff", "workflow-editar", "-h", "--help") and Path(raw[0]).exists():
+    if (
+        raw
+        and raw[0]
+        not in (
+            "audit",
+            "graph",
+            "dashboard",
+            "paths",
+            "verify-contracts",
+            "validation",
+            "journey",
+            "diff",
+            "workflow-editar",
+            "-h",
+            "--help",
+        )
+        and Path(raw[0]).exists()
+    ):
         raw = ["audit", *raw]
     args = parser.parse_args(raw)
     return args.func(args)

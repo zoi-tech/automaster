@@ -1,4 +1,5 @@
 """ERROR: step goto apontando para um nó que não existe no workflow."""
+
 from __future__ import annotations
 
 from ..finding import ERROR, Finding

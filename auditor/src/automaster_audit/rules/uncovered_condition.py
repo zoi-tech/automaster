@@ -3,6 +3,7 @@
 Pode ser intencional, mas costuma ser um buraco lógico ("lead vaza"). find_opportunity
 é ignorado (sempre tem Found/Not Found).
 """
+
 from __future__ import annotations
 
 from ..finding import INFO, Finding
