@@ -22,6 +22,7 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
 
   auditor:
@@ -35,4 +36,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: ruff format --check src tests
       - run: pytest -q
