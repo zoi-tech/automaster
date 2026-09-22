@@ -41,10 +41,11 @@ export function travarChrome(arquivo = lockPath()): () => void {
         throw new Error(
           `outro comando automaster já está com o Chrome (pid ${dono}). A escrita ao vivo é serial: ` +
             `espere ele terminar. Se tiver certeza de que morreu, apague ${arquivo}.`,
+          { cause: e },
         );
       }
       fs.rmSync(arquivo, { force: true }); // órfão
-      if (tentativa === 1) throw new Error(`não consegui travar ${arquivo}`);
+      if (tentativa === 1) throw new Error(`não consegui travar ${arquivo}`, { cause: e });
     }
   }
   let solto = false;

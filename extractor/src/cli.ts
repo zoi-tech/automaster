@@ -16,6 +16,7 @@ import { registrarAnotacoes } from "./cli/anotacoes.js";
 import { registrarWorkflows } from "./cli/workflows.js";
 import { registrarWorkflowEditar } from "./cli/workflow-editar.js";
 import { registrarSmoke } from "./cli/smoke.js";
+import { falhar } from "./saida.js";
 
 const program = new Command();
 program.name("automaster-extract").description("Extrai workflows GHL via API interna");
@@ -32,4 +33,4 @@ registrarWorkflows(program);
 registrarWorkflowEditar(program);
 registrarSmoke(program);
 
-program.parseAsync(process.argv);
+program.parseAsync(process.argv).catch(falhar);

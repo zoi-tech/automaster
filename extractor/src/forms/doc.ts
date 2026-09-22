@@ -13,7 +13,6 @@
 
 // o documento vem do GHL e tem dezenas de campos que não modelamos; `any` aqui
 // é deliberado: o que não entendemos precisa atravessar intacto
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export type Doc = Record<string, any>;
 
 export type Op =

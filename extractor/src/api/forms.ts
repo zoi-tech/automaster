@@ -26,7 +26,7 @@ async function listarTudo(
   client: GhlClient, rota: "forms" | "surveys", locationId: string,
 ): Promise<{ itens: unknown[]; total: number }> {
   const itens: unknown[] = [];
-  let total = 0;
+  let total = 0; // eslint-disable-line no-useless-assignment -- o TS exige inicialização; o loop só sai pelo break
   for (let skip = 0; ; skip += PAGINA) {
     const url = `${BASE}/${rota}/?locationId=${locationId}&limit=${PAGINA}&skip=${skip}`;
     const resp = await client.getJson<Record<string, unknown>>(url);

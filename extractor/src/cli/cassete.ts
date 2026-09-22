@@ -48,7 +48,7 @@ export function clienteDoCassete(cassete: Cassete): { client: GhlClient; usar: (
     if (!fila.length) throw new Error(`cassete sem resposta gravada para "${atual}" (regrave com smoke --gravar)`);
     return fila.shift();
   };
-  const responder = async (): Promise<unknown> => proxima();
+  const responder = (): Promise<unknown> => Promise.resolve(proxima());
   const client = {
     getJson: responder, putJson: responder, postJson: responder,
     deleteJson: responder, postMultipart: responder, getJsonNoAuth: responder,

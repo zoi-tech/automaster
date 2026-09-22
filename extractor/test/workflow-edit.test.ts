@@ -14,6 +14,9 @@ function doc(steps: unknown[], triggers: unknown[] = []): Documento {
   } as unknown as Documento;
 }
 
+/** `attributes` é opcional em `Step`; nos steps de teste ele sempre existe. */
+const attrs = (d: Documento, i: number): any => d.workflowData.templates[i]!.attributes;
+
 const ID_VELHO = "AkbAIoxcORSn9CELCijZ";
 const ID_NOVO = "ZZnovoCampo000000001";
 
@@ -25,14 +28,14 @@ test("trocarReferencia troca o id em qualquer profundidade e conta as trocas", (
   ]);
   const r = trocarReferencia(d, ID_VELHO, ID_NOVO);
   assert.equal(r.mudancas.length, 2);
-  assert.equal(r.doc.workflowData.templates[0].attributes.fields[0].id, ID_NOVO);
-  assert.equal(r.doc.workflowData.templates[1].attributes.url, "https://x/" + ID_NOVO);
+  assert.equal(attrs(r.doc, 0).fields[0].id, ID_NOVO);
+  assert.equal(attrs(r.doc, 1).url, "https://x/" + ID_NOVO);
 });
 
 test("trocarReferencia não muta o documento original", () => {
   const d = doc([{ id: "s1", type: "x", attributes: { campo: ID_VELHO } }]);
   trocarReferencia(d, ID_VELHO, ID_NOVO);
-  assert.equal(d.workflowData.templates[0].attributes.campo, ID_VELHO);
+  assert.equal(attrs(d, 0).campo, ID_VELHO);
 });
 
 test("trocarReferencia devolve zero mudanças quando o id não aparece", () => {
@@ -58,10 +61,10 @@ test("trocarTag só mexe nos campos onde tag mora, nunca no texto de mensagem", 
       { conditionSubType: "tags", conditionValue: ["quente"] }] }] }] } },
   ]);
   const r = trocarTag(d, "quente", "morno");
-  assert.deepEqual(r.doc.workflowData.templates[0].attributes.tags, ["morno", "frio"]);
-  assert.equal(r.doc.workflowData.templates[1].attributes.message, "você está quente");
+  assert.deepEqual(attrs(r.doc, 0).tags, ["morno", "frio"]);
+  assert.equal(attrs(r.doc, 1).message, "você está quente");
   assert.deepEqual(
-    r.doc.workflowData.templates[2].attributes.branches[0].segments[0].conditions[0].conditionValue,
+    attrs(r.doc, 2).branches[0].segments[0].conditions[0].conditionValue,
     ["morno"],
   );
   assert.equal(r.mudancas.length, 2);
@@ -69,7 +72,7 @@ test("trocarTag só mexe nos campos onde tag mora, nunca no texto de mensagem", 
 
 test("trocarTag compara ignorando caixa e espaço nas pontas, como a auditoria", () => {
   const d = doc([{ id: "s1", type: "remove_contact_tag", attributes: { tags: [" Quente "] } }]);
-  assert.deepEqual(trocarTag(d, "quente", "morno").doc.workflowData.templates[0].attributes.tags, ["morno"]);
+  assert.deepEqual(attrs(trocarTag(d, "quente", "morno").doc, 0).tags, ["morno"]);
 });
 
 // O campo real do documento do GHL é `parentKey`; `parent` NÃO existe em step nenhum.
@@ -102,14 +105,14 @@ test("removerStepsInalcancaveis não faz nada em workflow sem entrada identific�
 test("alterarAtributo escreve no caminho e recusa step inexistente", () => {
   const d = doc([{ id: "s1", type: "wait", attributes: { dias: 2 } }]);
   const r = alterarAtributo(d, "s1", "dias", 5);
-  assert.equal(r.doc.workflowData.templates[0].attributes.dias, 5);
+  assert.equal(attrs(r.doc, 0).dias, 5);
   assert.equal(r.mudancas.length, 1);
   assert.throws(() => alterarAtributo(d, "naoexiste", "dias", 5), /naoexiste/);
 });
 
 test("alterarAtributo aceita caminho aninhado com ponto", () => {
   const d = doc([{ id: "s1", type: "x", attributes: { alvo: { interno: 1 } } }]);
-  assert.equal(alterarAtributo(d, "s1", "alvo.interno", 9).doc.workflowData.templates[0].attributes.alvo.interno, 9);
+  assert.equal(attrs(alterarAtributo(d, "s1", "alvo.interno", 9).doc, 0).alvo.interno, 9);
 });
 
 test("renomear apara espaço nas pontas e recusa nome vazio", () => {

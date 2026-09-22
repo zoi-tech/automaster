@@ -15,7 +15,7 @@ import { conferirDump } from "../dump/schema.js";
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
-  await withClient(locationId, console.log, async (client, page, tokens) => {
+  await withClient(locationId, console.log, async (client, _page, tokens) => {
     console.log(`tokens ok (bearer ${tokens.bearer.slice(0, 12)}…, token-id ${tokens.tokenId.slice(0, 12)}…)`);
     const writer = new DumpWriter(DUMPS_DIR, locationId, stampNow());
 

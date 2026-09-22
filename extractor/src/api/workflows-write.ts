@@ -141,6 +141,7 @@ export async function lerDocumento(client: GhlClient, loc: string, wid: string):
     throw new Error(
       `não foi possível ler o documento do workflow ${wid} (${e instanceof Error ? e.message : e}). ` +
       "Sem ele não há prévia nem o que validar contra as 18 regras.",
+      { cause: e },
     );
   }
 }

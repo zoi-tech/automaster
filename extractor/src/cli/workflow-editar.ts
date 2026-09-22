@@ -217,7 +217,7 @@ function parseCorpo(v: string, flag = "--corpo"): Record<string, unknown> {
   try {
     return JSON.parse(v);
   } catch (e) {
-    throw new Error(`${flag} não é JSON válido (${e instanceof Error ? e.message : e})`);
+    throw new Error(`${flag} não é JSON válido (${e instanceof Error ? e.message : e})`, { cause: e });
   }
 }
 
@@ -361,7 +361,7 @@ async function adicionarTrigger(
   if (!o.triggerCorpo) throw new Error(`--trigger-acao ${o.triggerAcao} exige --trigger-corpo (JSON do trigger)`);
   if (substituir && !o.triggerId) throw new Error("--trigger-acao substituir exige --trigger-id (o trigger que sai)");
   let corpo: Record<string, unknown>;
-  try { corpo = JSON.parse(o.triggerCorpo); } catch (e) { throw new Error(`--trigger-corpo não é JSON válido: ${e}`); }
+  try { corpo = JSON.parse(o.triggerCorpo); } catch (e) { throw new Error(`--trigger-corpo não é JSON válido: ${e}`, { cause: e }); }
   if (!corpo?.type) throw new Error("--trigger-corpo precisa de `type` (ex.: appointment, contact_tag, form_submission)");
 
   const { triggers: antes, aviso } = await listarTriggersPrevia(

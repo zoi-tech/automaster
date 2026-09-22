@@ -247,6 +247,7 @@ async function runFormularioAcao(opts: {
               `${contagem}: ele ficou órfão, sem nome e sem campos, na ` +
               `subconta. Rode "formulario-acao --acao apagar -i ${novoId} --confirmo" ` +
               `para removê-lo. Erro original: ${e2 instanceof Error ? e2.message : String(e2)}`,
+              { cause: e2 },
             );
           }
           break;

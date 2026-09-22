@@ -55,7 +55,7 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
   const days = Number(opts.days) || 60;
   // em --json o stdout é só o payload; progresso vai para stderr
   const log = opts.json ? console.error : console.log;
-  await withClient(locationId, log, async (client, page) => {
+  await withClient(locationId, log, async (client, _page) => {
     log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
     const logs = await fetchAuditLogs(client, locationId, opts.id, days);
     log(`${logs.length} eventos do contato.`);
@@ -258,7 +258,10 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
       depois = await getContact(client, loc, id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`escrita aplicada (${snap.aplicado.join(", ") || "nada"}), mas o GET final falhou: ${msg}. snapshot em ${snapPath}`);
+      throw new Error(
+        `escrita aplicada (${snap.aplicado.join(", ") || "nada"}), mas o GET final falhou: ${msg}. snapshot em ${snapPath}`,
+        { cause: e },
+      );
     }
     const avisos = diffAvisos(antes, depois, esperado, new Set(tagsDel.length ? ["tags"] : []));
     for (const a of avisos) console.error(`AVISO: ${a}`);
