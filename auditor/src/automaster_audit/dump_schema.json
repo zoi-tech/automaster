@@ -1,0 +1,116 @@
+{
+  "_comentario": [
+    "Forma esperada do dump. Fonte única: o extractor confere contra este arquivo ao terminar",
+    "a extração (extractor/src/dump/schema.ts) e o auditor ao carregar (dump_schema.py).",
+    "Tipos: string | number | boolean | object | array. Caminho pontilhado desce um nível.",
+    "Mudou a forma? Suba o schemaVersion aqui, em writer.ts (SCHEMA_VERSION) e no __init__ do auditor."
+  ],
+  "schemaVersion": 1,
+  "arquivos": {
+    "manifest.json": {
+      "campos": {
+        "schemaVersion": "number",
+        "locationId": "string",
+        "extractedAt": "string",
+        "extractorVersion": "string",
+        "counts": "object",
+        "warnings": "array"
+      },
+      "opcionais": {
+        "locationName": "string"
+      }
+    },
+    "workflows/*.json": {
+      "campos": {
+        "id": "string",
+        "name": "string",
+        "fetchedAt": "string",
+        "raw": "object"
+      },
+      "opcionais": {
+        "status": "string",
+        "raw.steps": "object",
+        "raw.triggers": "array",
+        "raw.list_entry": "object",
+        "raw.detail": "object"
+      }
+    },
+    "pipelines.json": {
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object",
+        "raw.pipelines": "array"
+      }
+    },
+    "tags.json": {
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object",
+        "raw.tags": "array"
+      }
+    },
+    "custom_fields.json": {
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object",
+        "raw.customFields": "array"
+      }
+    },
+    "users.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object"
+      }
+    },
+    "calendars.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object"
+      }
+    },
+    "custom_values.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object"
+      }
+    },
+    "message_templates.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object"
+      }
+    },
+    "whatsapp_templates.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string"
+      }
+    },
+    "email_templates.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string"
+      }
+    },
+    "forms.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object",
+        "raw.forms": "array"
+      }
+    },
+    "surveys.json": {
+      "facultativo": true,
+      "campos": {
+        "fetchedAt": "string",
+        "raw": "object",
+        "raw.surveys": "array"
+      }
+    }
+  }
+}

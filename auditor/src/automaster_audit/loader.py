@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import SCHEMA_VERSION
+from .dump_schema import validar_dump
 
 
 class DumpError(Exception):
@@ -108,6 +109,16 @@ def load_dump(path: Path) -> DumpContext:
         raise DumpError(
             f"schemaVersion incompatível: dump={sv!r}, auditor suporta={SCHEMA_VERSION}. "
             "Re-extraia o dump ou use uma versão compatível do auditor."
+        )
+
+    problemas = validar_dump(path)
+    if problemas:
+        mostra = "\n  ".join(problemas[:5])
+        resto = f"\n  (+{len(problemas) - 5} outro(s))" if len(problemas) > 5 else ""
+        raise DumpError(
+            f"dump fora do contrato de formato (dump_schema.json):\n  {mostra}{resto}\n"
+            "Re-extraia a subconta; se o formato do extractor mudou de propósito, atualize "
+            "dump_schema.json e o loader juntos."
         )
 
     # workflows

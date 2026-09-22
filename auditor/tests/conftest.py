@@ -8,7 +8,17 @@ from pathlib import Path
 import pytest
 
 
+FETCHED_AT = "2026-06-10T00:00:00+00:00"
+
+
 def _write(path: Path, data) -> None:
+    """Envelope de entidade e de workflow leva `fetchedAt`, como o extractor grava.
+
+    O `dump_schema.json` cobra isso do dump real; a fixture tem que produzir a mesma forma,
+    senão testa um contrato que não existe.
+    """
+    if isinstance(data, dict) and ("raw" in data) and "fetchedAt" not in data:
+        data = {"fetchedAt": FETCHED_AT, **data}
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 
@@ -64,6 +74,7 @@ def make_dump(tmp_path):
             {
                 "schemaVersion": 1,
                 "locationId": "TESTLOC",
+                "extractorVersion": "teste",
                 "extractedAt": extracted_at,
                 "counts": {"workflows": len(workflows)},
                 "warnings": [],

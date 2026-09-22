@@ -16,6 +16,8 @@ automaster-audit = "automaster_audit.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/automaster_audit"]
+# o schema do dump é lido em tempo de execução pelo loader: vai no wheel
+artifacts = ["src/automaster_audit/dump_schema.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

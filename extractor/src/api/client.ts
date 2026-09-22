@@ -14,6 +14,8 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  */
 export class GhlClient {
   private tokens: Tokens;
+  /** Respostas desde o último `coletar()`. Ligado só pelo `smoke --gravar`. */
+  private espiadas: unknown[] | undefined;
   constructor(
     private context: BrowserContext,
     tokens: Tokens,
@@ -21,6 +23,23 @@ export class GhlClient {
     private throttleMs = 200,
   ) {
     this.tokens = tokens;
+  }
+
+  /** Liga a espia: daqui em diante toda resposta ok é acumulada para `coletar()`. */
+  espiar(): void {
+    this.espiadas = [];
+  }
+
+  /** Devolve o que chegou desde a última chamada e zera. Vazio quando a espia está desligada. */
+  coletar(): unknown[] {
+    const r = this.espiadas ?? [];
+    if (this.espiadas) this.espiadas = [];
+    return r;
+  }
+
+  private guardar<T>(r: T): T {
+    this.espiadas?.push(r);
+    return r;
   }
 
   private authHeaders(): Record<string, string> {
@@ -43,7 +62,7 @@ export class GhlClient {
     for (let attempt = 0; ; attempt++) {
       const headers = body === undefined ? this.authHeaders() : { ...this.authHeaders(), "content-type": "application/json" };
       const res = await this.context.request[method](url, { headers, data: body });
-      if (res.ok()) return (await res.json().catch(() => ({}))) as T;
+      if (res.ok()) return this.guardar((await res.json().catch(() => ({}))) as T);
 
       const status = res.status();
       if (status === 401 && !refreshed) {
@@ -77,7 +96,7 @@ export class GhlClient {
     for (let attempt = 0; ; attempt++) {
       const headers = { ...this.authHeaders(), ...extraHeaders };
       const res = await this.context.request.post(url, { headers, multipart: form });
-      if (res.ok()) return (await res.json().catch(() => ({}))) as T;
+      if (res.ok()) return this.guardar((await res.json().catch(() => ({}))) as T);
 
       const status = res.status();
       if (status === 401 && !refreshed) {
@@ -97,7 +116,7 @@ export class GhlClient {
   async getJsonNoAuth<T = unknown>(url: string): Promise<T> {
     const res = await this.context.request.get(url, { headers: { "user-agent": UA, accept: "application/json" } });
     if (!res.ok()) throw new Error(`GET ${url} → HTTP ${res.status()}`);
-    return (await res.json()) as T;
+    return this.guardar((await res.json()) as T);
   }
 }
 

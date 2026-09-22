@@ -1,4 +1,6 @@
 import type { Command } from "commander";
+import fs from "node:fs";
+import path from "node:path";
 import { withClient } from "./shared.js";
 import { decodeCompanyId } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
@@ -20,6 +22,7 @@ import { fetchSlaSettings } from "../api/settings.js";
 import { getContact } from "../api/contacts.js";
 import { fetchAuditLogs } from "../api/audit.js";
 import { emitir, falhar } from "../saida.js";
+import { forma, type Cassete } from "./cassete.js";
 
 // --------------------------------------------------------------- conferidores
 
@@ -192,6 +195,8 @@ export async function executar(
   ctx: Contexto,
   checagens: Checagem[],
   log: (msg: string) => void,
+  /** `antes` prepara a checagem (o cassete usa para escolher a fila); `depois` recebe o que ela consumiu. */
+  ganchos?: { antes?: (checagem: string) => void; depois?: (checagem: string, respostas: unknown[]) => void },
 ): Promise<Resultado[]> {
   const out: Resultado[] = [];
   for (const ch of checagens) {
@@ -201,7 +206,12 @@ export async function executar(
       continue;
     }
     try {
+      if (ganchos) {
+        ganchos.antes?.(ch.nome);
+        client.coletar(); // descarta o que sobrou da checagem anterior
+      }
       const r = await ch.chamar(client, ctx);
+      ganchos?.depois?.(ch.nome, client.coletar());
       const erro = ch.conferir(r);
       if (erro) {
         out.push({ nome: ch.nome, estado: "falhou", motivo: erro });
@@ -228,17 +238,26 @@ export function resumo(rs: Resultado[]): { ok: number; falhou: number; pulado: n
   };
 }
 
-async function runSmoke(o: { location: string; contato?: string; json?: boolean }): Promise<void> {
+async function runSmoke(o: { location: string; contato?: string; json?: boolean; gravar?: string }): Promise<void> {
   const log = o.json ? (): void => {} : console.log;
   let rs: Resultado[] = [];
+  const cassete: Cassete = { gravadoEm: new Date().toISOString(), respostas: {} };
   await withClient(o.location, log, async (client, _page, tokens) => {
     const ctx: Contexto = {
       loc: o.location,
       companyId: decodeCompanyId(tokens.tokenId) ?? "",
       contato: o.contato,
     };
-    rs = await executar(client, ctx, CHECAGENS, log);
+    if (o.gravar) client.espiar();
+    rs = await executar(client, ctx, CHECAGENS, log, o.gravar
+      ? { depois: (nome, respostas) => { cassete.respostas[nome] = respostas.map((r) => forma(r)); } }
+      : undefined);
   });
+  if (o.gravar) {
+    fs.mkdirSync(path.dirname(o.gravar), { recursive: true });
+    fs.writeFileSync(o.gravar, JSON.stringify(cassete, null, 2));
+    log(`cassete gravado em ${o.gravar} (só a forma das respostas)`);
+  }
   const r = resumo(rs);
   if (o.json) emitir(true, { checagens: rs, resumo: r });
   else console.log(`\n${r.ok} ok, ${r.falhou} falhou, ${r.pulado} pulado`);
@@ -252,5 +271,6 @@ export function registrarSmoke(program: Command): void {
     .requiredOption("-l, --location <id>", "locationId da subconta")
     .option("--contato <id>", "id de um contato; sem ele as rotas por contato saem como pulado")
     .option("--json", "imprime o resultado em JSON no stdout")
+    .option("--gravar <arquivo>", "grava a forma das respostas como cassete para o CI reproduzir")
     .action((o) => runSmoke(o).catch(falhar));
 }

@@ -4,6 +4,29 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.23.0 — o formato do dump virou contrato, e o CI passou a defender o parsing
+
+Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. A3 e A4 de
+`docs/backlog-arquitetura.md`.
+
+- **`dump_schema.json`** (em `auditor/src/automaster_audit/`): a forma do dump — arquivos
+  obrigatórios, opcionais, campos e tipos — num arquivo só, lido pelas duas metades. O
+  extractor confere ao terminar a extração (`src/dump/schema.ts`) e o auditor ao carregar,
+  que agora recusa dump fora do contrato dizendo qual campo e em qual arquivo. Antes o
+  formato só existia em prosa, e uma mudança aparecia três camadas adiante como regra
+  quebrada sem explicação. Conferido contra os 34 dumps em disco: todos passam.
+- **Cassete do smoke** (`npm run smoke -- -l <loc> --gravar <arquivo>`): grava a FORMA das
+  respostas da API interna, e o CI roda as mesmas 23 checagens contra ela sem abrir Chrome.
+  É o que faltava para uma regressão nossa de parsing em `src/api/*` aparecer no CI; o
+  smoke ao vivo continua sendo o que avisa que a API do GHL mudou.
+- **O cassete não carrega dado de cliente.** Toda string vira `"x"`, todo número `0`, array
+  guarda um item. Escapam só as chaves de `VOCABULARIO` — `type`, `status`, `dataType` e
+  mais dez —, cujo valor é palavra do protocolo do GHL e de que o parsing depende para
+  ramificar (`type: "workflow"` separa workflow de pasta na mesma lista). Um teste varre o
+  arquivo e falha se sobrar qualquer outro valor.
+- A fixture de teste do auditor (`conftest.make_dump`) passou a gravar `fetchedAt` e
+  `extractorVersion`, que o dump real sempre teve: testava uma forma que não existia.
+
 ## 0.22.0 — trava do Chrome e envelope JSON da CLI
 
 Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. Os dois primeiros itens de

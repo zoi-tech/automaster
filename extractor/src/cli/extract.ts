@@ -11,6 +11,7 @@ import {
 } from "../api/entities.js";
 import { DumpWriter, stampNow } from "../dump/writer.js";
 import { DUMPS_DIR, withClient } from "./shared.js";
+import { conferirDump } from "../dump/schema.js";
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
@@ -63,6 +64,14 @@ async function runExtract(opts: { location: string }): Promise<void> {
 
     await writer.writeManifest({ workflows: ok });
     console.log(`\nDump salvo em: ${writer.dir}`);
+    // Rede de formato: o auditor carrega o dump pelo MESMO dump_schema.json. Avisar aqui
+    // aponta a causa; descoberto lá adiante, aparece como regra quebrada sem explicação.
+    const fora = conferirDump(writer.dir);
+    if (fora.length) {
+      console.warn(`\naviso: o dump saiu fora do contrato de formato (dump_schema.json):`);
+      for (const f of fora.slice(0, 10)) console.warn(`  ${f}`);
+      if (fora.length > 10) console.warn(`  (+${fora.length - 10} outro(s))`);
+    }
   });
 }
 

@@ -10,10 +10,10 @@ não esforço. Marque `[x]` ao fechar e registre o commit.
   error:{code, message, gravou, snapshot}}`. Tira do Python a classificação de erro por
   prefixo do comando (`args[0].startswith("formulario-")`) e o palpite de escrita
   parcial (`"--confirmo" in args`), que hoje moram em `mcp/base.py:_run_extractor`.
-- [ ] **A3 — Schema do dump.** JSON Schema do `manifest.json` + envelopes, validado no
+- [x] **A3 — Schema do dump.** JSON Schema do `manifest.json` + envelopes, validado no
   fim da extração e na entrada do `loader.py`. Hoje o contrato entre as duas metades
   está só em prosa no CLAUDE.md; mudança de formato só aparece três camadas adiante.
-- [ ] **A4 — Fixtures da API interna.** Gravar uma vez as respostas reais das rotas do
+- [x] **A4 — Fixtures da API interna.** Gravar uma vez as respostas reais das rotas do
   smoke e rodar o parsing contra elas no CI. Pega regressão de formato sem Chrome, que
   é o que o smoke ao vivo não pode fazer no CI.
 - [ ] **A5 — Política de escrita de um lado só.** Teste que prove que nenhuma tool MCP

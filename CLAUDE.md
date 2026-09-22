@@ -39,7 +39,7 @@ Módulos do auditor: `mcp/` (as tools do servidor MCP), `loader.py` (monta `Dump
 
 **Regras de auditoria (18):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value,template}_ref` (ERROR; `template` cobre WhatsApp e SMS — e-mail tem regra própria); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `broken_form_ref` (ERROR; formulário/survey citado por trigger ou por `formId` de calendário que não existe mais — id `fb-` é o lead gen do Facebook e nunca acusa); `stale_email_template` (WARN; step de e-mail cujo template sumiu do builder — o id sai do `previewUrl`, nunca do `template_id`, e o e-mail continua sendo enviado, só não dá mais para editá-lo pelo app); `naming_convention`/`dead_end_draft`/`unused_form`/`unused_email_template` (INFO).
 
-O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-DD_HHmm>/`): `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
+O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-DD_HHmm>/`), descrito em **`auditor/src/automaster_audit/dump_schema.json`** e conferido pelos dois lados — o extractor no fim da extração (`src/dump/schema.ts`, aviso) e o auditor ao carregar (`dump_schema.py`, recusa). Mudou a forma? Muda o schema junto, senão o dump novo é recusado: `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
 
 ## Comandos
 
@@ -78,6 +78,7 @@ npm run anotacao-acao -- -l <loc> --contato <id> --tipo tarefa --acao criar --ti
 npm run tags -- -l <loc> --json                                          # tags da subconta (leitura ao vivo)
 npm run tag-acao -- -l <loc> --acao renomear --tag <nomeOuId> --nome <novo> --confirmo --json  # ESCREVE: tag da subconta
 npm run smoke -- -l <loc> [--contato <id>] --json         # confere se as rotas de leitura ainda respondem na forma esperada
+npm run smoke -- -l <loc> --contato <id> --gravar test/fixtures/api-forma.json  # regrava o cassete que o CI reproduz
 npm run discover -- --location <locationId>   # observar requests ao backend
 npx tsc --noEmit                               # typecheck (não há unit tests no extractor)
 
