@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "automaster-audit"
-version = "0.1.0"
+version = "0.25.0"
 description = "Auditor de workflows GHL extraídos pelo Automaster v2"
 requires-python = ">=3.12"
 

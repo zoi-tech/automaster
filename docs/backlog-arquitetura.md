@@ -31,3 +31,19 @@ não esforço. Marque `[x]` ao fechar e registre o commit.
   bloco do graft para outros agentes.
 
 Fechados em 0.22.0 (A1, A2), 0.23.0 (A3, A4) e 0.24.0 (A5–A8).
+
+## Rodada de 2026-09-21 (0.25.0) — higiene do que sobrou
+
+Levantado depois do A1–A8, na mesma revisão. Todos fechados.
+
+- [x] **B1 — Linter e formatter.** Não havia nenhum dos dois lados. `ruff` no auditor
+  (110 achados fechados, 82 arquivos formatados) e `eslint` + `typescript-eslint` no
+  extractor. Os três passos entraram no CI.
+- [x] **B2 — O typecheck não via os testes.** O `tsc` rodava só sobre `src`; os 225
+  testes do extractor nunca foram verificados. `tsconfig.check.json` cobre os dois, e
+  já apontou 9 acessos sem checagem em `workflow-edit.test.ts`.
+- [x] **B3 — Versões desalinhadas.** Os dois manifestos de pacote estavam parados em
+  `0.1.0` com o plugin em 0.24.0. Alinhados em 0.25.0 e travados por
+  `auditor/tests/test_versoes.py`, que também exige a seção no `CHANGELOG.md`.
+- [x] **B4 — Documentação com número errado.** O `plugin.json` dizia 35 tools (são 32
+  desde a 0.24.0) e o `CLAUDE.md` dizia 347 testes.

@@ -4,6 +4,30 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.25.0 — linter dos dois lados, e o typecheck que finalmente vê os testes
+
+Nenhuma tool nova, nenhuma regra nova, nenhum comportamento alterado: as 32 tools
+respondem exatamente como na 0.24.0, e as sete saídas do auditor sobre o dump da
+Instaltech saem byte a byte iguais. O que muda é o que o CI barra daqui em diante.
+
+- **Não havia linter nem formatter em nenhuma das duas metades.** Agora há `ruff` no
+  auditor e `eslint` + `typescript-eslint` no extractor, e os dois barram no CI. Do
+  lado Python, 110 achados fechados e 82 arquivos formatados — o commit de formatação
+  está sozinho e listado no `.git-blame-ignore-revs`, para o blame continuar apontando
+  para quem escreveu o código.
+- **O `tsc` rodava só sobre `src`**: os 225 testes do extractor nunca haviam sido
+  verificados. O `tsconfig.check.json` novo cobre `src` e `test`, e achou 9 acessos a
+  `attributes` sem checagem em `workflow-edit.test.ts`.
+- **Dois bugs de verdade saíram do lint**, não de um relatório de estilo: o
+  `program.parseAsync` da CLI não tinha `.catch`, então uma rejeição que escapasse de
+  um comando virava `unhandledRejection` — sem envelope JSON e sem mensagem —, e 8
+  `throw new Error(...)` engoliam o erro original, que agora vai em `cause`.
+- **As três versões do repo andam juntas.** Os manifestos do extractor e do auditor
+  estavam parados em `0.1.0` desde sempre. Alinhados aqui, e travados por
+  `auditor/tests/test_versoes.py`, que falha se divergirem ou se a versão não tiver
+  seção neste arquivo.
+- A descrição do plugin dizia 35 tools; são 32 desde a 0.24.0.
+
 ## 0.24.0 — três tools a menos, a guarda de escrita provada, um monolito quebrado
 
 **Trinta e duas tools, não trinta e cinco.** As regras seguem 18. A5 a A8 de
