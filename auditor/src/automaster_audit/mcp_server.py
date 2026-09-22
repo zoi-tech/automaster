@@ -39,7 +39,7 @@ TOOLS = {
 # Re-export: a tool é chamada por nome a partir daqui, e os testes também.
 from .mcp.dump import achados, buscar, comparar, dumps, inventario, jornada, workflow  # noqa: E402,F401
 from .mcp.contato import anotacao_acao, anotacoes, contato, editar  # noqa: E402,F401
-from .mcp.conversas import anexar, config, conversa_acao, conversas, conversas_buscar, enviar, grupo, rascunho, whatsapp, whatsapp_enviar  # noqa: E402,F401
+from .mcp.conversas import config, conversa_acao, conversas, enviar, grupo, whatsapp, whatsapp_enviar  # noqa: E402,F401
 from .mcp.tags import tag_acao, tags  # noqa: E402,F401
 from .mcp.oportunidades import oportunidade_acao, oportunidades, pipeline  # noqa: E402,F401
 from .mcp.agenda import agenda, agenda_acao  # noqa: E402,F401

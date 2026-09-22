@@ -6,10 +6,17 @@ from pathlib import Path
 from . import base
 from .base import CONVERSAS_CORPO, CONVERSAS_MAX_CHARS, ToolError, _LOC, _SNAP
 
-def conversas(loc: str, id: str, max: int = 100, atividades: bool = False,
+def conversas(loc: str, id: str | None = None, max: int = 100, atividades: bool = False,
               tipo: str | None = None, busca: str | None = None, email: str | None = None,
               snapshot: str | None = None) -> dict:
+    """Mensagens de um contato, ou — sem `id` — a busca por texto na subconta inteira."""
     _, meta = base._load(loc, snapshot)
+    if not id:
+        if not busca:
+            raise ToolError("sem id=<contactId> é a busca da subconta, e ela exige busca=<texto>")
+        out = base._run_extractor("conversas-buscar", "-l", loc, "--termo", busca,
+                                  "--max", str(int(max)), "--json")
+        return out | {"_snapshot": meta}
     args = ["conversas", "-l", loc, "-i", id, "--max", str(int(max))]
     if atividades:
         args.append("--atividades")
@@ -34,18 +41,26 @@ def conversas(loc: str, id: str, max: int = 100, atividades: bool = False,
     out["truncado"] = len(kept) < len(todas) or bool(out.get("maisPaginas"))
     return out | {"_snapshot": meta}
 
-def conversas_buscar(loc: str, termo: str, max: int = 20, snapshot: str | None = None) -> dict:
-    _, meta = base._load(loc, snapshot)
-    out = base._run_extractor("conversas-buscar", "-l", loc, "--termo", termo, "--max", str(int(max)), "--json")
-    return out | {"_snapshot": meta}
 
 CONVERSA_ACOES = ("lida", "nao-lida", "estrela", "sem-estrela", "apagar",
-                  "cancelar-agendada", "reenviar")
+                  "cancelar-agendada", "reenviar",
+                  "rascunho-listar", "rascunho-criar", "rascunho-apagar", "anexar")
 
 def conversa_acao(loc: str, acao: str, id: str | None = None, mensagem: str | None = None,
-                  email: bool = False, confirmo: bool = False, snapshot: str | None = None) -> dict:
+                  email: bool = False, confirmo: bool = False, texto: str | None = None,
+                  canal: str = "sms", rascunho_id: str | None = None,
+                  arquivos: list | None = None, conversa: str | None = None, grupo: bool = False,
+                  snapshot: str | None = None) -> dict:
     if acao not in CONVERSA_ACOES:
         raise ToolError(f"acao inválida: {acao}. Aceitas: {', '.join(CONVERSA_ACOES)}")
+    if acao.startswith("rascunho-"):
+        if not id:
+            raise ToolError(f"{acao} exige id=<contactId>")
+        return _rascunho(loc, id, acao.removeprefix("rascunho-"), texto, canal, rascunho_id, snapshot)
+    if acao == "anexar":
+        if not id:
+            raise ToolError("anexar exige id=<contactId>")
+        return _anexar(loc, id, arquivos or [], conversa, grupo, snapshot)
     _, meta = base._load(loc, snapshot)
     if acao in ("cancelar-agendada", "reenviar"):
         if not mensagem:
@@ -67,7 +82,7 @@ def conversa_acao(loc: str, acao: str, id: str | None = None, mensagem: str | No
         args.append("--confirmo")
     return base._run_extractor(*args, "--json") | {"_snapshot": meta}
 
-def rascunho(loc: str, id: str, acao: str = "listar", texto: str | None = None,
+def _rascunho(loc: str, id: str, acao: str = "listar", texto: str | None = None,
              canal: str = "sms", rascunho_id: str | None = None,
              snapshot: str | None = None) -> dict:
     if acao not in ("criar", "listar", "apagar"):
@@ -166,7 +181,7 @@ def grupo(loc: str, o: str, corpo: dict | None = None, conversa: str | None = No
 
 MAX_ANEXO_BYTES = 25 * 1024 * 1024
 
-def anexar(loc: str, id: str, arquivos: list, conversa: str | None = None,
+def _anexar(loc: str, id: str, arquivos: list, conversa: str | None = None,
            grupo: bool = False, snapshot: str | None = None) -> dict:
     """Sobe arquivos locais como anexo da conversa. Não envia nada ao contato."""
     if not arquivos:
@@ -226,7 +241,8 @@ TOOLS = {
     "conversas": (conversas, "AO VIVO: abre Chrome e lê as mensagens trocadas com um contato (SMS, e-mail, "
                   "WhatsApp...). Cada mensagem traz tipo, direcao, autor e `origem` (app/workflow/campaign/api) — "
                   "é `origem` que diz se veio de automação. Corpo cortado em 400 chars; eventos de timeline "
-                  "(ACTIVITY_*) ficam de fora salvo atividades=true.",
+                  "(ACTIVITY_*) ficam de fora salvo atividades=true. SEM `id`, com `busca`, procura o texto nas "
+                  "mensagens da subconta INTEIRA e devolve as conversas que casaram, com contato e trecho.",
                   {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
                    "max": {"type": "integer", "default": 100},
                    "atividades": {"type": "boolean", "default": False},
@@ -235,28 +251,27 @@ TOOLS = {
                    "email": {"type": "string", "description": "emailMessageId: devolve o e-mail completo em vez da lista"},
                    "snapshot": _SNAP},
                   ["loc", "id"]),
-    "conversas_buscar": (conversas_buscar, "Procura um texto nas mensagens de TODA a subconta e devolve as "
-                         "conversas que casaram, com contato e trecho. Serve para achar quem recebeu uma "
-                         "mensagem específica.",
-                         {"loc": _LOC, "termo": {"type": "string"}, "max": {"type": "integer", "default": 20},
-                          "snapshot": _SNAP}, ["loc", "termo"]),
     "conversa_acao": (conversa_acao, "ESCREVE: age sobre a conversa de um contato (lida, nao-lida, estrela, "
-                      "sem-estrela, apagar) ou sobre uma mensagem (cancelar-agendada, reenviar). `apagar` remove "
+                      "sem-estrela, apagar), sobre uma mensagem (cancelar-agendada, reenviar), sobre rascunho "
+                      "(rascunho-listar, rascunho-criar, rascunho-apagar) ou sobe anexo (anexar). `apagar` remove "
                       "a conversa INTEIRA — o GHL não apaga mensagem avulsa — e exige confirmo=true. As duas "
-                      "ações de mensagem pedem mensagem=<messageId>.",
+                      "ações de mensagem pedem mensagem=<messageId>. Rascunho fica na caixa do usuário e NÃO sai "
+                      "para o contato; `anexar` só cria os arquivos no CRM e devolve as URLs para `enviar"
+                      "(anexos=[...])`, teto de 25 MB por arquivo.",
                       {"loc": _LOC, "acao": {"type": "string", "enum": list(CONVERSA_ACOES)},
-                       "id": {"type": "string", "description": "id do contato (ações de conversa)"},
+                       "id": {"type": "string", "description": "id do contato (tudo menos as ações de mensagem)"},
                        "mensagem": {"type": "string", "description": "messageId (cancelar-agendada, reenviar)"},
                        "email": {"type": "boolean", "default": False, "description": "o id é de e-mail"},
-                       "confirmo": {"type": "boolean", "default": False}, "snapshot": _SNAP},
+                       "confirmo": {"type": "boolean", "default": False},
+                       "texto": {"type": "string", "description": "corpo (rascunho-criar)"},
+                       "canal": {"type": "string", "default": "sms", "description": "canal do rascunho"},
+                       "rascunho_id": {"type": "string", "description": "_id vindo de rascunho-listar"},
+                       "arquivos": {"type": "array", "items": {"type": "string"},
+                                    "description": "caminhos locais (anexar)"},
+                       "conversa": {"type": "string", "description": "conversationId (anexar; default: a 1ª)"},
+                       "grupo": {"type": "boolean", "default": False, "description": "anexo de group chat"},
+                       "snapshot": _SNAP},
                       ["loc", "acao"]),
-    "rascunho": (rascunho, "Rascunho de mensagem do contato: listar (default), criar, apagar. Rascunho fica "
-                 "salvo na caixa do usuário e não sai para o contato.",
-                 {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
-                  "acao": {"type": "string", "enum": ["criar", "listar", "apagar"], "default": "listar"},
-                  "texto": {"type": "string"}, "canal": {"type": "string", "default": "sms"},
-                  "rascunho_id": {"type": "string", "description": "_id vindo do listar"}, "snapshot": _SNAP},
-                 ["loc", "id"]),
     "enviar": (enviar, "ESCREVE EM PRODUÇÃO: envia mensagem ao contato pela conversa (SMS, Email, "
                "WhatsApp, InternalComment...). `InternalComment` é nota interna e NÃO sai para o contato — "
                "use para testar. Qualquer outro tipo exige confirmo=true, manda mensagem de verdade e não tem "
@@ -271,16 +286,6 @@ TOOLS = {
                              "description": "obrigatório em tudo que não seja InternalComment"},
                 "snapshot": _SNAP},
                ["loc", "id", "tipo", "texto"]),
-    "anexar": (anexar, "Sobe arquivos locais como anexo da conversa e devolve as URLs para usar em "
-               "`enviar(anexos=[...])`. NÃO fala com o contato — só cria os arquivos no CRM. Teto de 25 MB por "
-               "arquivo; fica um registro em <dumps>/_anexos/.",
-               {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
-                "arquivos": {"type": "array", "items": {"type": "string"},
-                             "description": "caminhos locais dos arquivos"},
-                "conversa": {"type": "string", "description": "conversationId (default: a primeira do contato)"},
-                "grupo": {"type": "boolean", "default": False, "description": "anexo de group chat"},
-                "snapshot": _SNAP},
-               ["loc", "id", "arquivos"]),
     "whatsapp": (whatsapp, "Leitura do WhatsApp da subconta (abre Chrome): `templates` (os componentes "
                  "inteiros), `aprovados` (só os liberados, formato de opção), `flows` (formulários "
                  "interativos), `numeros` (o id alimenta `de` no envio), `configurado`.",

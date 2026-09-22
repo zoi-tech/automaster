@@ -4,6 +4,26 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.24.0 — três tools a menos, a guarda de escrita provada, um monolito quebrado
+
+**Trinta e duas tools, não trinta e cinco.** As regras seguem 18. A5 a A8 de
+`docs/backlog-arquitetura.md`, que fecha a lista.
+
+- **Conversas cabem em três tools.** `conversas_buscar`, `rascunho` e `anexar` sumiram, e o
+  que faziam entrou onde já havia porta: a busca na subconta inteira é `conversas` sem
+  `id` e com `busca`, e rascunho e anexo viraram ações de `conversa_acao`
+  (`rascunho-listar`, `rascunho-criar`, `rascunho-apagar`, `anexar`). Era o domínio com
+  seis tools onde oportunidades resolve o mesmo com três; menos escolha, menos erro de
+  escolha. Nenhuma capacidade saiu.
+- **A guarda das 18 regras agora é provada, não combinada** (`test_politica_escrita.py`):
+  uma varredura do pacote falha se `--sem-regras` aparecer fora da única porta que roda
+  `validar_edicao`, ou se outro módulo chamar o comando de escrita de workflow. A flag
+  também não é parâmetro de tool nenhuma — o agente não tem como pedir para passar por fora.
+- **`workflow-edit.ts`**: 708 linhas viram uma fachada de 9, mais `workflow-edit/` com um
+  arquivo por assunto (`tipos`, `documento`, `guardas`, `canvas`). Quem importa continua
+  importando do mesmo lugar, e nenhuma declaração pública sumiu.
+- Os dois spikes de junho saíram do git: o extractor os substituiu, e o histórico guarda.
+
 ## 0.23.0 — o formato do dump virou contrato, e o CI passou a defender o parsing
 
 Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. A3 e A4 de

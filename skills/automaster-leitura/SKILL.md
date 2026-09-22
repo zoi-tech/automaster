@@ -1,6 +1,6 @@
 ---
 name: automaster-leitura
-description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversas_buscar, conversa_acao, rascunho, anexar, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, workflow_editar, modelos_email, anotacoes, anotacao_acao, tags, tag_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
+description: Como ler o que as tools automaster (dumps, comparar, inventario, achados, workflow, buscar, jornada, contato, conversas, conversa_acao, enviar, whatsapp, whatsapp_enviar, config, grupo, editar, oportunidades, oportunidade_acao, pipeline, agenda, agenda_acao, formularios, formulario_acao, formulario_estilo, workflows_ao_vivo, workflow_acao, workflow_editar, modelos_email, anotacoes, anotacao_acao, tags, tag_acao) devolvem sobre automações GoHighLevel — o que é ruído, o que é erro de verdade, o que é desenho. Use antes de interpretar qualquer resposta dessas tools ou de opinar sobre um dump.
 ---
 
 # Leitura do domínio automaster
@@ -47,7 +47,7 @@ sair, para quem, antes de mandar.
 **`conversa_acao` com `apagar` leva o histórico inteiro.** O GHL não apaga mensagem avulsa:
 a granularidade mínima é a conversa. Nunca ofereça isso como forma de "desfazer" um envio.
 
-**`anexar` não fala com o contato, mas deixa arquivo no CRM.** O upload só cria o arquivo e
+**`conversa_acao(acao="anexar")` não fala com o contato, mas deixa arquivo no CRM.** O upload só cria o arquivo e
 devolve a URL; nada sai até você chamar `enviar(anexos=[...])`. Não há desfazer do upload —
 o arquivo fica na pasta da conversa mesmo que o envio nunca aconteça.
 

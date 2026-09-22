@@ -358,7 +358,7 @@ def test_rascunho_apagar_exige_id(root, monkeypatch):
     root(workflows=[wf()])
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError):
-        srv.rascunho(LOC, "c1", acao="apagar")
+        srv.conversa_acao(LOC, "rascunho-apagar", id="c1")
 
 
 def test_enviar_agendado_recusa_nota_interna(root, monkeypatch):
@@ -382,12 +382,12 @@ def test_anexar_recusa_caminho_invalido(root, tmp_path, monkeypatch):
     root(workflows=[wf()])
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError):
-        srv.anexar(LOC, "c1", [])
+        srv.conversa_acao(LOC, "anexar", id="c1", arquivos=[])
     with pytest.raises(srv.ToolError) as e:
-        srv.anexar(LOC, "c1", [str(tmp_path / "nao-existe.png")])
+        srv.conversa_acao(LOC, "anexar", id="c1", arquivos=[str(tmp_path / "nao-existe.png")])
     assert "não existe" in str(e.value)
     with pytest.raises(srv.ToolError) as e:
-        srv.anexar(LOC, "c1", [str(tmp_path)])
+        srv.conversa_acao(LOC, "anexar", id="c1", arquivos=[str(tmp_path)])
     assert "não é arquivo" in str(e.value)
 
 
@@ -398,7 +398,7 @@ def test_anexar_recusa_arquivo_grande(root, tmp_path, monkeypatch):
     f = tmp_path / "grande.bin"
     f.write_bytes(b"x" * 11)
     with pytest.raises(srv.ToolError) as e:
-        srv.anexar(LOC, "c1", [str(f)])
+        srv.conversa_acao(LOC, "anexar", id="c1", arquivos=[str(f)])
     assert "teto" in str(e.value)
 
 
@@ -409,7 +409,7 @@ def test_anexar_passa_argumentos_ao_extractor(root, tmp_path, monkeypatch):
     seen = {}
     monkeypatch.setattr(mcp_base, "_run_extractor",
                         lambda *a: seen.update(args=a) or {"subido": True, "urls": ["http://x/a.png"]})
-    out = srv.anexar(LOC, "c1", [str(f)], conversa="k1", grupo=True)
+    out = srv.conversa_acao(LOC, "anexar", id="c1", arquivos=[str(f)], conversa="k1", grupo=True)
     assert out["urls"] == ["http://x/a.png"]
     args = seen["args"]
     assert args[:5] == ("conversas-anexar", "-l", LOC, "-i", "c1")
@@ -830,3 +830,19 @@ def test_previa_recusada_nao_acusa_escrita_parcial(monkeypatch, tmp_path):
     with pytest.raises(srv.ToolError) as e:
         srv._run_extractor("workflow-editar", "--confirmo")
     assert "parcialmente aplicada" not in str(e.value)
+
+
+def test_conversas_sem_contato_vira_busca_na_subconta(root, monkeypatch):
+    """A busca da subconta era uma tool à parte (`conversas_buscar`); virou esta porta."""
+    root(workflows=[wf()])
+    seen = {}
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: seen.update(args=a) or {"conversas": []})
+    srv.conversas(LOC, busca="boleto", max=5)
+    assert seen["args"][:6] == ("conversas-buscar", "-l", LOC, "--termo", "boleto", "--max")
+
+
+def test_conversas_sem_contato_e_sem_busca_diz_o_que_falta(root, monkeypatch):
+    root(workflows=[wf()])
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
+    with pytest.raises(srv.ToolError, match="busca"):
+        srv.conversas(LOC)

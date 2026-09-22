@@ -1,7 +1,5 @@
 dumps/
-spike/all/
-spike/entities/
-spike/*.json
+spike/
 spike-*.json
 .playwright-mcp/
 node_modules/
