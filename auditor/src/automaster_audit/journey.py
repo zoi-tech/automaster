@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from collections import Counter
 
-from .loader import DumpContext
 from .flow import index_steps, roots, successors
+from .loader import DumpContext
 
 # Tipos de trigger que o motor entende (demais → stats.triggers_ignorados)
 KNOWN_TRIGGERS = {
@@ -521,25 +521,19 @@ def _build_anytime(ctx: DumpContext, idx: TriggerIndex, walker: _Walker) -> list
     for t in idx.of_type("opportunity_created"):
         pconds = [c for c in t["conditions"] if _cond_field(c) == "opportunity.pipelineId"]
         vals = {str(c.get("value")) for c in pconds}
-        if pconds and not (vals & pipes_creatable):
-            add("oportunidade criada manualmente", t)
-        elif not pconds and not pipes_creatable:
+        if pconds and not (vals & pipes_creatable) or not pconds and not pipes_creatable:
             add("oportunidade criada manualmente", t)
 
     for t in idx.of_type("customer_reply"):
         scope = [c for c in t["conditions"] if _cond_field(c) == "workflow.id"]
         vals = {str(c.get("value")) for c in scope}
-        if scope and not (vals & wfs_messaging):
-            add(_ANYTIME_LABELS["customer_reply"], t)
-        elif not scope and not wfs_messaging:
+        if scope and not (vals & wfs_messaging) or not scope and not wfs_messaging:
             add(_ANYTIME_LABELS["customer_reply"], t)
 
     for t in idx.of_type("call_status"):
         scope = [c for c in t["conditions"] if _cond_field(c) == "workflow.id"]
         vals = {str(c.get("value")) for c in scope}
-        if scope and not (vals & wfs_calling):
-            add(_ANYTIME_LABELS["call_status"], t)
-        elif not scope and not wfs_calling:
+        if scope and not (vals & wfs_calling) or not scope and not wfs_calling:
             add(_ANYTIME_LABELS["call_status"], t)
 
     if not any_field_update:
@@ -551,9 +545,7 @@ def _build_anytime(ctx: DumpContext, idx: TriggerIndex, walker: _Walker) -> list
     for t in idx.of_type("opportunity_decay"):
         pconds = [c for c in t["conditions"] if "pipeline" in _cond_field(c).lower()]
         vals = {str(c.get("value")) for c in pconds}
-        if pconds and not (vals & pipes_creatable):
-            add(_ANYTIME_LABELS["opportunity_decay"], t)
-        elif not pconds and not pipes_creatable:
+        if pconds and not (vals & pipes_creatable) or not pconds and not pipes_creatable:
             add(_ANYTIME_LABELS["opportunity_decay"], t)
 
     for ttype in ("birthday_reminder", "appointment"):

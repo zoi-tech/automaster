@@ -1,7 +1,8 @@
 """Testes do motor da árvore de jornada do contato."""
+from conftest import tag_cond, trig, wf
+
 from automaster_audit.journey import TriggerIndex, build_journey
 from automaster_audit.loader import load_dump
-from conftest import tag_cond, trig, wf
 
 
 def test_trigger_index_groups_by_type_and_respects_inactive(make_dump):
@@ -162,7 +163,7 @@ def test_reply_with_message_condition_becomes_chip(make_dump):
            triggers=[trig("customer_reply", "r", conditions=[cond], tid="tr-r")])
     data = build_journey(load_dump(make_dump(workflows=[a, r])))
     msg = data["criacao"][0]["children"][0]["children"][0]
-    ev = [c for c in msg["children"] if c["kind"] == "event"][0]
+    ev = next(c for c in msg["children"] if c["kind"] == "event")
     assert any("Contains phrase" in c for c in ev["conds"])
 
 
@@ -335,8 +336,8 @@ def test_repeated_unscoped_reply_anchor_is_deduplicated(make_dump):
     data = build_journey(load_dump(make_dump(workflows=[a, r])))
     wnode = data["criacao"][0]["children"][0]
     msgs = [c for c in wnode["children"] if c["kind"] == "effect"]
-    ev1 = [c for c in msgs[0]["children"] if c["kind"] == "event"][0]
-    ev2 = [c for c in msgs[1]["children"] if c["kind"] == "event"][0]
+    ev1 = next(c for c in msgs[0]["children"] if c["kind"] == "event")
+    ev2 = next(c for c in msgs[1]["children"] if c["kind"] == "event")
     assert ev1["children"][0]["kind"] == "workflow"   # primeira âncora expande
     assert ev2["children"][0]["kind"] == "loop"        # demais referenciam
     assert "já expandido" in ev2["children"][0]["label"]

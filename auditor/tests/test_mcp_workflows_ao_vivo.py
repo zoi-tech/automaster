@@ -1,4 +1,5 @@
 import pytest
+
 from automaster_audit import mcp_server as srv
 from automaster_audit.mcp import base as mcp_base
 
@@ -103,7 +104,7 @@ def test_acao_monta_os_argumentos_com_confirmo(espiao):
 def test_as_duas_tools_estao_declaradas():
     for nome in ("workflows_ao_vivo", "workflow_acao"):
         assert nome in srv.TOOLS
-    func, desc, props, req = srv.TOOLS["workflow_acao"]
+    _func, desc, props, req = srv.TOOLS["workflow_acao"]
     assert "ESCREVE" in desc
     assert req == ["loc", "acao", "id"]
     assert "snapshot" not in props, "tool ao vivo de workflow não usa dump"

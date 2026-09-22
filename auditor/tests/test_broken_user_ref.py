@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_user_ref
-from conftest import wf
 
 USERS = [
     {"id": "u1", "name": "Ativo Um", "deleted": False},

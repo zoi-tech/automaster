@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 AGENDA_LEITURA = ("calendarios", "calendario", "livres", "eventos", "bloqueios", "ver", "notas")
 
@@ -117,12 +117,12 @@ def agenda_acao(loc: str, acao: str, id: str | None = None, calendario: str | No
 
 
 TOOLS = {
-    "agenda": (agenda, "Leitura ao vivo da agenda (abre Chrome, não usa o dump): "
+    "agenda": (agenda, ("Leitura ao vivo da agenda (abre Chrome, não usa o dump): "
                "`calendarios` (os calendários da subconta), `calendario` (um pelo id), "
                "`livres` (horários livres de um calendário num período, teto de 31 dias), "
                "`eventos` (só compromissos do período — bloqueio NUNCA aparece aqui, use "
                "`bloqueios` para isso), `bloqueios` (só os bloqueios do período), `ver` (um compromisso pelo id), `notas` (as notas de um "
-               "compromisso). Datas em ISO com fuso: 2026-10-02T14:00:00-03:00.",
+               "compromisso). Datas em ISO com fuso: 2026-10-02T14:00:00-03:00."),
                {"loc": _LOC, "o": {"type": "string", "enum": list(AGENDA_LEITURA),
                                    "default": "calendarios"},
                 "id": {"type": "string", "description": "id do calendário ou do compromisso"},
@@ -135,7 +135,7 @@ TOOLS = {
                 "limite": {"type": "integer"}, "pagina": {"type": "integer"},
                 "snapshot": _SNAP},
                ["loc"]),
-    "agenda_acao": (agenda_acao, "ESCREVE EM PRODUÇÃO E FALA COM O CLIENTE: marca, remarca, "
+    "agenda_acao": (agenda_acao, ("ESCREVE EM PRODUÇÃO E FALA COM O CLIENTE: marca, remarca, "
                     "muda a situação ou cancela um compromisso, bloqueia um horário (`bloquear`, "
                     "`bloqueio-editar` — bloqueio não tem contato nem situação e exige `dono`, "
                     "`inicio` e `fim`), e cria, "
@@ -147,7 +147,7 @@ TOOLS = {
                     "devolve um id novo avulso e a série perde aquele dia para sempre, não é "
                     "uma edição no lugar) ou serie (todos). "
                     "`silenciar` evita a notificação mas também desliga os workflows, e pode "
-                    "não impedir o e-mail que o próprio calendário manda.",
+                    "não impedir o e-mail que o próprio calendário manda."),
                     {"loc": _LOC, "acao": {"type": "string", "enum": list(AGENDA_ACOES)},
                      "id": {"type": "string",
                             "description": "id do compromisso ou do bloqueio (tudo menos marcar e bloquear)"},

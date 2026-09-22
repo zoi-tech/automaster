@@ -1,7 +1,8 @@
+from conftest import wf
+
 from automaster_audit.graph import build_graph
 from automaster_audit.graph_html import write_graph_html
 from automaster_audit.loader import load_dump
-from conftest import wf
 
 
 def test_graph_links_tag_to_workflows(make_dump):

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+
 from ..validacao_escrita import validar_edicao
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 WF_LEITURA = ("lista", "dentro", "contato")
 
@@ -231,27 +232,27 @@ def workflow_editar(loc: str, acao: str, id: str | None = None, nome: str | None
 
 
 TOOLS = {
-    "workflows_ao_vivo": (workflows_ao_vivo, "Leitura AO VIVO de workflows (abre Chrome, não usa o "
+    "workflows_ao_vivo": (workflows_ao_vivo, ("Leitura AO VIVO de workflows (abre Chrome, não usa o "
                           "dump e não exige extração prévia): `lista` (todos os workflows com o status "
                           "corrente), `dentro` (quem está dentro de um workflow agora, com o passo em "
                           "que cada um parou, desde quando e por que entrou), `contato` (em que "
                           "workflows um contato está agora). Teto de 500 inscritos, ajustável por "
                           "`limite`; a resposta declara se cortou. `nomes=true` resolve o nome de cada "
-                          "contato, uma chamada por contato — lento em lista grande.",
+                          "contato, uma chamada por contato — lento em lista grande."),
                           {"loc": _LOC, "o": {"type": "string", "enum": list(WF_LEITURA), "default": "lista"},
                            "id": {"type": "string", "description": "id do workflow (com o=dentro)"},
                            "contato": {"type": "string", "description": "id do contato (com o=contato)"},
                            "limite": {"type": "integer", "description": "teto de inscritos (padrão 500)"},
                            "nomes": {"type": "boolean", "default": False}},
                           ["loc"]),
-    "workflow_acao": (workflow_acao, "ESCREVE EM PRODUÇÃO: publica ou despublica um workflow "
+    "workflow_acao": (workflow_acao, ("ESCREVE EM PRODUÇÃO: publica ou despublica um workflow "
                       "(`publicar` com o status desejado), inscreve um contato, remove um contato ou "
                       "retoma uma inscrição parada. Exige confirmo=true; registro em "
                       "<dumps>/_workflows/<locationId>/<workflowId>/. Despublicar NÃO remove ninguém: quem está "
                       "dentro congela no passo em que está e volta a andar, todo mundo de uma vez, "
                       "quando o workflow for republicado. Inscrever é enfileirado pelo servidor — ler "
                       "logo depois pode não mostrar o contato ainda. A ação é carimbada com o usuário "
-                      "logado no histórico do GHL; `usuario` sobrescreve.",
+                      "logado no histórico do GHL; `usuario` sobrescreve."),
                       {"loc": _LOC, "acao": {"type": "string", "enum": list(WF_ACOES)},
                        "id": {"type": "string", "description": "id do workflow"},
                        "contato": {"type": "string", "description": "inscrever, remover, retomar"},
@@ -263,7 +264,7 @@ TOOLS = {
                        "confirmo": {"type": "boolean", "default": False}},
                       ["loc", "acao", "id"]),
     "workflow_editar": (workflow_editar,
-                        "ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
+                        ("ESCREVE AO VIVO: cria, renomeia, move, duplica e apaga workflow; e edita o "
                         "corpo de um existente — troca uma referência (`trocar-ref`), troca uma tag pelo "
                         "nome (`trocar-tag`), remove steps que nunca executam (`limpar-orfaos`), altera um "
                         "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
@@ -272,7 +273,7 @@ TOOLS = {
                         "Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
                         "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
                         "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
-                        "`url`, o link do editor. Não move container nem remove ramo de container isolado.",
+                        "`url`, o link do editor. Não move container nem remove ramo de container isolado."),
                         {"loc": _LOC,
                          "acao": {"type": "string", "enum": list(WF_EDITAR_ACOES)},
                          "id": {"type": "string", "description": "id do workflow (tudo menos criar)"},

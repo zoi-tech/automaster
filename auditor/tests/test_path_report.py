@@ -1,7 +1,8 @@
 """Testes da Camada 2: rótulos de ação e relatório Markdown de caminhos."""
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.path_report import build_paths_report, describe_step, write_paths_report
-from conftest import wf
 
 
 def _ctx(make_dump, **kw):

@@ -1,10 +1,11 @@
 import json
 
 import pytest
+from conftest import wf
+
 from automaster_audit import rules
 from automaster_audit.loader import DumpError, load_dump
 from automaster_audit.report import write_reports
-from conftest import wf
 
 
 def test_loader_rejects_bad_schema_version(make_dump):

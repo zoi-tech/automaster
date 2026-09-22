@@ -12,14 +12,42 @@ import sys
 from pathlib import Path
 
 from .mcp import (
-    agenda as _m_agenda, contato as _m_contato, conversas as _m_conversas,
-    dump as _m_dump, emails as _m_emails, formularios as _m_formularios,
-    oportunidades as _m_oportunidades, tags as _m_tags, workflows as _m_workflows,
+    agenda as _m_agenda,
 )
-from .mcp.base import ToolError, _root
+from .mcp import (
+    contato as _m_contato,
+)
+from .mcp import (
+    conversas as _m_conversas,
+)
+from .mcp import (
+    dump as _m_dump,
+)
+from .mcp import (
+    emails as _m_emails,
+)
+from .mcp import (
+    formularios as _m_formularios,
+)
+from .mcp import (
+    oportunidades as _m_oportunidades,
+)
+from .mcp import (
+    tags as _m_tags,
+)
+from .mcp import (
+    workflows as _m_workflows,
+)
+
 # Re-export de leitura: `mcp_server._ctx` e afins seguem sendo o MESMO objeto.
 from .mcp.base import (  # noqa: F401
-    EXTRACTOR_DIR, _ctx, _load, _run_extractor, _run_timeline,
+    EXTRACTOR_DIR,
+    ToolError,
+    _ctx,
+    _load,
+    _root,
+    _run_extractor,
+    _run_timeline,
 )
 
 PROTOCOL = "2025-06-18"
@@ -37,16 +65,21 @@ TOOLS = {
 }
 
 # Re-export: a tool é chamada por nome a partir daqui, e os testes também.
-from .mcp.dump import achados, buscar, comparar, dumps, inventario, jornada, workflow  # noqa: E402,F401
-from .mcp.contato import anotacao_acao, anotacoes, contato, editar  # noqa: E402,F401
-from .mcp.conversas import config, conversa_acao, conversas, enviar, grupo, whatsapp, whatsapp_enviar  # noqa: E402,F401
-from .mcp.tags import tag_acao, tags  # noqa: E402,F401
-from .mcp.oportunidades import oportunidade_acao, oportunidades, pipeline  # noqa: E402,F401
-from .mcp.agenda import agenda, agenda_acao  # noqa: E402,F401
-from .mcp.formularios import formulario_acao, formulario_estilo, formularios  # noqa: E402,F401
-from .mcp.workflows import workflow_acao, workflow_editar, workflows_ao_vivo  # noqa: E402,F401
-from .mcp.emails import modelos_email  # noqa: E402,F401
-from .mcp.workflows import WF_EDITAR_ACOES, _WF_EDITAR_COM_CORPO  # noqa: E402,F401
+from .mcp.agenda import agenda, agenda_acao  # noqa: F401
+from .mcp.contato import anotacao_acao, anotacoes, contato, editar  # noqa: F401
+from .mcp.conversas import config, conversa_acao, conversas, enviar, grupo, whatsapp, whatsapp_enviar  # noqa: F401
+from .mcp.dump import achados, buscar, comparar, dumps, inventario, jornada, workflow  # noqa: F401
+from .mcp.emails import modelos_email  # noqa: F401
+from .mcp.formularios import formulario_acao, formulario_estilo, formularios  # noqa: F401
+from .mcp.oportunidades import oportunidade_acao, oportunidades, pipeline  # noqa: F401
+from .mcp.tags import tag_acao, tags  # noqa: F401
+from .mcp.workflows import (  # noqa: F401  # noqa: E402,F401
+    _WF_EDITAR_COM_CORPO,
+    WF_EDITAR_ACOES,
+    workflow_acao,
+    workflow_editar,
+    workflows_ao_vivo,
+)
 
 
 def _tool_list() -> list[dict]:
@@ -62,7 +95,7 @@ def _version() -> str:
         return "0"
     try:
         return json.loads((Path(root) / ".claude-plugin" / "plugin.json").read_text())["version"]
-    except Exception:
+    except Exception:  # noqa: BLE001 - versão é informativa; fora do plugin ou com manifesto torto, devolve "0"
         return "0"
 
 

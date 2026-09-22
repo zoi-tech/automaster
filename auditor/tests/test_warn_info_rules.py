@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import dead_end_draft, naming_convention, workflow_unreachable
-from conftest import wf
 
 STEP = {"type": "sms", "name": "SMS", "attributes": {}}
 

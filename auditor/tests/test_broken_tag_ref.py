@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_tag_ref
-from conftest import wf
 
 
 def test_flags_missing_tag(make_dump):

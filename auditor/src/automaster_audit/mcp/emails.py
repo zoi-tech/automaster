@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 from urllib.request import Request, urlopen
+
 from ..rules._helpers import email_template_id, steps_of_type
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 MODELOS_OP = ("lista", "usos", "conteudo")
 
@@ -19,7 +20,7 @@ _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 
 def _ler_url(url: str) -> bytes:
     """Isolada para o teste trocar. Única ida à rede do servidor: URL pública, sem credencial."""
-    with urlopen(Request(url, headers={"user-agent": _UA}), timeout=20) as r:  # noqa: S310
+    with urlopen(Request(url, headers={"user-agent": _UA}), timeout=20) as r:
         return r.read()
 
 class _Texto(HTMLParser):
@@ -86,10 +87,10 @@ def modelos_email(loc: str, o: str = "lista", id: str | None = None,
 
 TOOLS = {
     "modelos_email": (modelos_email,
-                      "DO DUMP: templates do email builder. `lista` (id, nome, pasta, datas), "
+                      ("DO DUMP: templates do email builder. `lista` (id, nome, pasta, datas), "
                       "`usos` (qual workflow e step cita cada um, quais ninguém usa, quais o "
                       "builder não tem) e `conteudo` (texto e links de um template, baixado na "
-                      "hora). Não é o corpo de e-mail de uma conversa — para isso use `conversas`.",
+                      "hora). Não é o corpo de e-mail de uma conversa — para isso use `conversas`."),
                       {"loc": _LOC, "o": {"type": "string", "enum": list(MODELOS_OP)},
                        "id": {"type": "string", "description": "template, obrigatório em `conteudo`"},
                        "snapshot": _SNAP}, ["loc"]),

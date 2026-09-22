@@ -1,7 +1,8 @@
+from conftest import wf
+
 from automaster_audit.dashboard import build_dashboard
 from automaster_audit.dashboard_html import write_dashboard_html
 from automaster_audit.loader import load_dump
-from conftest import wf
 
 
 def test_dashboard_aggregates_workflow_refs(make_dump):

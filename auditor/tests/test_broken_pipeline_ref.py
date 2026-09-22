@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_pipeline_ref
-from conftest import wf
 
 PIPELINES = [{"id": "P1", "stages": [{"id": "S1"}, {"id": "S2"}]}]
 

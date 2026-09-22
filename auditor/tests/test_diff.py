@@ -1,8 +1,8 @@
 """Diff entre dois snapshots da mesma subconta."""
+from conftest import wf
+
 from automaster_audit.diff import build_diff, render_md
 from automaster_audit.loader import load_dump
-
-from conftest import wf
 
 
 def _step(sid="s1", name="Add tag", tags=("x",)):

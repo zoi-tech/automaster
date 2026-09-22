@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
+
 from .. import rules
 from ..dashboard import build_dashboard
 from ..journey import build_journey
@@ -50,7 +51,7 @@ def _snapshot(loc: str, snapshot: str | None = None) -> tuple[Path, dict]:
     path = loc_dir / (snapshot or snaps[0])
     extracted = _manifest(path).get("extractedAt", "")
     try:
-        age = (datetime.now(timezone.utc) - datetime.fromisoformat(extracted.replace("Z", "+00:00"))).days
+        age = (datetime.now(UTC) - datetime.fromisoformat(extracted)).days
     except ValueError:
         age = -1
     return path, {"snapshot": path.name, "extractedAt": extracted, "idade_dias": age}
@@ -111,7 +112,8 @@ def _run_extractor(*args: str) -> dict:
            "PATH": os.pathsep.join([os.environ.get("PATH", ""), *extra])}
     cmd = [str(tsx), "src/cli.ts", *args]
     try:
-        r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env)
+        r = subprocess.run(cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env,
+                           check=False)  # o returncode vira erro de tool logo abaixo
     except subprocess.TimeoutExpired as e:
         dica_estado = ("confira o estado atual com a tool `formularios`, o=detalhe."
                        if args[0].startswith("formulario-") else

@@ -1,6 +1,7 @@
+from conftest import trig, wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules.broken_form_ref import check
-from conftest import trig, wf
 
 
 def form_cond(field, valores):

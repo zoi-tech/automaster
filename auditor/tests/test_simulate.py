@@ -1,7 +1,8 @@
 """Testes da Camada 3: simulação de cenário contra o grafo (simulate.py)."""
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.simulate import simulate
-from conftest import wf
 
 
 def _wf(make_dump, steps, triggers=None):

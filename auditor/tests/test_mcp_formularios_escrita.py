@@ -1,4 +1,5 @@
 import pytest
+
 from automaster_audit import mcp_server as srv
 from automaster_audit.mcp import base as mcp_base
 
@@ -73,6 +74,6 @@ def test_as_duas_tools_estao_declaradas():
     assert "formulario_acao" in srv.TOOLS
     assert "formulario_estilo" in srv.TOOLS
     for nome in ("formulario_acao", "formulario_estilo"):
-        func, desc, props, req = srv.TOOLS[nome]
+        _func, desc, _props, req = srv.TOOLS[nome]
         assert "loc" in req and "acao" in req
         assert "ESCREVE" in desc

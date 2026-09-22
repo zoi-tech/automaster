@@ -2,9 +2,10 @@
 import json
 
 import pytest
+from conftest import wf
+
 from automaster_audit.contract import ContractError, load_contracts, run_contracts
 from automaster_audit.loader import load_dump
-from conftest import wf
 
 # Workflow sintético: find_opportunity → criar oportunidade (shape da Fase 0)
 OPP_STEPS = [

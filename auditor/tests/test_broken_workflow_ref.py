@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_workflow_ref
-from conftest import wf
 
 
 def test_flags_missing_target(make_dump):

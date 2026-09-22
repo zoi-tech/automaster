@@ -1,4 +1,5 @@
 import pytest
+
 from automaster_audit import mcp_server as s
 from automaster_audit.loader import load_dump
 from automaster_audit.mcp import base as mcp_base

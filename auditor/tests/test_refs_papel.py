@@ -1,7 +1,8 @@
 """Índice reverso com papel: tag citada só em trigger não é órfã."""
+from conftest import wf
+
 from automaster_audit.dashboard import build_dashboard
 from automaster_audit.loader import load_dump
-from conftest import wf
 
 
 def _trigger_tag(tag):

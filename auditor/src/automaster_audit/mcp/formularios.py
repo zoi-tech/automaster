@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import json
+
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 FORM_LEITURA = ("lista", "detalhe", "submissoes", "buscar")
 
@@ -111,11 +112,11 @@ def formulario_estilo(loc: str, acao: str, tipo: str = "formulario", id: str | N
 
 
 TOOLS = {
-    "formularios": (formularios, "Leitura ao vivo de formulários e surveys (abre Chrome, não usa o dump): "
+    "formularios": (formularios, ("Leitura ao vivo de formulários e surveys (abre Chrome, não usa o dump): "
                     "`lista` (todos, já paginados), `detalhe` (um, com os campos), `submissoes` (respostas, "
                     "com filtro de formulário, contato e período), `buscar` (por nome). O parâmetro `tipo` "
                     "escolhe entre formulário e survey. O id `fb-<locationId>` nas submissões é o formulário "
-                    "de lead do Facebook, não um formulário da subconta.",
+                    "de lead do Facebook, não um formulário da subconta."),
                     {"loc": _LOC, "o": {"type": "string", "enum": list(FORM_LEITURA), "default": "lista"},
                      "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},
                      "id": {"type": "string", "description": "id do formulário ou survey (com o=detalhe)"},
@@ -128,7 +129,7 @@ TOOLS = {
                      "snapshot": _SNAP},
                     ["loc"]),
     "formulario_acao": (formulario_acao,
-                        "ESCREVE EM PRODUÇÃO: cria, edita, duplica, apaga ou restaura um "
+                        ("ESCREVE EM PRODUÇÃO: cria, edita, duplica, apaga ou restaura um "
                         "formulário ou survey. A edição REPUBLICA O DOCUMENTO INTEIRO a partir "
                         "do que está no servidor, aplicando as `ops` declaradas — nunca peça "
                         "JSON cru do formulário. Use acao='previa' primeiro: ela mostra campo "
@@ -139,7 +140,7 @@ TOOLS = {
                         "exceto em acao='criar' com ops: o documento nasce vazio, então as duas "
                         "guardas saem sempre liberadas, e o formulário pode publicar sem botão "
                         "de envio. Slide só existe em survey. Exige confirmo=true; registro em "
-                        "<dumps>/_formularios/.",
+                        "<dumps>/_formularios/."),
                         {"loc": _LOC, "acao": {"type": "string", "enum": list(FORM_ACOES)},
                          "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},
                          "id": {"type": "string"}, "nome": {"type": "string"},
@@ -156,7 +157,7 @@ TOOLS = {
                          "snapshot": _SNAP},
                         ["loc", "acao"]),
     "formulario_estilo": (formulario_estilo,
-                          "ESCREVE EM PRODUÇÃO: aplica a identidade visual a um formulário ou "
+                          ("ESCREVE EM PRODUÇÃO: aplica a identidade visual a um formulário ou "
                           "survey (acao='aplicar'), mostra a prévia ('previa'), tira screenshot "
                           "da página pública real ('previa-visual'), lê os temas e a paleta da "
                           "subconta ('temas', 'paleta-ver') ou grava a paleta padrão "
@@ -169,7 +170,7 @@ TOOLS = {
                           "respondeu num formato inesperado, e por isso a gravação SUBSTITUIU "
                           "a paleta em vez de mesclar nela — leia esse "
                           "campo antes de assumir que nada se perdeu. Exige confirmo=true para "
-                          "gravar; registro em <dumps>/_formularios/.",
+                          "gravar; registro em <dumps>/_formularios/."),
                           {"loc": _LOC, "acao": {"type": "string", "enum": list(ESTILO_ACOES)},
                            "tipo": {"type": "string", "enum": list(FORM_TIPOS), "default": "formulario"},
                            "id": {"type": "string"},

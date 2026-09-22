@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import json
+
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 OPP_LEITURA = ("pipelines", "listar", "buscar", "ver")
 
@@ -94,9 +95,9 @@ def pipeline(loc: str, acao: str, id: str | None = None, nome: str | None = None
 
 
 TOOLS = {
-    "oportunidades": (oportunidades, "Leitura ao vivo de pipelines e oportunidades (abre Chrome, não usa "
+    "oportunidades": (oportunidades, ("Leitura ao vivo de pipelines e oportunidades (abre Chrome, não usa "
                       "o dump): `pipelines` (funis e seus estágios), `listar` (cards, com filtro de pipeline, "
-                      "estágio, status e contato), `buscar` (termo livre), `ver` (um card pelo id).",
+                      "estágio, status e contato), `buscar` (termo livre), `ver` (um card pelo id)."),
                       {"loc": _LOC, "o": {"type": "string", "enum": list(OPP_LEITURA), "default": "pipelines"},
                        "id": {"type": "string", "description": "id da oportunidade (com o=ver)"},
                        "pipeline": {"type": "string"}, "estagio": {"type": "string"},
@@ -107,10 +108,10 @@ TOOLS = {
                        "pagina": {"type": "integer", "description": "página da listagem, a partir de 1"},
                        "snapshot": _SNAP},
                       ["loc"]),
-    "oportunidade_acao": (oportunidade_acao, "ESCREVE EM PRODUÇÃO: cria, edita, move de estágio, muda o "
+    "oportunidade_acao": (oportunidade_acao, ("ESCREVE EM PRODUÇÃO: cria, edita, move de estágio, muda o "
                           "status, apaga ou restaura uma oportunidade. Exige confirmo=true; registro em "
                           "<dumps>/_oportunidades/. `apagar` é reversível por `restaurar`. O contato de um "
-                          "card só se define na criação e não pode ser trocado depois.",
+                          "card só se define na criação e não pode ser trocado depois."),
                           {"loc": _LOC, "acao": {"type": "string", "enum": list(OPP_ACOES)},
                            "id": {"type": "string", "description": "id da oportunidade (tudo menos criar)"},
                            "pipeline": {"type": "string"}, "estagio": {"type": "string"},
@@ -125,11 +126,11 @@ TOOLS = {
                            "confirmo": {"type": "boolean", "default": False},
                            "snapshot": _SNAP},
                           ["loc", "acao"]),
-    "pipeline": (pipeline, "ESCREVE EM PRODUÇÃO: cria, edita ou apaga um pipeline. `estagios` é "
+    "pipeline": (pipeline, ("ESCREVE EM PRODUÇÃO: cria, edita ou apaga um pipeline. `estagios` é "
                  "SUBSTITUTIVO — estágio ausente da lista é removido, e os cards dele migram para um "
                  "estágio que sobrou, o que acorda toda automação que reage a transição. A tool recusa "
                  "remover estágio que tem card dentro, a menos que apagar_com_cards=true. "
-                 "Apagar pipeline NÃO tem restore; o estado anterior fica em <dumps>/_oportunidades/.",
+                 "Apagar pipeline NÃO tem restore; o estado anterior fica em <dumps>/_oportunidades/."),
                  {"loc": _LOC, "acao": {"type": "string", "enum": list(PIPE_ACOES)},
                   "id": {"type": "string", "description": "id do pipeline (editar e apagar)"},
                   "nome": {"type": "string"},

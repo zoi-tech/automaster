@@ -1,11 +1,12 @@
 import json
+import pathlib
+import tempfile
+
 import pytest
 
 from automaster_audit import mcp_server
 from automaster_audit.mcp import base as mcp_base
 from automaster_audit.mcp import workflows as mcp_workflows
-import pathlib
-import tempfile
 
 
 class _ResultadoFalso:
@@ -30,7 +31,7 @@ class _CtxFalso:
 
 def test_tool_esta_registrada():
     assert "workflow_editar" in mcp_server.TOOLS
-    func, descricao, schema, obrigatorios = mcp_server.TOOLS["workflow_editar"]
+    func, descricao, _schema, obrigatorios = mcp_server.TOOLS["workflow_editar"]
     assert callable(func)
     assert "loc" in obrigatorios and "acao" in obrigatorios
     assert "ESCREVE" in descricao

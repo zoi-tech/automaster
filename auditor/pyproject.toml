@@ -9,7 +9,7 @@ description = "Auditor de workflows GHL extraídos pelo Automaster v2"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "ruff"]
 
 [project.scripts]
 automaster-audit = "automaster_audit.cli:main"
@@ -18,6 +18,12 @@ automaster-audit = "automaster_audit.cli:main"
 packages = ["src/automaster_audit"]
 # o schema do dump é lido em tempo de execução pelo loader: vai no wheel
 artifacts = ["src/automaster_audit/dump_schema.json"]
+
+[tool.ruff]
+# 120 e não o padrão 88: o código escreve longo de propósito (descrições de tool,
+# literais de HTML). Com 88, 1210 linhas seriam quebradas; com 120, 60.
+line-length = 120
+target-version = "py312"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

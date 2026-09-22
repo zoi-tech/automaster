@@ -1,10 +1,11 @@
 """Testes da camada 1 (lógica sã): flow graph + regras estruturais."""
 from types import SimpleNamespace
 
+from conftest import wf
+
 from automaster_audit.flow import reachable, roots, successors
 from automaster_audit.loader import load_dump
-from automaster_audit.rules import broken_goto, unreachable_step, uncovered_condition, workflow_call_cycle
-from conftest import wf
+from automaster_audit.rules import broken_goto, uncovered_condition, unreachable_step, workflow_call_cycle
 
 
 # --- flow.successors ---

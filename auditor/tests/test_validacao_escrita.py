@@ -1,8 +1,8 @@
 import pytest
+from conftest import wf
 
 from automaster_audit.loader import load_dump
 from automaster_audit.validacao_escrita import validar_edicao
-from conftest import wf
 
 
 def _passo_tag(sid, tags):

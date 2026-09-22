@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+
 from ..diff import build_diff
 from ..path_report import workflow_paths_lines
 from . import base
-from .base import FATIAS, ToolError, _LOC, _SNAP, _findings, _journey, _manifest, _root, _snapshot, _snapshots
+from .base import _LOC, _SNAP, FATIAS, ToolError, _findings, _journey, _manifest, _root, _snapshot, _snapshots
+
 
 def dumps() -> list[dict]:
     root = _root()
@@ -130,25 +132,25 @@ def comparar(loc: str, antes: str | None = None, depois: str | None = None) -> d
 
 
 TOOLS = {
-    "comparar": (comparar, "Diff entre dois snapshots da mesma subconta: workflows adicionados/removidos/"
+    "comparar": (comparar, ("Diff entre dois snapshots da mesma subconta: workflows adicionados/removidos/"
                  "alterados (nome, status, steps, triggers) e entidades que entraram ou sumiram. Sem antes/depois, "
-                 "compara os dois mais recentes. Só lê o disco.",
+                 "compara os dois mais recentes. Só lê o disco."),
                  {"loc": _LOC, "antes": {"type": "string", "description": "snapshot mais antigo (default: o penúltimo)"},
                   "depois": {"type": "string", "description": "snapshot mais recente (default: o último)"}}, ["loc"]),
     "dumps": (dumps, "Lista subcontas com dump, snapshots e data. ~200 tokens.", {}, []),
-    "inventario": (inventario, "summary (~80 tokens) ou uma fatia: workflows, tags, fields, pipelines, "
-                   "users, calendars, custom_values (até ~20k tokens).",
+    "inventario": (inventario, ("summary (~80 tokens) ou uma fatia: workflows, tags, fields, pipelines, "
+                   "users, calendars, custom_values (até ~20k tokens)."),
                    {"loc": _LOC, "fatia": {"type": "string", "enum": list(FATIAS)}, "snapshot": _SNAP}, ["loc"]),
-    "workflow": (workflow, "DO DUMP (pode estar velho; para o estado corrente use `workflows_ao_vivo`): "
-                 "meta, árvore de caminhos (teto ~1.5k tokens, flag caminhos_truncado) e achados de um workflow.",
+    "workflow": (workflow, ("DO DUMP (pode estar velho; para o estado corrente use `workflows_ao_vivo`): "
+                 "meta, árvore de caminhos (teto ~1.5k tokens, flag caminhos_truncado) e achados de um workflow."),
                  {"loc": _LOC, "id": {"type": "string"}, "snapshot": _SNAP}, ["loc", "id"]),
     "achados": (achados, "Achados agrupados por (rule, workflow, detail) com n; counts por severidade sempre.",
                 {"loc": _LOC, "severidade": {"type": "string", "enum": ["ERROR", "WARN", "INFO"]}, "snapshot": _SNAP}, ["loc"]),
-    "buscar": (buscar, "Termo em tags (com papeis: dispara/adiciona/remove/condicao), fields, pipelines, users, "
-               "custom values e nomes de workflow.",
+    "buscar": (buscar, ("Termo em tags (com papeis: dispara/adiciona/remove/condicao), fields, pipelines, users, "
+               "custom values e nomes de workflow."),
                {"loc": _LOC, "termo": {"type": "string"}, "snapshot": _SNAP}, ["loc", "termo"]),
-    "jornada": (jornada, "Um nível da árvore de jornada por chamada (~60 tokens/nó). caminho é posicional, "
-                "ex. [0,3,1], sobre criacao+anytime; profundidade expande filhos.",
+    "jornada": (jornada, ("Um nível da árvore de jornada por chamada (~60 tokens/nó). caminho é posicional, "
+                "ex. [0,3,1], sobre criacao+anytime; profundidade expande filhos."),
                 {"loc": _LOC, "caminho": {"type": "array", "items": {"type": "integer"}},
                  "profundidade": {"type": "integer", "default": 1}, "snapshot": _SNAP}, ["loc"]),
 }

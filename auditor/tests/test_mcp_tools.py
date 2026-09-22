@@ -4,9 +4,9 @@ import shutil
 import subprocess
 
 import pytest
+from conftest import tag_cond, trig, wf
 
 from automaster_audit import mcp_server as srv
-from conftest import tag_cond, trig, wf
 from automaster_audit.mcp import base as mcp_base
 from automaster_audit.mcp import conversas as mcp_conversas
 
@@ -128,7 +128,7 @@ def test_workflow_meta_paths_and_findings(root):
 
 def test_workflow_paths_have_ceiling(root, monkeypatch):
     # cadeia de 60 if_else = muitos caminhos; o teto corta e avisa
-    steps, prev = [], None
+    steps = []
     for i in range(40):
         b = {"id": f"b{i}", "type": "if_else", "name": f"If{i}", "attributes": {"branches": [
             {"id": f"y{i}", "name": "Sim"}, {"id": f"n{i}", "name": "Não"}]}}

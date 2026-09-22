@@ -1,5 +1,6 @@
-from automaster_audit.loader import load_dump
 from conftest import wf
+
+from automaster_audit.loader import load_dump
 
 
 def test_listas_ausentes_nao_criam_chave(make_dump):

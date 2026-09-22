@@ -1,7 +1,8 @@
 """Testes da Camada 2: enumeração de caminhos de execução."""
+from conftest import wf
+
 from automaster_audit.flow import enumerate_paths
 from automaster_audit.loader import load_dump
-from conftest import wf
 
 
 def _wf(make_dump, steps):

@@ -1,8 +1,8 @@
 """broken_template_ref: step citando template que sumiu."""
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules.broken_template_ref import check
-
-from conftest import wf
 
 
 def _step(tipo, tid, campo="template_id", sid="s1"):

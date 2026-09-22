@@ -314,7 +314,7 @@ def shell_meta(dump_dir) -> dict:
             items = raw.get(raw_key, []) if isinstance(raw, dict) else []
             counts[key] = len(items) if isinstance(items, list) else 0
         return {"counts": counts, "schema": manifest.get("schemaVersion")}
-    except Exception:
+    except Exception:  # noqa: BLE001 - contagem da sidebar é enfeite: dump ilegível vira None, não erro
         return {"counts": None, "schema": None}
 
 

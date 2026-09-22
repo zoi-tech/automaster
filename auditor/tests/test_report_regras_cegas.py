@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.report import _render_md
-from conftest import wf
 
 
 def test_dump_sem_listas_avisa_que_as_regras_estao_cegas(make_dump):

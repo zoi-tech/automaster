@@ -1,11 +1,12 @@
 """Testes do validation.html: agregação das 3 camadas + render Tron auto-contido."""
 import json
 
+from conftest import wf
+
 from automaster_audit.cli import build_parser, run_validation
 from automaster_audit.loader import load_dump
 from automaster_audit.validation import build_validation
 from automaster_audit.validation_html import write_validation_html
-from conftest import wf
 
 # if_else com 2 ramos (shape de test_enumerate_paths) + tag quebrada (ERROR camada 1)
 BRANCH_STEPS = [

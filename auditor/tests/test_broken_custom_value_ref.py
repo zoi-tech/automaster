@@ -1,6 +1,7 @@
+from conftest import wf
+
 from automaster_audit.loader import load_dump
 from automaster_audit.rules import broken_custom_value_ref
-from conftest import wf
 
 CVS = [{"id": "c1", "name": "Estoque", "fieldKey": "{{ custom_values.estoque }}", "value": "X"}]
 

@@ -13,7 +13,7 @@ from .contract import ContractError, run_contracts
 from .finding import ERROR, INFO, WARN
 from .flow import enumerate_paths, index_steps
 from .loader import DumpContext
-from .path_report import _fmt_terminal, _trie, _Trie, describe_step
+from .path_report import _fmt_terminal, _Trie, _trie, describe_step
 
 _SEV_ORDER = {ERROR: 0, WARN: 1, INFO: 2}
 

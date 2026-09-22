@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+
 from ..journey import TriggerIndex
 from . import base
-from .base import CONTATO_NOISE, ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, CONTATO_NOISE, ToolError
+
 
 def contato(loc: str, id: str, days: int = 60, ate: str | None = None, snapshot: str | None = None) -> dict:
     _, meta = base._load(loc, snapshot)
@@ -103,17 +105,17 @@ def anotacao_acao(loc: str, acao: str, contato: str, tipo: str = "nota", id: str
 
 
 TOOLS = {
-    "contato": (contato, "AO VIVO: abre Chrome e pagina o audit log do contato (~10 s logado, exige setup do "
+    "contato": (contato, ("AO VIVO: abre Chrome e pagina o audit log do contato (~10 s logado, exige setup do "
                 "extractor). Eventos mais recentes primeiro (~155 tokens cada), sourceWorkflowName resolvido; teto ~10k tokens, "
-                "pagine com ate=proximo_ate.",
+                "pagine com ate=proximo_ate."),
                 {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
                  "days": {"type": "integer", "default": 60},
                  "ate": {"type": "string", "description": "só eventos antes deste ISO (paginação)"}, "snapshot": _SNAP},
                 ["loc", "id"]),
-    "anotacoes": (anotacoes, "Leitura ao vivo de notas e tarefas do contato (abre Chrome, não usa o "
+    "anotacoes": (anotacoes, ("Leitura ao vivo de notas e tarefas do contato (abre Chrome, não usa o "
                   "dump): `lista` e `detalhe` precisam de contato; `buscar` varre as tarefas de TODA "
                   "a subconta e só existe para tarefa — é a forma de responder o que está atrasado. "
-                  "Nota de compromisso é outra coisa, e sai pela tool `agenda`.",
+                  "Nota de compromisso é outra coisa, e sai pela tool `agenda`."),
                   {"loc": _LOC,
                    "o": {"type": "string", "enum": list(ANOTACAO_LEITURA), "default": "lista"},
                    "tipo": {"type": "string", "enum": list(ANOTACAO_TIPOS), "default": "nota"},
@@ -125,10 +127,10 @@ TOOLS = {
                    "limite": {"type": "integer", "description": "quantas tarefas; o servidor usa 25"}},
                   ["loc"]),
     "anotacao_acao": (anotacao_acao,
-                      "ESCREVE EM PRODUÇÃO: cria, edita ou apaga nota e tarefa do contato, e conclui "
+                      ("ESCREVE EM PRODUÇÃO: cria, edita ou apaga nota e tarefa do contato, e conclui "
                       "ou reabre tarefa. Sem confirmo=true devolve a prévia com o corpo que iria para "
                       "o servidor, sem gravar. Criar tarefa exige titulo e prazo (ISO); a tarefa nasce "
-                      "não concluída. Apagar não tem desfazer.",
+                      "não concluída. Apagar não tem desfazer."),
                       {"loc": _LOC,
                        "acao": {"type": "string", "enum": list(ANOTACAO_ACOES)},
                        "contato": {"type": "string", "description": "contactId"},
@@ -140,9 +142,9 @@ TOOLS = {
                        "dono": {"type": "string", "description": "responsável pela tarefa"},
                        "confirmo": {"type": "boolean", "description": "true grava de verdade", "default": False}},
                       ["loc", "acao", "contato"]),
-    "editar": (editar, "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
+    "editar": (editar, ("ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
                "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
-               "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags.",
+               "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags."),
                {"loc": _LOC, "id": {"type": "string", "description": "id do contato"},
                 "set": {"type": "object", "description": "campo (nome, fieldKey ou id) → valor"},
                 "tags_adicionar": {"type": "array", "items": {"type": "string"}},

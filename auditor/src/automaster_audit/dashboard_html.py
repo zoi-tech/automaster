@@ -383,7 +383,7 @@ def _audit_from_dump(dump_dir: Path) -> dict | None:
         from . import rules
         from .loader import load_dump
         findings = rules.run_all(load_dump(dump_dir))
-    except Exception:
+    except Exception:  # noqa: BLE001 - pasta ilegível degrada para inventário puro, nunca quebra o painel
         return None
     return {
         "counts": {s: sum(1 for f in findings if f.severity == s)

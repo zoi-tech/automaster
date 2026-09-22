@@ -13,6 +13,7 @@ def test_dump_da_fixture_esta_no_contrato(make_dump):
 
 def test_schema_e_o_mesmo_que_o_extractor_le():
     from pathlib import Path
+
     import automaster_audit
     esperado = Path(automaster_audit.__file__).with_name("dump_schema.json")
     assert esperado.is_file(), "o extractor procura o schema exatamente neste caminho"

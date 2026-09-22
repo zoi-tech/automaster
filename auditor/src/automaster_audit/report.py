@@ -55,8 +55,8 @@ def _render_md(ctx: DumpContext, findings: list[Finding]) -> str:
         "",
         "## Sumário",
         "",
-        f"| Severidade | Achados |",
-        f"|---|---|",
+        "| Severidade | Achados |",
+        "|---|---|",
         f"| ERROR | {c[ERROR]} |",
         f"| WARN | {c[WARN]} |",
         f"| INFO | {c[INFO]} |",
@@ -68,9 +68,9 @@ def _render_md(ctx: DumpContext, findings: list[Finding]) -> str:
         lines += [
             "## Regras cegas",
             "",
-            "O dump é anterior a estas listas, então as regras abaixo não rodaram. "
+            ("O dump é anterior a estas listas, então as regras abaixo não rodaram. "
             "Ausência de achado aqui não é prova de que está tudo certo — re-extraia a "
-            "subconta para valer.",
+            "subconta para valer."),
             "",
             "| Lista ausente | Regra sem efeito |",
             "|---|---|",

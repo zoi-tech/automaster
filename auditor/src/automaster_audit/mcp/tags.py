@@ -1,9 +1,8 @@
 """Tags da subconta, com o cruzamento de impacto contra o dump."""
 from __future__ import annotations
 
-
 from . import base
-from .base import ToolError, _LOC, _SNAP
+from .base import _LOC, _SNAP, ToolError
 
 TAG_ACOES = ("criar", "renomear", "apagar")
 
@@ -28,7 +27,7 @@ def _impacto_tags(loc: str, snapshot: str | None = None) -> tuple[dict | None, d
     """
     try:
         ctx, meta = base._load(loc, snapshot)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - a tag é ao vivo: qualquer falha de dump vira aviso, não erro
         return None, {"motivo": str(e)}
     dash = base._dash(str(ctx.path))
     idx = {
@@ -104,21 +103,21 @@ def tag_acao(loc: str, acao: str, tag: str | None = None, nome: str | None = Non
 
 
 TOOLS = {
-    "tags": (tags, "Tags da subconta, lidas AO VIVO e cruzadas com os workflows que citam cada uma "
+    "tags": (tags, ("Tags da subconta, lidas AO VIVO e cruzadas com os workflows que citam cada uma "
              "(campo `workflows`) e em que papel (`papeis`: dispara, adiciona, remove, condicao). O "
              "cruzamento vem do dump, então `_snapshot` diz de quando ele é; sem dump a lista sai "
-             "com `workflows: null` e um aviso. Workflow guarda o NOME da tag, nunca o id.",
+             "com `workflows: null` e um aviso. Workflow guarda o NOME da tag, nunca o id."),
              {"loc": _LOC,
               "termo": {"type": "string", "description": "filtra as tags por parte do nome"},
               "snapshot": _SNAP},
              ["loc"]),
     "tag_acao": (tag_acao,
-                 "ESCREVE EM PRODUÇÃO: cria, renomeia ou apaga uma tag da subconta. Sem confirmo=true "
+                 ("ESCREVE EM PRODUÇÃO: cria, renomeia ou apaga uma tag da subconta. Sem confirmo=true "
                  "devolve a prévia. RENOMEAR é seguro: o servidor troca o nome dentro dos workflows "
                  "que citam a tag, inclusive no trigger. APAGAR é perigoso: arranca a tag de todos os "
                  "contatos que a têm, pode disparar automação de tag removida, e não há como saber "
                  "quantos contatos são — o GHL não expõe essa contagem. Apagar tag citada por "
-                 "workflow exige apagar_citada=true.",
+                 "workflow exige apagar_citada=true."),
                  {"loc": _LOC,
                   "acao": {"type": "string", "enum": list(TAG_ACOES)},
                   "tag": {"type": "string", "description": "nome ou id da tag (renomear, apagar)"},

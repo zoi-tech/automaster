@@ -1,8 +1,11 @@
+from typing import ClassVar
+
 import pytest
+
 from automaster_audit import mcp_server as srv
-from automaster_audit.mcp_server import ToolError
 from automaster_audit.mcp import base as mcp_base
 from automaster_audit.mcp import tags as mcp_tags
+from automaster_audit.mcp_server import ToolError
 
 
 @pytest.fixture
@@ -147,4 +150,4 @@ def test_contrato_das_tools_de_tag():
 
 class _CtxFalso:
     path = "/tmp/dump-falso"
-    workflows: list = []
+    workflows: ClassVar[list] = []

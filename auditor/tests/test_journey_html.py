@@ -1,10 +1,11 @@
 import re
 
+from conftest import wf
+from test_journey import step, trig
+
 from automaster_audit.journey import build_journey
 from automaster_audit.journey_html import write_journey_html
 from automaster_audit.loader import load_dump
-from conftest import wf
-from test_journey import step, trig
 
 
 def test_journey_html_selfcontained_and_xss_safe(make_dump, tmp_path):
