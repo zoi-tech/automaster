@@ -10,6 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import { DUMPS_DIR, latestDumpDir, latestDumpEntity, withClient } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 /** id → nome dos workflows do dump mais recente da subconta (melhor esforço). */
 function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
@@ -99,7 +100,7 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
       const withNames = events.map((l) =>
         l.sourceId && wfNames.has(String(l.sourceId)) ? { ...l, sourceWorkflowName: wfNames.get(String(l.sourceId)) } : l,
       );
-      process.stdout.write(JSON.stringify({ locationId, id: opts.id, days, events: withNames }) + "\n");
+      emitir(true, { locationId, id: opts.id, days, events: withNames });
       return;
     }
     const html = renderTimelineHtml(events, {
@@ -263,7 +264,7 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
     for (const a of avisos) console.error(`AVISO: ${a}`);
     const out = { locationId: loc, id, snapshot: snapPath, antes, depois, avisos,
       mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
-    if (opts.json) process.stdout.write(JSON.stringify(out) + "\n");
+    if (opts.json) emitir(true, out);
     else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);
   });
 }
@@ -286,5 +287,5 @@ export function registrarContato(program: Command): void {
     .option("--set <nome=valor>", "campo (nome, fieldKey ou id) = valor; repetível", (v: string, acc: string[]) => [...acc, v], [])
     .option("--tag <+nome|-nome>", "adiciona (+) ou remove (-) tag; repetível", (v: string, acc: string[]) => [...acc, v], [])
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runContatoEditar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runContatoEditar(o).catch(falhar));
 }

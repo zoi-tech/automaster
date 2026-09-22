@@ -10,6 +10,7 @@ import {
 } from "../api/workflows-live.js";
 import fs from "node:fs";
 import { withClient, registroEscrita, numeroOpcional } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 const WF_LEITURA = ["lista", "dentro", "contato"];
 
@@ -93,8 +94,7 @@ async function runWorkflowsAoVivo(opts: {
         break;
       }
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -211,7 +211,7 @@ async function runWorkflowAcao(opts: {
     }
 
     const out = saidaWorkflowAcao({ acao: opts.acao, workflowId: wid, resposta: r, registro, aviso });
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
@@ -227,7 +227,7 @@ export function registrarWorkflows(program: Command): void {
     .option("--limite <n>", `teto de inscritos trazidos (padrão ${WF_TETO_PADRAO})`)
     .option("--nomes", "resolve o nome de cada contato: uma chamada por contato, é lento em lista grande")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runWorkflowsAoVivo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runWorkflowsAoVivo(o).catch(falhar));
 
   program
     .command("workflow-acao")
@@ -242,5 +242,5 @@ export function registrarWorkflows(program: Command): void {
     .option("--inicio <iso>", "início programado da execução (inscrever), ISO com fuso")
     .option("--confirmo", "obrigatório: muda dado real e não tem desfazer")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runWorkflowAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runWorkflowAcao(o).catch(falhar));
 }

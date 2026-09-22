@@ -6,6 +6,7 @@ import {
 } from "../api/annotations.js";
 import { listarTags, criarTag, renomearTag, apagarTag, acharTag } from "../api/tags.js";
 import { withClient, registroEscrita } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 const ANOTACAO_LEITURA = ["lista", "detalhe", "buscar"] as const;
 
@@ -51,7 +52,7 @@ async function runAnotacoes(o: OptsAnotacoes): Promise<void> {
       });
     }
     const r = { op, tipo, contato: o.contato ?? null, resultado: saida };
-    console.log(o.json ? JSON.stringify(r) : JSON.stringify(r, null, 2));
+    emitir(o.json, r);
   });
 }
 
@@ -103,7 +104,7 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
       previa: true, aplicado: false, acao: o.acao, tipo, contato: o.contato, id: o.id ?? null,
       corpo, aviso: "nada foi gravado. Repita com --confirmo para gravar.",
     };
-    console.log(o.json ? JSON.stringify(previa) : JSON.stringify(previa, null, 2));
+    emitir(o.json, previa);
     return;
   }
 
@@ -122,7 +123,7 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
       aplicado: true, acao: o.acao, tipo, contato: o.contato, id: o.id ?? null,
       resposta, apagou: o.acao === "apagar" ? deuCerto(resposta) : undefined, registro,
     };
-    console.log(o.json ? JSON.stringify(r) : JSON.stringify(r, null, 2));
+    emitir(o.json, r);
   });
 }
 
@@ -137,7 +138,7 @@ async function runTags(o: { location: string; termo?: string; json?: boolean }):
       tags = tags.filter((t) => t.name.toLowerCase().includes(alvo));
     }
     const saida = { total: tags.length, tags };
-    console.log(o.json ? JSON.stringify(saida) : JSON.stringify(saida, null, 2));
+    emitir(o.json, saida);
   });
 }
 
@@ -190,7 +191,7 @@ async function runTagAcao(o: OptsTagAcao): Promise<void> {
           "GHL não expõe contagem de contatos por tag. Pode disparar os workflows com trigger " +
           "de tag removida — isso não tem prova, nem a favor nem contra.";
       }
-      console.log(o.json ? JSON.stringify(previa) : JSON.stringify(previa, null, 2));
+      emitir(o.json, previa);
       return;
     }
 
@@ -203,7 +204,7 @@ async function runTagAcao(o: OptsTagAcao): Promise<void> {
       acao: o.acao, antes: alvo ?? null, nome: o.nome ?? null, resposta,
     });
     const feito = { aplicado: true, acao: o.acao, resposta, registro };
-    console.log(o.json ? JSON.stringify(feito) : JSON.stringify(feito, null, 2));
+    emitir(o.json, feito);
   });
 }
 
@@ -221,7 +222,7 @@ export function registrarAnotacoes(program: Command): void {
     .option("--termo <texto>", "busca no texto das tarefas (-o buscar)")
     .option("--limite <n>", "quantas tarefas trazer; o servidor usa 25 por padrão")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runAnotacoes(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runAnotacoes(o).catch(falhar));
 
   program
     .command("anotacao-acao")
@@ -237,7 +238,7 @@ export function registrarAnotacoes(program: Command): void {
     .option("--dono <userId>", "responsável pela tarefa")
     .option("--confirmo", "obrigatório: grava de verdade. Sem ele, só mostra a prévia")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runAnotacaoAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runAnotacaoAcao(o).catch(falhar));
 
   program
     .command("tags")
@@ -245,7 +246,7 @@ export function registrarAnotacoes(program: Command): void {
     .requiredOption("-l, --location <id>", "locationId da subconta")
     .option("--termo <texto>", "filtra as tags por parte do nome")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runTags(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runTags(o).catch(falhar));
 
   program
     .command("tag-acao")
@@ -256,5 +257,5 @@ export function registrarAnotacoes(program: Command): void {
     .option("--nome <texto>", "nome novo (criar, renomear)")
     .option("--confirmo", "obrigatório: grava de verdade. Sem ele, só mostra a prévia")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runTagAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runTagAcao(o).catch(falhar));
 }

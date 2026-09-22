@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { emitir, falhar } from "../saida.js";
 import fs from "node:fs";
 import { withClient, registroEscrita } from "./shared.js";
 import { decodeUserId } from "../auth/token.js";
@@ -435,7 +436,7 @@ const exigeConfirmo = (acao: string) =>
 const semSegredo = (o: Opts) => ({ ...o, json: undefined, confirmo: undefined });
 
 function imprimir(saida: Record<string, unknown>, o: Opts, log: (m: string) => void): void {
-  if (o.json) console.log(JSON.stringify(saida));
+  if (o.json) emitir(true, saida);
   else {
     let status: string;
     if (saida.aplicado === true) {
@@ -477,8 +478,5 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")
     .option("--publicado", "obrigatório junto de --confirmo quando o workflow está publicado")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runWorkflowEditar(o).catch((e) => {
-      console.error(e instanceof Error ? e.message : e);
-      process.exit(1);
-    }));
+    .action((o) => runWorkflowEditar(o).catch(falhar));
 }

@@ -4,6 +4,26 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.22.0 — trava do Chrome e envelope JSON da CLI
+
+Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. Os dois primeiros itens de
+`docs/backlog-arquitetura.md`, que é o resto da lista.
+
+- **Trava do perfil do Chrome** (`extractor/src/auth/lock.ts`): `~/.automaster/chrome.lock`
+  com o PID de quem está segurando. Dois comandos de escrita ao vivo em paralelo já
+  geraram, na 0.12.0, uma exclusão que ninguém pediu; a serialização era convenção
+  escrita na documentação e agora é erro na hora, com o PID no texto. Lock de processo
+  morto é roubado (`process.kill(pid, 0)` só pergunta se o PID existe).
+- **Envelope JSON** (`extractor/src/saida.ts`): com `--json` toda saída da CLI vira uma
+  linha `{ok, data}` ou `{ok:false, error:{code, message}}`, mais `escrita:{tentada,
+  rastros}` quando um PUT/POST/DELETE chegou a sair. Sem `--json` nada muda.
+- **O lado Python parou de adivinhar.** `mcp/base.py` lia o objeto solto do comando e,
+  quando dava errado, deduzia o tipo do erro pelo prefixo do nome do comando e a escrita
+  parcial de `--confirmo` estar nos argumentos — o que acusava produção alterada até numa
+  prévia recusada, que não grava nada. Agora lê `code` e `escrita.tentada`, e cita o
+  arquivo do estado anterior. Sem envelope (processo morto antes de imprimir) vale o
+  palpite conservador de antes.
+
 ## 0.21.0 — consolidação: CI, smoke da API e dois monolitos quebrados
 
 Nenhuma tool nova, nenhuma regra nova: seguem 35 e 18. O que muda é a sustentação.

@@ -799,3 +799,34 @@ def test_formularios_passa_filtros_ao_extractor(root, monkeypatch):
     assert "--formulario" in visto["args"] and "S1" in visto["args"]
     assert "--inicio" in visto["args"] and "2026-09-01" in visto["args"]
     assert "--limite" in visto["args"] and "5" in visto["args"]
+
+
+def _extractor(monkeypatch, tmp_path, stdout, returncode=0):
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True, exist_ok=True); tsx.write_text("")
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
+    monkeypatch.setattr(mcp_base.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr=""))
+
+
+def test_envelope_de_sucesso_e_desembrulhado(monkeypatch, tmp_path):
+    _extractor(monkeypatch, tmp_path, 'ruído em stdout\n{"ok": true, "data": {"n": 3}}')
+    assert srv._run_extractor("tags", "-l", "L1") == {"n": 3}
+
+
+def test_envelope_de_erro_traz_code_e_so_avisa_de_escrita_que_saiu(monkeypatch, tmp_path):
+    _extractor(monkeypatch, tmp_path,
+               '{"ok": false, "error": {"code": "http_422", "message": "position obrigatório"},'
+               ' "escrita": {"tentada": true, "rastros": ["/r/antes.json"]}}', returncode=1)
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("workflow-editar", "--confirmo")
+    assert "http_422" in str(e.value) and "position obrigatório" in str(e.value)
+    assert "parcialmente aplicada" in str(e.value) and "/r/antes.json" in str(e.value)
+
+
+def test_previa_recusada_nao_acusa_escrita_parcial(monkeypatch, tmp_path):
+    """Antes do envelope, `--confirmo` nos argumentos bastava para acusar — e prévia não grava."""
+    _extractor(monkeypatch, tmp_path, '{"ok": false, "error": {"message": "prévia recusada"}}', returncode=1)
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("workflow-editar", "--confirmo")
+    assert "parcialmente aplicada" not in str(e.value)

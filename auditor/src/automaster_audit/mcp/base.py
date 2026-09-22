@@ -125,21 +125,46 @@ def _run_extractor(*args: str) -> dict:
             f"snapshot): {dica_estado} "
             + _head_tail(e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace"))
         ) from e
-    if r.returncode != 0 or not r.stdout.strip():
-        # A dica de rastro só faz sentido quando havia escrita para ser aplicada. Numa prévia
-        # recusada ela dizia que produção podia ter mudado, e não podia. `contato-editar` é a
-        # exceção: grava direto, não tem prévia.
-        gravava = "--confirmo" in args or args[0] == "contato-editar"
-        dica = "" if not gravava else (
-               " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `formularios`, o=detalhe."
-                if args[0].startswith("formulario-") else
-                " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool "
-                "`workflows_ao_vivo`, ou `workflow_editar` com acao='historico'."
-                if args[0].startswith("workflow") else
-                " A escrita pode ter sido parcialmente aplicada: confira o estado atual com a tool `contato`."
-                if args[0] == "contato-editar" else "")
-        raise ToolError(f"{args[0]} falhou (código {r.returncode}): {_head_tail(r.stderr)}{dica}")
-    return json.loads(r.stdout.strip().splitlines()[-1])
+    saida = _envelope(r.stdout)
+    if r.returncode != 0 or saida is None or saida.get("ok") is False:
+        erro = (saida or {}).get("error", {})
+        raise ToolError(f"{args[0]} falhou ({erro.get('code') or f'código {r.returncode}'}): "
+                        f"{erro.get('message') or _head_tail(r.stderr)}{_dica_escrita(args, saida)}")
+    return saida.get("data", saida)
+
+
+def _envelope(stdout: str) -> dict | None:
+    """Última linha do stdout, que a CLI emite como `{ok, data}` (src/saida.ts)."""
+    linhas = stdout.strip().splitlines()
+    if not linhas:
+        return None
+    try:
+        return json.loads(linhas[-1])
+    except json.JSONDecodeError:
+        return None
+
+
+def _dica_escrita(args: tuple[str, ...], saida: dict | None) -> str:
+    """Avisa de escrita parcial quando a CLI diz que um PUT/POST/DELETE chegou a sair.
+
+    Com envelope a resposta é exata (`escrita.tentada`), e uma prévia recusada — que não
+    grava nada — deixa de ser acusada, como era quando isto se adivinhava de `--confirmo`
+    estar nos argumentos. SEM envelope o processo morreu antes de imprimir, e aí não dá
+    para saber: vale o palpite conservador de antes.
+    """
+    escrita = (saida or {}).get("escrita", {})
+    if saida is not None and not escrita.get("tentada"):
+        return ""
+    if saida is None and not ("--confirmo" in args or args[0] == "contato-editar"):
+        return ""
+    confira = ("`formularios`, o=detalhe" if args[0].startswith("formulario-") else
+               "`workflows_ao_vivo`, ou `workflow_editar` com acao='historico'"
+               if args[0].startswith("workflow") else "`contato`")
+    rastros = escrita.get("rastros") or []
+    extra = f" O estado anterior está em {rastros[0]}." if rastros else ""
+    return (f" A escrita pode ter sido parcialmente aplicada: confira o estado atual "
+            f"com a tool {confira}.{extra}")
+
 
 def _run_timeline(loc: str, id: str, days: int) -> dict:
     return _run_extractor("timeline", "-l", loc, "-i", id, "-d", str(days), "--json")

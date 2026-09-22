@@ -16,6 +16,7 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import { sleep, withClient, registroEscrita, numeroOpcional } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 async function runFormularios(opts: {
   location: string; o: string; tipo: string; id?: string; formulario?: string;
@@ -63,8 +64,7 @@ async function runFormularios(opts: {
       default:
         throw new Error(`-o inválido: ${opts.o}. Aceitos: lista, detalhe, submissoes, buscar`);
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -148,7 +148,7 @@ async function runFormularioAcao(opts: {
         versionId: v.versionId, em: v.updatedAt, por: v.updatedByUser,
         documento: v.formDataDownloadUrl ?? v.surveyDataDownloadUrl,
       }));
-      if (opts.json) console.log(JSON.stringify({ versoes }));
+      if (opts.json) emitir(true, { versoes });
       else versoes.forEach((v: any) => log(`${v.em}  ${v.versionId}  ${v.por ?? ""}`));
       return;
     }
@@ -160,7 +160,7 @@ async function runFormularioAcao(opts: {
         permitirSemBotao: opts.permitirSemBotao, permitirVazio: opts.permitirVazio,
       });
       const previa = diferenca(doc, novo);
-      if (opts.json) console.log(JSON.stringify({ aplicado: false, previa }));
+      if (opts.json) emitir(true, { aplicado: false, previa });
       else {
         log(previa.length ? previa.join("\n") : "nada mudaria");
         log("\nnada foi gravado. Repita com --confirmo para publicar.");
@@ -274,7 +274,7 @@ async function runFormularioAcao(opts: {
       em: new Date().toISOString(), acao: opts.acao, tipo, ops, antes, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
@@ -320,7 +320,7 @@ async function runFormularioEstilo(opts: {
       const r = opts.acao === "temas"
         ? await temas(client, tipo, opts.location)
         : await paletaPadrao(client, opts.location);
-      if (opts.json) console.log(JSON.stringify({ resultado: r }));
+      if (opts.json) emitir(true, { resultado: r });
       else log(JSON.stringify(r, null, 2));
       return;
     }
@@ -351,7 +351,7 @@ async function runFormularioEstilo(opts: {
       } finally {
         await aba.close();
       }
-      if (opts.json) console.log(JSON.stringify({ url, arquivo: destino }));
+      if (opts.json) emitir(true, { url, arquivo: destino });
       else log(`${url}\n${destino}`);
       return;
     }
@@ -366,7 +366,7 @@ async function runFormularioEstilo(opts: {
       const novo = aplicar(doc, opsDeEstilo(doc, tokens!), { permitirSemBotao: true, permitirVazio: true });
       if (!opts.confirmo) {
         const previa = diferenca(doc, novo);
-        if (opts.json) console.log(JSON.stringify({ aplicado: false, previa }));
+        if (opts.json) emitir(true, { aplicado: false, previa });
         else { log(previa.length ? previa.join("\n") : "nada mudaria"); log("\nnada foi gravado. Repita com --confirmo."); }
         return;
       }
@@ -387,7 +387,7 @@ async function runFormularioEstilo(opts: {
         em: new Date().toISOString(), acao: "estilo", tipo, tokens, antes: doc, aplicado: true, resposta: r,
       }, null, 2));
       const out = { aplicado: true, acao: "estilo", resposta: r, registro };
-      if (opts.json) console.log(JSON.stringify(out));
+      if (opts.json) emitir(true, out);
       else log(`ok — estilo aplicado; registro em ${registro}`);
       return;
     }
@@ -426,7 +426,7 @@ async function runFormularioEstilo(opts: {
       em: new Date().toISOString(), acao: "paleta-gravar", tokens, antes, colors, aviso, aplicado: true, resposta: r,
     }, null, 2));
     const out = saidaPaletaGravar({ resposta: r, registro, aviso });
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — paleta gravada; registro em ${registro}`);
   });
 }
@@ -446,7 +446,7 @@ export function registrarFormularios(program: Command): void {
     .option("--limite <n>", "quantas submissões trazer, até 100")
     .option("--pagina <n>", "página das submissões, a partir de 1")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runFormularios(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runFormularios(o).catch(falhar));
 
   program
     .command("formulario-acao")
@@ -465,7 +465,7 @@ export function registrarFormularios(program: Command): void {
     .option("--permitir-vazio", "libera deixar o documento sem nenhum campo")
     .option("--confirmo", "obrigatório: publica de verdade. Sem ele, só mostra a prévia")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runFormularioAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runFormularioAcao(o).catch(falhar));
 
   program
     .command("formulario-estilo")
@@ -479,5 +479,5 @@ export function registrarFormularios(program: Command): void {
     .option("--saida <arquivo>", "previa-visual: caminho do PNG (padrão: temp)")
     .option("--confirmo", "obrigatório para gravar. Sem ele, só mostra a prévia (exceto paleta-gravar)")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runFormularioEstilo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runFormularioEstilo(o).catch(falhar));
 }

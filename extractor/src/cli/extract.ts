@@ -67,7 +67,7 @@ async function runExtract(opts: { location: string }): Promise<void> {
 }
 
 async function runDiscover(opts: { location: string; area: string; rota?: string; filtro?: string }): Promise<void> {
-  const { context, page } = await openSession();
+  const { context, page, soltar } = await openSession();
   const rota = opts.rota ?? (opts.area === "contatos" ? "contacts/smart_list/All" : "automation/workflows");
   console.log(
     `Modo discover: navegue manualmente pela aba ${opts.area} da subconta ${opts.location}.\n` +
@@ -96,6 +96,7 @@ async function runDiscover(opts: { location: string; area: string; rota?: string
   await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/${rota}`, { waitUntil: "domcontentloaded" });
   await page.waitForEvent("close", { timeout: 0 }).catch(() => {});
   await context.close();
+  soltar();
 }
 
 export function registrarExtract(program: Command): void {

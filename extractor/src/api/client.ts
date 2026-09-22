@@ -1,5 +1,6 @@
 import type { APIResponse, BrowserContext } from "playwright";
 import type { Tokens } from "../auth/token.js";
+import { marcarEscrita } from "../saida.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
@@ -37,6 +38,7 @@ export class GhlClient {
   /** Chamada autenticada com JSON. Trata 401 (refresh 1x) e 429 (backoff). */
   private async request<T>(method: "get" | "put" | "post" | "delete", url: string, body?: unknown): Promise<T> {
     await sleep(this.throttleMs);
+    if (method !== "get") marcarEscrita();
     let refreshed = false;
     for (let attempt = 0; ; attempt++) {
       const headers = body === undefined ? this.authHeaders() : { ...this.authHeaders(), "content-type": "application/json" };
@@ -70,6 +72,7 @@ export class GhlClient {
     url: string, form: FormData, extraHeaders: Record<string, string> = {},
   ): Promise<T> {
     await sleep(this.throttleMs);
+    marcarEscrita();
     let refreshed = false;
     for (let attempt = 0; ; attempt++) {
       const headers = { ...this.authHeaders(), ...extraHeaders };

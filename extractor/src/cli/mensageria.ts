@@ -13,6 +13,7 @@ import {
 } from "../api/group.js";
 import fs from "node:fs";
 import { withClient, registroEscrita } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 async function runWhatsapp(opts: {
   location: string; o: string; template?: string; json?: boolean;
@@ -28,8 +29,7 @@ async function runWhatsapp(opts: {
       case "flows": out = await waFlows(client, opts.location); break;
       default: throw new Error(`-o inválido: ${opts.o}. Aceitos: configurado, numeros, templates, aprovados, flows`);
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -69,7 +69,7 @@ async function runWhatsappEnviar(opts: {
     }
     fs.writeFileSync(registro, JSON.stringify({ em: new Date().toISOString(), enviado: true, resposta: r }, null, 2));
     const out = { enviado: true, contactId: opts.id, conversationId: r.conversationId ?? null, messageId: r.messageId ?? null, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — messageId ${out.messageId}; registro em ${registro}`);
   });
 }
@@ -106,8 +106,7 @@ async function runConfig(opts: {
         break;
       default: throw new Error(`-o inválido: ${opts.o}`);
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -147,8 +146,7 @@ async function runGrupo(opts: {
         break;
       default: throw new Error(`-o inválido: ${opts.o}`);
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -160,7 +158,7 @@ export function registrarMensageria(program: Command): void {
     .requiredOption("-o <op>", "configurado | numeros | templates | aprovados | flows")
     .option("--template <id>", "um template só (com -o templates)")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runWhatsapp(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runWhatsapp(o).catch(falhar));
 
   program
     .command("whatsapp-enviar")
@@ -179,7 +177,7 @@ export function registrarMensageria(program: Command): void {
     .option("--quando <iso>", "agenda o envio (ISO)")
     .option("--confirmo", "obrigatório: a mensagem sai para o contato")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runWhatsappEnviar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runWhatsappEnviar(o).catch(falhar));
 
   program
     .command("config")
@@ -190,7 +188,7 @@ export function registrarMensageria(program: Command): void {
     .option("--conversa <id>", "conversationId (sla-zerar)")
     .option("--confirmo", "obrigatório nas escritas")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConfig(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConfig(o).catch(falhar));
 
   program
     .command("grupo")
@@ -203,5 +201,5 @@ export function registrarMensageria(program: Command): void {
     .option("--desde <data>", "histórico visível: -1 tudo, 0 nada, YYYY-MM-DD a partir de")
     .option("--confirmo", "obrigatório em criar e mensagem")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runGrupo(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runGrupo(o).catch(falhar));
 }

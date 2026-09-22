@@ -9,6 +9,7 @@ import {
 import { stampNow } from "../dump/writer.js";
 import fs from "node:fs";
 import { DUMPS_DIR, withClient } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 async function runConversas(opts: {
   location: string; id: string; max: string; atividades?: boolean; tipo?: string;
@@ -19,7 +20,7 @@ async function runConversas(opts: {
     const convs = await searchConversations(client, opts.location, opts.id);
     if (!convs.length) {
       const vazio = { contactId: opts.id, conversas: [], mensagens: [], maisPaginas: false, proximo: null };
-      if (opts.json) console.log(JSON.stringify(vazio));
+      if (opts.json) emitir(true, vazio);
       else log("Nenhuma conversa para este contato.");
       return;
     }
@@ -73,7 +74,7 @@ async function runConversas(opts: {
       maisPaginas,
       proximo,
     };
-    if (opts.json) { console.log(JSON.stringify(payload)); return; }
+    if (opts.json) { emitir(true, payload); return; }
     for (const m of itens.slice().reverse()) {
       const quem = m.direcao === "inbound" ? "contato" : (m.origem ?? "saída");
       console.log(`${m.data}  ${m.tipo.padEnd(10)} ${quem.padEnd(9)} ${m.corpo.replace(/\s+/g, " ").slice(0, 120)}`);
@@ -131,7 +132,7 @@ async function runConversasAnexar(opts: {
     fs.writeFileSync(registro, JSON.stringify({ subidoEm: now.toISOString(), conversationId, arquivos, subido: true, resposta: r }, null, 2));
 
     const out = { subido: true, conversationId, contactId: opts.id, urls: r.urls, uploadedFiles: r.uploadedFiles, mediaSids: r.mediaSids, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else { log(`ok — ${r.urls.length} URL(s); registro em ${registro}`); r.urls.forEach((u) => log(u)); }
   });
 }
@@ -176,7 +177,7 @@ async function runConversasEnviar(opts: {
       registro,
       interno: tipo === "InternalComment",
     };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — messageId ${out.messageId}; registro em ${registro}`);
   });
 }
@@ -220,7 +221,7 @@ async function runConversasRascunho(opts: {
       if (!opts.rascunho) throw new Error("apagar exige --rascunho <id>");
       out = { apagado: await deleteDraft(client, opts.rascunho) };
     } else throw new Error(`--acao inválida: ${opts.acao}. Aceitas: criar, listar, apagar`);
-    console.log(JSON.stringify(out, opts.json ? undefined : null, opts.json ? undefined : 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -234,7 +235,7 @@ async function runConversasMensagem(opts: {
       : opts.acao === "reenviar"
         ? await resend(client, opts.location, opts.id, opts.email)
         : (() => { throw new Error(`--acao inválida: ${opts.acao}. Aceitas: cancelar, reenviar`); })();
-    console.log(JSON.stringify({ acao: opts.acao, id: opts.id, resposta: r }));
+    emitir(true, { acao: opts.acao, id: opts.id, resposta: r });
   });
 }
 
@@ -252,7 +253,7 @@ async function runConversasBuscar(opts: {
       tipo: c.matchedMessage?.type != null ? typeName(c.matchedMessage.type) : null,
       trecho: (c.matchedMessage?.body ?? "").slice(0, 200),
     }));
-    if (opts.json) console.log(JSON.stringify({ termo: opts.termo, n: itens.length, resultados: itens }));
+    if (opts.json) emitir(true, { termo: opts.termo, n: itens.length, resultados: itens });
     else for (const i of itens) console.log(`${i.contato ?? i.contactId}  ${i.tipo ?? "?"}  ${i.trecho.replace(/\s+/g, " ")}`);
   });
 }
@@ -271,7 +272,7 @@ export function registrarConversas(program: Command): void {
     .option("--email <emailMessageId>", "e-mail completo (id vem de emailMessageId, não do id da mensagem)")
     .option("--transcricao <messageId>", "transcrição de uma chamada")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversas(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversas(o).catch(falhar));
 
   program
     .command("conversas-enviar")
@@ -285,7 +286,7 @@ export function registrarConversas(program: Command): void {
     .option("--anexo <url>", "URL de anexo; repetível", (v: string, acc: string[]) => [...acc, v], [])
     .option("--quando <iso>", "agenda o envio (ISO); InternalComment não aceita")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasEnviar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasEnviar(o).catch(falhar));
 
   program
     .command("conversas-anexar")
@@ -297,7 +298,7 @@ export function registrarConversas(program: Command): void {
     .option("--grupo", "anexo de group chat (isGroupSms)")
     .option("--v4", "manda o header version: v4")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasAnexar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasAnexar(o).catch(falhar));
 
   program
     .command("conversas-marcar")
@@ -307,7 +308,7 @@ export function registrarConversas(program: Command): void {
     .requiredOption("--acao <acao>", "lida | nao-lida | estrela | sem-estrela | apagar")
     .option("--confirmo", "obrigatório em apagar")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasMarcar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasMarcar(o).catch(falhar));
 
   program
     .command("conversas-rascunho")
@@ -319,7 +320,7 @@ export function registrarConversas(program: Command): void {
     .option("--canal <canal>", "sms | email", "sms")
     .option("--rascunho <id>", "id do rascunho (apagar)")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasRascunho(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasRascunho(o).catch(falhar));
 
   program
     .command("conversas-mensagem")
@@ -329,7 +330,7 @@ export function registrarConversas(program: Command): void {
     .requiredOption("--id <messageId>", "id da mensagem (ou emailMessageId com --email)")
     .option("--email", "trata o id como e-mail")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasMensagem(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasMensagem(o).catch(falhar));
 
   program
     .command("conversas-buscar")
@@ -338,5 +339,5 @@ export function registrarConversas(program: Command): void {
     .requiredOption("--termo <txt>", "texto a procurar")
     .option("--max <n>", "máximo de conversas", "20")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runConversasBuscar(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runConversasBuscar(o).catch(falhar));
 }

@@ -7,6 +7,7 @@ import {
 } from "../api/opportunities.js";
 import fs from "node:fs";
 import { withClient, registroEscrita, numeroOpcional } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 const OPP_ACOES = ["criar", "editar", "mover", "status", "apagar", "restaurar"];
 
@@ -44,8 +45,7 @@ async function runOportunidades(opts: {
           `-o inválido: ${opts.o}. Aceitos: pipelines, listar, buscar, ver`,
         );
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -125,7 +125,7 @@ async function runOportunidadeAcao(opts: {
       em: new Date().toISOString(), acao: opts.acao, corpo, antes, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
@@ -204,7 +204,7 @@ async function runPipeline(opts: {
       em: new Date().toISOString(), acao: opts.acao, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
@@ -224,7 +224,7 @@ export function registrarOportunidades(program: Command): void {
     .option("--limite <n>", "quantos cards trazer")
     .option("--pagina <n>", "página da listagem, a partir de 1")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runOportunidades(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runOportunidades(o).catch(falhar));
 
   program
     .command("oportunidade-acao")
@@ -244,7 +244,7 @@ export function registrarOportunidades(program: Command): void {
     .option("--campos <json>", 'campos personalizados: [{"id":"...","fieldValue":"..."}]')
     .option("--confirmo", "obrigatório: muda dado real e não tem desfazer")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runOportunidadeAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runOportunidadeAcao(o).catch(falhar));
 
   program
     .command("pipeline")
@@ -257,5 +257,5 @@ export function registrarOportunidades(program: Command): void {
     .option("--apagar-com-cards", "libera remover estágio com card dentro; os cards migram para outro estágio")
     .option("--confirmo", "obrigatório: muda a estrutura do funil e não tem desfazer")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runPipeline(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runPipeline(o).catch(falhar));
 }

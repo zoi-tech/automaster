@@ -1,7 +1,7 @@
 {
   "name": "automaster",
   "description": "Backup, auditoria e edição de automações GoHighLevel: 35 tools MCP sobre o dump offline e sobre a subconta ao vivo (contato, conversas, WhatsApp, oportunidades, pipelines, agenda, formulários e surveys, workflows ao vivo, templates de e-mail, notas e tarefas do contato, tags da subconta), /automaster-extract e /automaster-audit",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "author": {
     "name": "ZOI"
   },

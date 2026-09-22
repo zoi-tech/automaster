@@ -5,6 +5,7 @@ import { openSession } from "../auth/session.js";
 import { captureTokens, type Tokens } from "../auth/token.js";
 import { GhlClient } from "../api/client.js";
 import { stampNow } from "../dump/writer.js";
+import { marcarRastro } from "../saida.js";
 
 export const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
 
@@ -40,7 +41,7 @@ export async function withClient(
   // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
   fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
 ): Promise<void> {
-  const { context, page } = await openSession();
+  const { context, page, soltar } = await openSession();
   try {
     log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
     let tokens = await captureTokens(page, locationId);
@@ -53,6 +54,7 @@ export async function withClient(
     await fn(new GhlClient(context, tokens, refresh), page, tokens);
   } finally {
     await context.close();
+    soltar();
   }
 }
 
@@ -63,6 +65,7 @@ export function registroEscrita(loc: string, pasta: string, chave: string, dados
   const now = new Date();
   const registro = path.join(dir, `${stampNow(now)}${now.getSeconds().toString().padStart(2, "0")}.json`);
   fs.writeFileSync(registro, JSON.stringify({ em: now.toISOString(), ...(dados as object) }, null, 2));
+  marcarRastro(registro);
   return registro;
 }
 

@@ -6,6 +6,7 @@ import {
 } from "../api/calendars.js";
 import fs from "node:fs";
 import { withClient, registroEscrita } from "./shared.js";
+import { emitir, falhar } from "../saida.js";
 
 const AGENDA_LEITURA = ["calendarios", "calendario", "livres", "eventos", "bloqueios", "ver", "notas"];
 
@@ -102,8 +103,7 @@ async function runAgenda(opts: {
         break;
       }
     }
-    if (opts.json) console.log(JSON.stringify(out));
-    else console.log(JSON.stringify(out, null, 2));
+    emitir(opts.json, out);
   });
 }
 
@@ -315,7 +315,7 @@ async function runAgendaAcao(opts: {
       corpo: bloqueio ? corpoBloqueio : corpo, antes, aplicado: true, resposta: r,
     }, null, 2));
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
-    if (opts.json) console.log(JSON.stringify(out));
+    if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
   });
 }
@@ -337,7 +337,7 @@ export function registrarAgenda(program: Command): void {
     .option("--limite <n>", "quantas notas trazer, até 20")
     .option("--pagina <n>", "página das notas, a partir de 1")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runAgenda(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runAgenda(o).catch(falhar));
 
   program
     .command("agenda-acao")
@@ -362,5 +362,5 @@ export function registrarAgenda(program: Command): void {
     .option("--forcar", "marca fora da disponibilidade, sem checar horário livre")
     .option("--confirmo", "obrigatório: fala com o cliente e não tem desfazer")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runAgendaAcao(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runAgendaAcao(o).catch(falhar));
 }

@@ -19,6 +19,7 @@ import { fetchTemplates as waTemplates } from "../api/whatsapp.js";
 import { fetchSlaSettings } from "../api/settings.js";
 import { getContact } from "../api/contacts.js";
 import { fetchAuditLogs } from "../api/audit.js";
+import { emitir, falhar } from "../saida.js";
 
 // --------------------------------------------------------------- conferidores
 
@@ -239,7 +240,7 @@ async function runSmoke(o: { location: string; contato?: string; json?: boolean 
     rs = await executar(client, ctx, CHECAGENS, log);
   });
   const r = resumo(rs);
-  if (o.json) console.log(JSON.stringify({ checagens: rs, resumo: r }));
+  if (o.json) emitir(true, { checagens: rs, resumo: r });
   else console.log(`\n${r.ok} ok, ${r.falhou} falhou, ${r.pulado} pulado`);
   if (r.falhou > 0) process.exit(1);
 }
@@ -251,5 +252,5 @@ export function registrarSmoke(program: Command): void {
     .requiredOption("-l, --location <id>", "locationId da subconta")
     .option("--contato <id>", "id de um contato; sem ele as rotas por contato saem como pulado")
     .option("--json", "imprime o resultado em JSON no stdout")
-    .action((o) => runSmoke(o).catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); }));
+    .action((o) => runSmoke(o).catch(falhar));
 }
