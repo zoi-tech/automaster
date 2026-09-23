@@ -4,6 +4,7 @@
  */
 import type { Step, Documento } from "./tipos.js";
 import { porId, igual } from "./tipos.js";
+import { CONFIG_CAMPOS } from "./documento.js";
 
 export interface DiffWorkflow {
   nome?: { antes?: string; depois?: string };
@@ -13,6 +14,8 @@ export interface DiffWorkflow {
   triggersAdicionados: { id: string; nome?: string }[];
   triggersRemovidos: { id: string; nome?: string }[];
   triggersAlterados: { id: string; nome?: string }[];
+  /** Chaves de CONFIG_CAMPOS que mudaram; ausente quando nenhuma mudou. */
+  configuracao?: Record<string, { antes: unknown; depois: unknown }>;
   vazio: boolean;
 }
 
@@ -56,12 +59,16 @@ export function diffWorkflow(antes: Documento, depois: Documento): DiffWorkflow 
     .map(rotuloTrigger);
 
   const nome = antes.name === depois.name ? undefined : { antes: antes.name, depois: depois.name };
+  const mudouConfig = CONFIG_CAMPOS.filter((c) => !igual(antes[c], depois[c]));
+  const configuracao = mudouConfig.length
+    ? Object.fromEntries(mudouConfig.map((c) => [c, { antes: antes[c], depois: depois[c] }]))
+    : undefined;
   const vazio =
-    !nome && !stepsAdicionados.length && !stepsRemovidos.length && !stepsAlterados.length &&
+    !nome && !configuracao && !stepsAdicionados.length && !stepsRemovidos.length && !stepsAlterados.length &&
     !triggersAdicionados.length && !triggersRemovidos.length && !triggersAlterados.length;
   return {
     nome, stepsAdicionados, stepsRemovidos, stepsAlterados,
-    triggersAdicionados, triggersRemovidos, triggersAlterados, vazio,
+    triggersAdicionados, triggersRemovidos, triggersAlterados, configuracao, vazio,
   };
 }
 

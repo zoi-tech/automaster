@@ -4,6 +4,7 @@ import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
   criarStep, removerStep, moverStep, conferirTriggersEsperados,
+  configurarWorkflow, CONFIG_CAMPOS, conferirEscrita,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -433,4 +434,35 @@ test("container if_else leva o nome do step para attributes.conditionName", () =
     undefined, [{ name: "a" }, { name: "b" }]);
   const c2 = r2.doc.workflowData.templates.find((s: any) => s.nodeType === "condition-node") as any;
   assert.equal(c2.attributes.conditionName, "Escolhido");
+});
+
+test("configurarWorkflow liga a reentrada sem mexer em step", () => {
+  const d = { ...doc([{ id: "s1", type: "sms" }]), allowMultiple: false } as Documento;
+  const r = configurarWorkflow(d, "allowMultiple", true);
+  assert.equal(r.doc.allowMultiple, true);
+  assert.deepEqual(r.mudancas, ["allowMultiple: false → true"]);
+  assert.equal(d.allowMultiple, false, "não muta o original");
+  assert.deepEqual(r.doc.workflowData, d.workflowData);
+});
+
+test("configurarWorkflow com o valor atual não muda nada", () => {
+  const d = { ...doc([{ id: "s1", type: "sms" }]), allowMultiple: true } as Documento;
+  assert.deepEqual(configurarWorkflow(d, "allowMultiple", true).mudancas, []);
+});
+
+test("configurarWorkflow recusa chave fora da lista e valor não booleano", () => {
+  const d = doc([{ id: "s1", type: "sms" }]);
+  assert.throws(() => configurarWorkflow(d, "stopOnResponse", true), /allowMultiple/);
+  assert.throws(() => configurarWorkflow(d, "allowMultiple", "sim"), /true ou false/);
+  assert.deepEqual([...CONFIG_CAMPOS], ["allowMultiple"]);
+});
+
+test("diffWorkflow enxerga configuração e a conferência pega save que não pegou", () => {
+  const antes = { ...doc([{ id: "s1", type: "sms" }]), allowMultiple: false } as Documento;
+  const pedido = configurarWorkflow(antes, "allowMultiple", true).doc;
+  const diff = diffWorkflow(antes, pedido);
+  assert.deepEqual(diff.configuracao, { allowMultiple: { antes: false, depois: true } });
+  assert.equal(diff.vazio, false);
+  assert.equal(conferirEscrita(pedido, antes).ok, false, "relido sem a mudança é duvidoso");
+  assert.equal(conferirEscrita(pedido, pedido).ok, true);
 });
