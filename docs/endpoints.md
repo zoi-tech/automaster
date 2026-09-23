@@ -180,6 +180,16 @@ releitura devolve — provado ao vivo na Cliente A em 2026-09-22 (workflow
 (`stopOnResponse`, `autoMarkAsRead`, `allowMultipleOpportunity`, `removeContactFromLastStep`)
 não foram exercitadas.
 
+Prova ao vivo da 0.26.0 (Cliente A, 2026-09-22, só prévias, nada gravado), no mesmo
+workflow, que não está no dump `2026-09-22_2104`:
+
+- `--acao configuracao --campo allowMultiple --valor true` devolveu `aplicado: false`, "nada a
+  mudar" — a reentrada já estava ligada.
+- `--acao trocar-tag --de transferir-luana --para transferir-luana-x` rodou as 18 regras com
+  entidades ao vivo e recusou: `pode_gravar: false`, `broken_tag_ref` citando
+  `transferir-luana-x`, aviso "workflow mais novo que o dump, validado a partir do documento
+  ao vivo". Antes da 0.26.0 esse workflow passava sem validação.
+
 | O que | Rota | Corpo | Ao vivo |
 |---|---|---|---|
 | Ler o documento (steps completos) | `GET .../workflow/<loc>/<wid>` | — | ✓ |
