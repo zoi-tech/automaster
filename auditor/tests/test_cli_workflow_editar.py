@@ -61,6 +61,7 @@ def test_repassa_todos_os_parametros(monkeypatch, capsys):
         "step": None,
         "caminho": None,
         "valor": None,
+        "campo": None,
         "trigger_acao": None,
         "trigger_id": None,
         "trigger_corpo": None,
@@ -156,3 +157,26 @@ def test_subcomando_nao_e_confundido_com_pasta_de_dump(monkeypatch, capsys, tmp_
     )
     assert codigo == 0
     assert vistos["acao"] == "historico"
+
+
+def test_configuracao_chega_na_tool(monkeypatch, capsys):
+    codigo, vistos, _ = _rodar(
+        monkeypatch,
+        capsys,
+        [
+            "workflow-editar",
+            "-l",
+            "L1",
+            "--acao",
+            "configuracao",
+            "-i",
+            "W1",
+            "--campo",
+            "allowMultiple",
+            "--valor",
+            "true",
+        ],
+        resposta={"aplicado": True},
+    )
+    assert codigo == 0
+    assert vistos["campo"] == "allowMultiple" and vistos["valor"] == "true"

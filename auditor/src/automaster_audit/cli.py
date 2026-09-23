@@ -201,6 +201,7 @@ def run_workflow_editar(args: argparse.Namespace) -> int:
         "step",
         "caminho",
         "valor",
+        "campo",
         "trigger_acao",
         "trigger_id",
         "trigger_corpo",
@@ -301,7 +302,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_we.add_argument("--para", help="id ou tag de destino (trocar-ref/trocar-tag)")
     p_we.add_argument("--step", help="id do step (atributo, step-remover, step-mover)")
     p_we.add_argument("--caminho", help="caminho do campo dentro do step (atributo)")
-    p_we.add_argument("--valor", help="valor novo do campo (atributo)")
+    p_we.add_argument("--valor", help="valor novo do campo (atributo; configuracao: valor da configuração geral)")
+    p_we.add_argument("--campo", help="configuração geral do workflow (configuracao): allowMultiple")
     p_we.add_argument(
         "--trigger-acao", choices=("adicionar", "remover", "substituir"), help="operação de trigger (acao=trigger)"
     )
