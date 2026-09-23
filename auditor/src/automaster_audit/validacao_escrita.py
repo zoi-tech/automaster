@@ -58,6 +58,8 @@ def validar_edicao(
     workflow_id: str,
     doc_editado: dict,
     triggers: list | None = None,
+    doc_antes: dict | None = None,
+    triggers_antes: list | None = None,
 ) -> ResultadoValidacao:
     """Valida o documento editado; `triggers` é a lista AUTORITATIVA do workflow.
 
@@ -68,10 +70,32 @@ def validar_edicao(
     triggers do dump (o save de corpo não os altera — provado ao vivo) e marca
     `triggers_do_dump`; ela nunca finge que a lista é vazia, senão todo ERROR de
     trigger sairia como "resolvido".
+
+    `doc_antes`/`triggers_antes` cobrem o workflow mais novo que o dump (criado ou
+    duplicado depois da extração): sem eles, workflow fora do dump é `ValueError`;
+    com eles, o workflow entra no contexto montado a partir do documento lido ao vivo.
     """
     alvo = next((w for w in ctx.workflows if w.id == workflow_id), None)
     if alvo is None:
-        raise ValueError(f"workflow {workflow_id} não está neste dump — extraia a subconta de novo")
+        if doc_antes is None:
+            raise ValueError(f"workflow {workflow_id} não está neste dump — extraia a subconta de novo")
+        # Workflow mais novo que o dump (criado ou duplicado depois da extração): entra no
+        # contexto montado do documento lido ao vivo. É a montagem do zero, o caso em que
+        # mais cabe erro, e até aqui era o único sem guarda.
+        alvo = Workflow(
+            id=workflow_id,
+            name=doc_antes.get("name", ""),
+            status=doc_antes.get("status", ""),
+            raw={
+                "detail": doc_antes,
+                "steps": {"templates": (doc_antes.get("workflowData") or {}).get("templates") or []},
+                "triggers": triggers_antes if triggers_antes is not None else (triggers or []),
+            },
+        )
+        ctx = copy.copy(ctx)
+        ctx.workflows = [*ctx.workflows, alvo]
+        ctx.workflow_ids = ctx.workflow_ids | {workflow_id}
+        ctx.workflow_names = {**ctx.workflow_names, workflow_id: alvo.name}
 
     antes = _chaves_erro(ctx, workflow_id)
 
