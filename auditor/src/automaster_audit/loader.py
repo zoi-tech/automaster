@@ -18,6 +18,7 @@ As actions de cada workflow vivem em raw.steps.templates (baixadas do Firebase).
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from dataclasses import dataclass, field
@@ -145,51 +146,98 @@ def load_dump(path: Path) -> DumpContext:
     ctx.workflow_names = {w.id: w.name for w in workflows}
 
     # entidades (envelope {raw: <resposta API>})
-    pipelines = _entity_raw(path / "pipelines.json").get("pipelines", [])
-    for p in pipelines:
-        ctx.pipeline_ids.add(p.get("id"))
-        if p.get("id"):
-            ctx.pipeline_names[p["id"]] = p.get("name", p["id"])
-        for s in p.get("stages", []):
-            ctx.stage_ids.add(s.get("id"))
-            if s.get("id"):
-                ctx.stage_names[s["id"]] = s.get("name", s["id"])
-
-    tags = _entity_raw(path / "tags.json").get("tags", [])
-    ctx.tag_names = {t.get("name", "").strip().lower() for t in tags if t.get("name")}
-
-    fields = _entity_raw(path / "custom_fields.json").get("customFields", [])
-    for f in fields:
-        fid = f.get("id") or f.get("_id")
-        if fid:
-            ctx.field_ids.add(fid)
-            ctx.field_names[fid] = f.get("name", fid)
+    _aplicar_pipelines(ctx, _entity_raw(path / "pipelines.json"))
+    _aplicar_tags(ctx, _entity_raw(path / "tags.json"))
+    _aplicar_fields(ctx, _entity_raw(path / "custom_fields.json"))
 
     # entidades opcionais (ausentes em dumps anteriores ao schema com users/etc)
-    users = _entity_raw_optional(path / "users.json").get("users", [])
-    ctx.users = users
-    for u in users:
-        uid = u.get("id") or u.get("_id")
-        if uid:
-            ctx.user_ids.add(uid)
-            ctx.user_names[uid] = u.get("name") or f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or uid
-            if u.get("deleted"):
-                ctx.user_deleted.add(uid)
-
+    _aplicar_users(ctx, _entity_raw_optional(path / "users.json"))
     ctx.calendars = _entity_raw_optional(path / "calendars.json").get("calendars", [])
-
-    cvs = _entity_raw_optional(path / "custom_values.json").get("customValues", [])
-    ctx.custom_values = cvs
-    for cv in cvs:
-        for key in _cv_keys(cv):
-            ctx.cv_keys.add(key)
+    _aplicar_custom_values(ctx, _entity_raw_optional(path / "custom_values.json"))
 
     _load_templates(ctx, path)
     _load_forms(ctx, path)
 
-    ctx.pipeline_ids.discard(None)
-    ctx.stage_ids.discard(None)
     return ctx
+
+
+def _aplicar_pipelines(ctx: DumpContext, raw: dict) -> None:
+    ids, stages, nomes, nomes_stage = set(), set(), {}, {}
+    for p in raw.get("pipelines", []):
+        if p.get("id"):
+            ids.add(p["id"])
+            nomes[p["id"]] = p.get("name", p["id"])
+        for s in p.get("stages", []):
+            if s.get("id"):
+                stages.add(s["id"])
+                nomes_stage[s["id"]] = s.get("name", s["id"])
+    ctx.pipeline_ids, ctx.stage_ids, ctx.pipeline_names, ctx.stage_names = ids, stages, nomes, nomes_stage
+
+
+def _aplicar_tags(ctx: DumpContext, raw: dict) -> None:
+    ctx.tag_names = {t.get("name", "").strip().lower() for t in raw.get("tags", []) if t.get("name")}
+
+
+def _aplicar_fields(ctx: DumpContext, raw: dict) -> None:
+    ids, nomes = set(), {}
+    for f in raw.get("customFields", []):
+        fid = f.get("id") or f.get("_id")
+        if fid:
+            ids.add(fid)
+            nomes[fid] = f.get("name", fid)
+    ctx.field_ids, ctx.field_names = ids, nomes
+
+
+def _aplicar_users(ctx: DumpContext, raw: dict) -> None:
+    users = raw.get("users", [])
+    ids, nomes, apagados = set(), {}, set()
+    for u in users:
+        uid = u.get("id") or u.get("_id")
+        if uid:
+            ids.add(uid)
+            nomes[uid] = u.get("name") or f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or uid
+            if u.get("deleted"):
+                apagados.add(uid)
+    ctx.users, ctx.user_ids, ctx.user_names, ctx.user_deleted = users, ids, nomes, apagados
+
+
+def _aplicar_custom_values(ctx: DumpContext, raw: dict) -> None:
+    cvs = raw.get("customValues", [])
+    ctx.custom_values = cvs
+    ctx.cv_keys = {k for cv in cvs for k in _cv_keys(cv)}
+
+
+def _aplicar_lista_workflows(ctx: DumpContext, lista: list) -> None:
+    """Lista ao vivo (`ListEntry[]`): só ids e nomes. O corpo de cada workflow continua do dump."""
+    ids = {w.get("_id") or w.get("id") for w in lista} - {None}
+    ctx.workflow_ids = ids | {w.id for w in ctx.workflows}
+    ctx.workflow_names = {
+        **ctx.workflow_names,
+        **{(w.get("_id") or w.get("id")): w.get("name", "") for w in lista if (w.get("_id") or w.get("id"))},
+    }
+
+
+_SOBREPOSICAO = {
+    "pipelines": _aplicar_pipelines,
+    "tags": _aplicar_tags,
+    "custom_fields": _aplicar_fields,
+    "users": _aplicar_users,
+    "custom_values": _aplicar_custom_values,
+    "workflows": _aplicar_lista_workflows,
+}
+
+
+def sobrepor_entidades(ctx: DumpContext, entidades: dict) -> DumpContext:
+    """Cópia rasa do ctx com as listas lidas AO VIVO no lugar das do dump.
+
+    Entidade criada depois da extração não pode virar referência quebrada na validação de
+    escrita. Chave ausente em `entidades` (rota que falhou) mantém a lista do dump.
+    """
+    novo = copy.copy(ctx)
+    for chave, aplicar in _SOBREPOSICAO.items():
+        if chave in entidades and entidades[chave] is not None:
+            aplicar(novo, entidades[chave])
+    return novo
 
 
 def _load_templates(ctx: DumpContext, path: Path) -> None:
