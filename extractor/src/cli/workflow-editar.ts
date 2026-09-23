@@ -14,18 +14,19 @@ import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo, renomear, montarCorpo,
   checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
   conferirTriggersEsperados, conferirCamadaCrua, criarStep, removerStep, moverStep,
+  configurarWorkflow, CONFIG_CAMPOS,
   type Documento
 } from "../api/workflow-edit.js";
 
 export const WF_EDITAR_ACOES = [
   "criar", "renomear", "mover", "duplicar", "apagar",
-  "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
+  "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico", "configuracao",
   "step-criar", "step-remover", "step-mover",
 ] as const;
 
 export interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
-  de?: string; para?: string; step?: string; caminho?: string; valor?: string;
+  de?: string; para?: string; step?: string; caminho?: string; valor?: string; campo?: string;
   corpo?: string; depoisDe?: string; ramos?: string; comSubarvore?: boolean;
   triggerAcao?: string; triggerId?: string; triggerCorpo?: string; versaoEsperada?: string;
   triggersEsperados?: string;
@@ -114,7 +115,11 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       return imprimir(saida, o, log);
     }
 
-    const problemas = checarPublicavel(editado);
+    const problemas = checarPublicavel(editado).map((p) =>
+      o.acao === "configuracao" && p === "o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio"
+        ? "o workflow ainda não tem nenhum step, e o app recusa salvar workflow vazio: crie o primeiro step (--acao step-criar) e configure depois"
+        : p,
+    );
     if (problemas.length) {
       throw new Error(
         "a edição deixaria o workflow num estado que o app recusa salvar, e o cliente ficaria travado no editor:\n  - " +
@@ -204,6 +209,9 @@ function aplicarOperacao(doc: Documento, o: Opts) {
     case "step-mover":
       if (!o.step || !o.depoisDe) throw new Error("--acao step-mover exige --step e --depois-de");
       return moverStep(doc, o.step, o.depoisDe);
+    case "configuracao":
+      if (!o.campo || o.valor === undefined) throw new Error("--acao configuracao exige --campo e --valor");
+      return configurarWorkflow(doc, o.campo, parseValor(o.valor));
     default:
       throw new Error(`ação sem corpo tratada no caminho errado: ${o.acao}`);
   }
@@ -463,7 +471,8 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--para <v>", "id ou nome de tag novo (trocar-ref, trocar-tag)")
     .option("--step <id>", "id do step (atributo)")
     .option("--caminho <c>", "campo dentro de attributes, aninhado com ponto (atributo)")
-    .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
+    .option("--campo <c>", "configuração geral do workflow (configuracao): " + CONFIG_CAMPOS.join(" | "))
+    .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo, configuracao)")
     .option("--corpo <json>", "JSON do step que entra (step-criar)")
     .option("--depois-de <id>", "id do step que fica logo ANTES; sem ele, step-criar põe o step no início do fluxo")
     .option("--ramos <json>", "lista JSON de ramos: o step nasce container de N saídas (step-criar)")
