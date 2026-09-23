@@ -115,11 +115,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       return imprimir(saida, o, log);
     }
 
-    const problemas = checarPublicavel(editado).map((p) =>
-      o.acao === "configuracao" && p === "o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio"
-        ? "o workflow ainda não tem nenhum step, e o app recusa salvar workflow vazio: crie o primeiro step (--acao step-criar) e configure depois"
-        : p,
-    );
+    const problemas = checarPublicavel(editado, o.acao);
     if (problemas.length) {
       throw new Error(
         "a edição deixaria o workflow num estado que o app recusa salvar, e o cliente ficaria travado no editor:\n  - " +
@@ -182,7 +178,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
   });
 }
 
-function aplicarOperacao(doc: Documento, o: Opts) {
+export function aplicarOperacao(doc: Documento, o: Opts) {
   switch (o.acao) {
     case "trocar-ref":
       if (!o.de || !o.para) throw new Error("--acao trocar-ref exige --de e --para (ids)");

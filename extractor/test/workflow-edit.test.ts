@@ -163,6 +163,20 @@ test("checarPublicavel aprova workflow são", () => {
   assert.deepEqual(checarPublicavel(doc([{ id: "a", type: "sms", attributes: {} }])), []);
 });
 
+test("checarPublicavel troca a mensagem de workflow vazio pela orientação quando acao é configuracao", () => {
+  assert.deepEqual(
+    checarPublicavel(doc([]), "configuracao"),
+    ["o workflow ainda não tem nenhum step, e o app recusa salvar workflow vazio: crie o primeiro step (--acao step-criar) e configure depois"],
+  );
+});
+
+test("checarPublicavel mantém a mensagem original de workflow vazio para outras ações", () => {
+  assert.deepEqual(
+    checarPublicavel(doc([]), "atributo"),
+    ["o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio"],
+  );
+});
+
 test("diffWorkflow separa step somado, removido e alterado, e mostra o campo", () => {
   const antes = doc([
     { id: "a", type: "wait", name: "Espera", attributes: { dias: 2 } },

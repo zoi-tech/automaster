@@ -200,11 +200,15 @@ export function montarCorpo(
  * tipo de ação. As outras (remetente de e-mail, loop sem corpo, múltiplos goals)
  * ficam para a parte B — limite declarado, não coberto.
  */
-export function checarPublicavel(doc: Documento): string[] {
+export function checarPublicavel(doc: Documento, acao?: string): string[] {
   const steps = doc.workflowData?.templates ?? [];
   const erros: string[] = [];
   if (!steps.length) {
-    erros.push("o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio");
+    erros.push(
+      acao === "configuracao"
+        ? "o workflow ainda não tem nenhum step, e o app recusa salvar workflow vazio: crie o primeiro step (--acao step-criar) e configure depois"
+        : "o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio",
+    );
   }
   const ids = new Set(steps.map((s) => s.id));
   for (const s of steps) {
