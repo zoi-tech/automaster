@@ -54,15 +54,17 @@ Uso real, não revisão de código: uma reclamação de lead trocando de dono na
 (`HNEdypCYlMDyGCKSkTGQ`) e, na sequência, uma automação de transferência por tag montada do
 zero pelas tools. Cada item abaixo custou tempo ou um desvio para fora do automaster.
 
-- [ ] **C1 — Configuração geral do workflow não tem porta.** Workflow criado por API nasce
+- [x] **C1 — Configuração geral do workflow não tem porta.** Workflow criado por API nasce
   com `allowMultiple: false` (reentrada desligada). Em workflow disparado por tag, que é
   feito para rodar de novo no mesmo contato, isso quebra em silêncio: a segunda vez não
   entra, sem erro. Foi ligado por script avulso sobre `salvarWorkflow`, fora das tools.
-- [ ] **C2 — As 18 regras não validam o que o automaster cria.** Workflow mais novo que o
+  Fechado em 0.26.0.
+- [x] **C2 — As 18 regras não validam o que o automaster cria.** Workflow mais novo que o
   dump sai com `validacao.rodou: false` em toda edição — 13 de 13 na montagem da Cliente A.
   Pior, latente também em workflow antigo: a regra compara contra as entidades do dump, então
   uma tag criada depois da extração vira `broken_tag_ref` e a edição que a cita seria
   RECUSADA. As três tags da Cliente A foram criadas dois minutos depois da extração.
+  Fechado em 0.26.0.
 - [ ] **C3 — Não há leitura ao vivo de usuários.** Duas vendedoras novas não estavam no dump
   de 3 dias; só uma extração inteira as trouxe.
 - [ ] **C4 — "Quem mudou o dono e por quê" é trabalho braçal.** Não existe "contatos com

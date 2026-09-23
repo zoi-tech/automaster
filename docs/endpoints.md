@@ -174,6 +174,12 @@ Provada ao vivo em 2026-09-21 na Instaltech, em dois workflows descartáveis cri
 apagados na hora. Detalhe e respostas verbatim em
 `docs/superpowers/handoffs/2026-09-20-workflows-escrita-prova.md`.
 
+`allowMultiple` na raiz do documento sobrevive ao `PUT /workflow/<loc>/<wid>` e é o que a
+releitura devolve — provado ao vivo na Cliente A em 2026-09-22 (workflow
+`a6e9784b-2d9a-44ab-aa0d-ed67cdc90800`, versão 11 → 12). As demais chaves de raiz
+(`stopOnResponse`, `autoMarkAsRead`, `allowMultipleOpportunity`, `removeContactFromLastStep`)
+não foram exercitadas.
+
 | O que | Rota | Corpo | Ao vivo |
 |---|---|---|---|
 | Ler o documento (steps completos) | `GET .../workflow/<loc>/<wid>` | — | ✓ |
