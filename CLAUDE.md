@@ -82,7 +82,7 @@ npm run smoke -- -l <loc> --contato <id> --gravar test/fixtures/api-forma.json  
 npm run discover -- --location <locationId>   # observar requests ao backend
 npm run typecheck                              # tsc sobre src E test (tsconfig.check.json)
 npm run lint                                   # eslint + typescript-eslint
-npm test                                       # suíte (225 testes)
+npm test                                       # suíte (235 testes)
 
 # Auditor (em auditor/) — usa venv: .venv/bin/...
 python -m venv .venv && .venv/bin/pip install -e .
@@ -95,7 +95,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
-.venv/bin/python -m pytest -q                             # suíte (364 testes)
+.venv/bin/python -m pytest -q                             # suíte (372 testes)
 .venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests  # lint + formatação
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
