@@ -2,8 +2,9 @@ import type { Command } from "commander";
 import { emitir, falhar } from "../saida.js";
 import fs from "node:fs";
 import { withClient, registroEscrita } from "./shared.js";
-import { decodeUserId } from "../auth/token.js";
+import { decodeUserId, decodeCompanyId, type Tokens } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
+import { lerEntidadesAoVivo } from "../api/entidades-vivo.js";
 import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
@@ -46,7 +47,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
   conferirCamadaCrua(o);
 
-  await withClient(o.location, log, async (client, _page, tokens) => {
+  await withClient(o.location, log, async (client, _page, tokens: Tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
     const saida: Record<string, unknown> = {
       aplicado: false, acao: o.acao, id: o.id,
@@ -60,7 +61,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     }
 
     if (o.acao === "trigger") {
-      return await acaoTrigger(client, o, saida, log);
+      return await acaoTrigger(client, o, saida, log, tokens);
     }
 
     if (SEM_CORPO.has(o.acao)) {
@@ -132,9 +133,11 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
         aplicado: false,
         motivo: "prévia: rode de novo com --confirmo para gravar",
         documento: editado,
+        documentoAntes: doc,
         // lista AUTORITATIVA de triggers: o documento não a traz. Quem valida contra
         // as 18 regras precisa dela, senão conclui que o workflow não tem trigger.
         triggers: await listarTriggers(client, o.location, o.id!),
+        ...(await entidadesParaPrevia(client, o.location, tokens)),
       });
       return imprimir(saida, o, log);
     }
@@ -176,6 +179,16 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     }
     imprimir(saida, o, log);
   });
+}
+
+/**
+ * Entidades lidas AO VIVO (não do dump) para a prévia validar referências contra o estado
+ * atual da subconta. Rota que falha entra em `entidadesFalhas`, e a validação cai no dump
+ * só para aquela lista.
+ */
+async function entidadesParaPrevia(client: GhlClient, loc: string, tokens: Tokens) {
+  const { entidades, falhas } = await lerEntidadesAoVivo(client, loc, decodeCompanyId(tokens.tokenId));
+  return { entidades, ...(falhas.length ? { entidadesFalhas: falhas } : {}) };
 }
 
 export function aplicarOperacao(doc: Documento, o: Opts) {
@@ -273,14 +286,14 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
  * o `only-triggers` responde 200 sem gravar nada — nenhum dos dois serve aqui.
  */
 async function acaoTrigger(
-  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void,
+  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void, tokens: Tokens,
 ): Promise<void> {
   const acao = o.triggerAcao ?? "";
   if (!TRIGGER_ACOES.includes(acao as never)) {
     throw new Error(`--trigger-acao deve ser um de: ${TRIGGER_ACOES.join(" | ")}`);
   }
   if (acao === "adicionar" || acao === "substituir") {
-    return await adicionarTrigger(client, o, saida, log, acao === "substituir");
+    return await adicionarTrigger(client, o, saida, log, acao === "substituir", tokens);
   }
   if (!o.triggerId) throw new Error("--trigger-acao remover exige --trigger-id");
 
@@ -310,8 +323,10 @@ async function acaoTrigger(
     // `workflow_unreachable` — a validação não pode sumir aqui.
     const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
     Object.assign(saida, {
-      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar", documento,
+      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
+      documento, documentoAntes: documento, triggersAntesLista: triggers,
       versao: documento.version,
+      ...(await entidadesParaPrevia(client, o.location, tokens)),
     });
     return imprimir(saida, o, log);
   }
@@ -361,6 +376,7 @@ export const TRIGGER_ACOES = ["adicionar", "remover", "substituir"] as const;
  */
 async function adicionarTrigger(
   client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void, substituir: boolean,
+  tokens: Tokens,
 ): Promise<void> {
   if (!o.triggerCorpo) throw new Error(`--trigger-acao ${o.triggerAcao} exige --trigger-corpo (JSON do trigger)`);
   if (substituir && !o.triggerId) throw new Error("--trigger-acao substituir exige --trigger-id (o trigger que sai)");
@@ -394,7 +410,10 @@ async function adicionarTrigger(
     if (a) { saida.avisos = [a]; log(a); }
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
-      documento, versao: documento.version,
+      documento, documentoAntes: documento,
+      ...(antes ? { triggersAntesLista: antes } : {}),
+      versao: documento.version,
+      ...(await entidadesParaPrevia(client, o.location, tokens)),
     });
     return imprimir(saida, o, log);
   }
