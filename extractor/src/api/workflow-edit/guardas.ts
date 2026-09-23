@@ -134,6 +134,21 @@ export function conferirTriggersEsperados(
   );
 }
 
+/**
+ * Workflow criado por API nasce com `allowMultiple: false`. Em gatilho de tag ADICIONADA
+ * isso quebra em silêncio: o contato que já passou uma vez não entra de novo quando
+ * recebe a tag outra vez (descoberto na Cliente A, 2026-09-22). Tag removida fica de
+ * fora: `contact_tag` cobre as duas, e o que as separa é `condition.field`.
+ */
+export function avisoReentrada(trigger: Record<string, unknown>, allowMultiple: unknown): string | undefined {
+  if (trigger?.type !== "contact_tag" || allowMultiple !== false) return undefined;
+  const conds = (trigger.conditions as { field?: string }[] | undefined) ?? [];
+  const deTag = conds.filter((c) => c?.field === "tagsAdded" || c?.field === "tagsRemoved");
+  if (deTag.length && !deTag.some((c) => c.field === "tagsAdded")) return undefined;
+  return "reentrada desligada neste workflow: o contato que já passou por ele não entra de novo " +
+    "quando receber a tag outra vez. Ligue com --acao configuracao --campo allowMultiple --valor true.";
+}
+
 export function conferirVersaoEsperada(o: { versaoEsperada?: string }, versaoAgora: number | undefined): void {
   if (o.versaoEsperada === undefined) return;
   if (String(versaoAgora) !== String(o.versaoEsperada)) {

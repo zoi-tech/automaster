@@ -14,7 +14,7 @@ import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo, renomear, montarCorpo,
   checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
   conferirTriggersEsperados, conferirCamadaCrua, criarStep, removerStep, moverStep,
-  configurarWorkflow, CONFIG_CAMPOS,
+  configurarWorkflow, CONFIG_CAMPOS, avisoReentrada,
   type Documento
 } from "../api/workflow-edit.js";
 
@@ -390,6 +390,8 @@ async function adicionarTrigger(
 
   if (!o.confirmo) {
     const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
+    const a = avisoReentrada(corpo, documento.allowMultiple);
+    if (a) { saida.avisos = [a]; log(a); }
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
       documento, versao: documento.version,
@@ -397,8 +399,12 @@ async function adicionarTrigger(
     return imprimir(saida, o, log);
   }
 
-  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
+  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number; allowMultiple?: boolean };
   conferirVersaoEsperada(o, meta?.version);
+  {
+    const a = avisoReentrada(corpo, meta?.allowMultiple);
+    if (a) { saida.avisos = [a]; log(a); }
+  }
   if (antes) conferirTriggersEsperados(o, antes);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 

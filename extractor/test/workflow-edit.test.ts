@@ -4,7 +4,7 @@ import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo,
   renomear, montarCorpo, checarPublicavel, diffWorkflow, type Documento,
   criarStep, removerStep, moverStep, conferirTriggersEsperados,
-  configurarWorkflow, CONFIG_CAMPOS, conferirEscrita,
+  configurarWorkflow, CONFIG_CAMPOS, conferirEscrita, avisoReentrada,
 } from "../src/api/workflow-edit.js";
 
 function doc(steps: unknown[], triggers: unknown[] = []): Documento {
@@ -479,4 +479,15 @@ test("diffWorkflow enxerga configuração e a conferência pega save que não pe
   assert.equal(diff.vazio, false);
   assert.equal(conferirEscrita(pedido, antes).ok, false, "relido sem a mudança é duvidoso");
   assert.equal(conferirEscrita(pedido, pedido).ok, true);
+});
+
+test("avisoReentrada só dispara em tag adicionada com reentrada desligada", () => {
+  const adicionada = { type: "contact_tag", conditions: [{ field: "tagsAdded", value: "x" }] };
+  const removida = { type: "contact_tag", conditions: [{ field: "tagsRemoved", value: "x" }] };
+  const qualquer = { type: "contact_tag", conditions: [] };
+  assert.match(avisoReentrada(adicionada, false)!, /reentrada desligada/);
+  assert.match(avisoReentrada(qualquer, false)!, /reentrada desligada/);
+  assert.equal(avisoReentrada(adicionada, true), undefined);
+  assert.equal(avisoReentrada(removida, false), undefined);
+  assert.equal(avisoReentrada({ type: "form_submission" }, false), undefined);
 });
