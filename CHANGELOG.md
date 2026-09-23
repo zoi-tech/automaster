@@ -4,6 +4,20 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.26.0 — configuração do workflow e validação ao vivo
+
+- **Ação `configuracao`** em `workflow-editar` (só `allowMultiple` por enquanto): recusa
+  workflow sem step, não passa pelas 18 regras — configuração geral não é referência.
+- **Aviso de reentrada**: adicionar gatilho de tag no workflow com `allowMultiple` desligado
+  avisa em vez de gravar em silêncio; remover tag não avisa.
+- **Prévia devolve o documento de antes e as entidades ao vivo** (tags, usuários, funis,
+  campos, custom values, lista de workflows); rota que falha cai para o dump e o aviso nomeia
+  qual.
+- **As 18 regras validam workflow que ainda não está no dump** (montado do documento) e usam
+  as entidades lidas ao vivo em vez das do dump quando disponíveis — fecha o falso positivo de
+  tag criada depois da extração.
+- Documento e entidades ao vivo nunca voltam na resposta da tool MCP `workflow_editar`.
+
 ## 0.25.0 — linter dos dois lados, e o typecheck que finalmente vê os testes
 
 Nenhuma tool nova, nenhuma regra nova, nenhum comportamento alterado: as 32 tools

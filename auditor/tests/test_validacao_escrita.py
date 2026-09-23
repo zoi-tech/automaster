@@ -61,6 +61,27 @@ def test_workflow_fora_do_dump_e_erro_claro(make_dump):
         validar_edicao(ctx, "w9", {"workflowData": {"templates": []}})
 
 
+def _doc(steps):
+    return {"name": "Novo", "status": "draft", "workflowData": {"templates": steps}}
+
+
+def test_workflow_fora_do_dump_e_validado_com_o_documento_de_antes(make_dump):
+    ctx = load_dump(make_dump(workflows=[wf(id="w1")], tags=["boa"]))
+    antes = _doc([_passo_tag("s1", ["boa"])])
+    depois = _doc([_passo_tag("s1", ["boa"]), _passo_tag("s2", ["inventada"])])
+    r = validar_edicao(ctx, "w9", depois, triggers=[], doc_antes=antes, triggers_antes=[])
+    assert r.pode_gravar is False
+    assert any("inventada" in e for e in r.erros_novos)
+
+
+def test_workflow_fora_do_dump_sem_erro_novo_pode_gravar(make_dump):
+    ctx = load_dump(make_dump(workflows=[wf(id="w1")], tags=["boa"]))
+    antes = _doc([])
+    depois = _doc([_passo_tag("s1", ["boa"])])
+    r = validar_edicao(ctx, "w9", depois, triggers=[], doc_antes=antes, triggers_antes=[])
+    assert r.pode_gravar is True
+
+
 def test_validacao_nao_altera_o_contexto_carregado(make_dump):
     caminho = make_dump(workflows=[wf(id="w1", steps=[_passo_tag("s1", ["tag-boa"])])], tags=["tag-boa"])
     ctx = load_dump(caminho)

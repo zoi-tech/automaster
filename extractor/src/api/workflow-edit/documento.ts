@@ -160,6 +160,24 @@ export function renomear(doc: Documento, nome: string): Resultado {
 }
 
 /**
+ * Configurações gerais do workflow que a ação `configuracao` altera. Só entra chave com
+ * prova ao vivo de que sobrevive ao save: `allowMultiple` (reentrada), provada na Cliente A
+ * Mulher em 2026-09-22. As outras chaves de raiz do documento ficam de fora até serem provadas.
+ */
+export const CONFIG_CAMPOS = ["allowMultiple"] as const;
+
+export function configurarWorkflow(doc: Documento, campo: string, valor: unknown): Resultado {
+  if (!(CONFIG_CAMPOS as readonly string[]).includes(campo)) {
+    throw new Error(`--campo ${campo} não é configurável. Use: ${CONFIG_CAMPOS.join(" | ")}`);
+  }
+  if (typeof valor !== "boolean") throw new Error(`--valor de ${campo} precisa ser true ou false`);
+  const out = clonar(doc);
+  const antes = out[campo];
+  out[campo] = valor;
+  return { doc: out, mudancas: antes === valor ? [] : [`${campo}: ${String(antes)} → ${String(valor)}`] };
+}
+
+/**
  * Corpo do PUT: o documento EDITADO, tal como veio da leitura, mais as três
  * listas que o app recalcula a cada save e o autor da edição. Nada é inventado:
  * campo que a leitura não trouxe não entra (ver spec, "Como o corpo é montado").
@@ -182,11 +200,15 @@ export function montarCorpo(
  * tipo de ação. As outras (remetente de e-mail, loop sem corpo, múltiplos goals)
  * ficam para a parte B — limite declarado, não coberto.
  */
-export function checarPublicavel(doc: Documento): string[] {
+export function checarPublicavel(doc: Documento, acao?: string): string[] {
   const steps = doc.workflowData?.templates ?? [];
   const erros: string[] = [];
   if (!steps.length) {
-    erros.push("o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio");
+    erros.push(
+      acao === "configuracao"
+        ? "o workflow ainda não tem nenhum step, e o app recusa salvar workflow vazio: crie o primeiro step (--acao step-criar) e configure depois"
+        : "o workflow ficaria sem nenhuma ação, e o app recusa salvar workflow vazio",
+    );
   }
   const ids = new Set(steps.map((s) => s.id));
   for (const s of steps) {

@@ -153,6 +153,11 @@ terminou** — o `status` de cada linha (`finished` ou não) é quem distingue h
 presença atual. `dentro_agora` já conta só quem não terminou; não some o tamanho da lista de
 `inscricoes` para saber em quantos workflows o contato está.
 
+**Workflow criado por API nasce com a reentrada desligada** (`allowMultiple: false`).
+Gatilho de tag adicionada devolve aviso; ligue com `acao=configuracao, campo=allowMultiple,
+valor=true`. `validacao.aviso` diz de onde vieram as entidades: com `(do dump, por falha de
+leitura: ...)` a lista citada pode estar velha.
+
 `workflow_acao` escreve ao vivo. **Despublicar não remove quem está dentro: congela** no
 passo em que está e volta a andar, todo mundo de uma vez, quando o workflow for republicado.
 **Inscrever é enfileirado pelo servidor**: conferir logo em seguida pode não mostrar o

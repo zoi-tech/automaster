@@ -2,8 +2,9 @@ import type { Command } from "commander";
 import { emitir, falhar } from "../saida.js";
 import fs from "node:fs";
 import { withClient, registroEscrita } from "./shared.js";
-import { decodeUserId } from "../auth/token.js";
+import { decodeUserId, decodeCompanyId, type Tokens } from "../auth/token.js";
 import type { GhlClient } from "../api/client.js";
+import { lerEntidadesAoVivo } from "../api/entidades-vivo.js";
 import { getWorkflowMeta, guardaPublicado } from "../api/workflows-live.js";
 import {
   criarWorkflow, duplicarWorkflow, renomearWorkflow, moverWorkflow, apagarWorkflow,
@@ -14,18 +15,19 @@ import {
   trocarReferencia, trocarTag, removerStepsInalcancaveis, alterarAtributo, renomear, montarCorpo,
   checarPublicavel, diffWorkflow, conferirEscrita, conferirVersaoEsperada,
   conferirTriggersEsperados, conferirCamadaCrua, criarStep, removerStep, moverStep,
+  configurarWorkflow, CONFIG_CAMPOS, avisoReentrada,
   type Documento
 } from "../api/workflow-edit.js";
 
 export const WF_EDITAR_ACOES = [
   "criar", "renomear", "mover", "duplicar", "apagar",
-  "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico",
+  "trocar-ref", "trocar-tag", "limpar-orfaos", "atributo", "trigger", "historico", "configuracao",
   "step-criar", "step-remover", "step-mover",
 ] as const;
 
 export interface Opts {
   location: string; acao: string; id?: string; nome?: string; pasta?: string;
-  de?: string; para?: string; step?: string; caminho?: string; valor?: string;
+  de?: string; para?: string; step?: string; caminho?: string; valor?: string; campo?: string;
   corpo?: string; depoisDe?: string; ramos?: string; comSubarvore?: boolean;
   triggerAcao?: string; triggerId?: string; triggerCorpo?: string; versaoEsperada?: string;
   triggersEsperados?: string;
@@ -45,7 +47,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
   conferirCamadaCrua(o);
 
-  await withClient(o.location, log, async (client, _page, tokens) => {
+  await withClient(o.location, log, async (client, _page, tokens: Tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
     const saida: Record<string, unknown> = {
       aplicado: false, acao: o.acao, id: o.id,
@@ -59,7 +61,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
     }
 
     if (o.acao === "trigger") {
-      return await acaoTrigger(client, o, saida, log);
+      return await acaoTrigger(client, o, saida, log, tokens);
     }
 
     if (SEM_CORPO.has(o.acao)) {
@@ -114,7 +116,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       return imprimir(saida, o, log);
     }
 
-    const problemas = checarPublicavel(editado);
+    const problemas = checarPublicavel(editado, o.acao);
     if (problemas.length) {
       throw new Error(
         "a edição deixaria o workflow num estado que o app recusa salvar, e o cliente ficaria travado no editor:\n  - " +
@@ -131,9 +133,11 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
         aplicado: false,
         motivo: "prévia: rode de novo com --confirmo para gravar",
         documento: editado,
+        documentoAntes: doc,
         // lista AUTORITATIVA de triggers: o documento não a traz. Quem valida contra
         // as 18 regras precisa dela, senão conclui que o workflow não tem trigger.
         triggers: await listarTriggers(client, o.location, o.id!),
+        ...(await entidadesParaPrevia(client, o.location, tokens)),
       });
       return imprimir(saida, o, log);
     }
@@ -177,7 +181,17 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
   });
 }
 
-function aplicarOperacao(doc: Documento, o: Opts) {
+/**
+ * Entidades lidas AO VIVO (não do dump) para a prévia validar referências contra o estado
+ * atual da subconta. Rota que falha entra em `entidadesFalhas`, e a validação cai no dump
+ * só para aquela lista.
+ */
+async function entidadesParaPrevia(client: GhlClient, loc: string, tokens: Tokens) {
+  const { entidades, falhas } = await lerEntidadesAoVivo(client, loc, decodeCompanyId(tokens.tokenId));
+  return { entidades, ...(falhas.length ? { entidadesFalhas: falhas } : {}) };
+}
+
+export function aplicarOperacao(doc: Documento, o: Opts) {
   switch (o.acao) {
     case "trocar-ref":
       if (!o.de || !o.para) throw new Error("--acao trocar-ref exige --de e --para (ids)");
@@ -204,6 +218,9 @@ function aplicarOperacao(doc: Documento, o: Opts) {
     case "step-mover":
       if (!o.step || !o.depoisDe) throw new Error("--acao step-mover exige --step e --depois-de");
       return moverStep(doc, o.step, o.depoisDe);
+    case "configuracao":
+      if (!o.campo || o.valor === undefined) throw new Error("--acao configuracao exige --campo e --valor");
+      return configurarWorkflow(doc, o.campo, parseValor(o.valor));
     default:
       throw new Error(`ação sem corpo tratada no caminho errado: ${o.acao}`);
   }
@@ -269,14 +286,14 @@ async function escritaSemCorpo(client: GhlClient, o: Opts, usuarioId: string) {
  * o `only-triggers` responde 200 sem gravar nada — nenhum dos dois serve aqui.
  */
 async function acaoTrigger(
-  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void,
+  client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void, tokens: Tokens,
 ): Promise<void> {
   const acao = o.triggerAcao ?? "";
   if (!TRIGGER_ACOES.includes(acao as never)) {
     throw new Error(`--trigger-acao deve ser um de: ${TRIGGER_ACOES.join(" | ")}`);
   }
   if (acao === "adicionar" || acao === "substituir") {
-    return await adicionarTrigger(client, o, saida, log, acao === "substituir");
+    return await adicionarTrigger(client, o, saida, log, acao === "substituir", tokens);
   }
   if (!o.triggerId) throw new Error("--trigger-acao remover exige --trigger-id");
 
@@ -306,8 +323,10 @@ async function acaoTrigger(
     // `workflow_unreachable` — a validação não pode sumir aqui.
     const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
     Object.assign(saida, {
-      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar", documento,
+      aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
+      documento, documentoAntes: documento, triggersAntesLista: triggers,
       versao: documento.version,
+      ...(await entidadesParaPrevia(client, o.location, tokens)),
     });
     return imprimir(saida, o, log);
   }
@@ -357,6 +376,7 @@ export const TRIGGER_ACOES = ["adicionar", "remover", "substituir"] as const;
  */
 async function adicionarTrigger(
   client: GhlClient, o: Opts, saida: Record<string, unknown>, log: (m: string) => void, substituir: boolean,
+  tokens: Tokens,
 ): Promise<void> {
   if (!o.triggerCorpo) throw new Error(`--trigger-acao ${o.triggerAcao} exige --trigger-corpo (JSON do trigger)`);
   if (substituir && !o.triggerId) throw new Error("--trigger-acao substituir exige --trigger-id (o trigger que sai)");
@@ -386,15 +406,24 @@ async function adicionarTrigger(
 
   if (!o.confirmo) {
     const documento = (await lerDocumento(client, o.location, o.id!)) as Documento;
+    const a = avisoReentrada(corpo, documento.allowMultiple);
+    if (a) { saida.avisos = [a]; log(a); }
     Object.assign(saida, {
       aplicado: false, motivo: "prévia: rode de novo com --confirmo para gravar",
-      documento, versao: documento.version,
+      documento, documentoAntes: documento,
+      ...(antes ? { triggersAntesLista: antes } : {}),
+      versao: documento.version,
+      ...(await entidadesParaPrevia(client, o.location, tokens)),
     });
     return imprimir(saida, o, log);
   }
 
-  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number };
+  const meta = (await getWorkflowMeta(client, o.location, o.id!)) as { status?: string; version?: number; allowMultiple?: boolean };
   conferirVersaoEsperada(o, meta?.version);
+  {
+    const a = avisoReentrada(corpo, meta?.allowMultiple);
+    if (a) { saida.avisos = [a]; log(a); }
+  }
   if (antes) conferirTriggersEsperados(o, antes);
   if (meta?.status === "published") await guardaPublicado(client, o, saida, log, "gravar");
 
@@ -463,7 +492,8 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--para <v>", "id ou nome de tag novo (trocar-ref, trocar-tag)")
     .option("--step <id>", "id do step (atributo)")
     .option("--caminho <c>", "campo dentro de attributes, aninhado com ponto (atributo)")
-    .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo)")
+    .option("--campo <c>", "configuração geral do workflow (configuracao): " + CONFIG_CAMPOS.join(" | "))
+    .option("--valor <v>", "valor novo; JSON válido vira JSON, o resto é texto (atributo, configuracao)")
     .option("--corpo <json>", "JSON do step que entra (step-criar)")
     .option("--depois-de <id>", "id do step que fica logo ANTES; sem ele, step-criar põe o step no início do fluxo")
     .option("--ramos <json>", "lista JSON de ramos: o step nasce container de N saídas (step-criar)")

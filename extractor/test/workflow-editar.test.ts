@@ -6,6 +6,19 @@ import {
   type Documento,
 } from "../src/api/workflow-edit.js";
 import { lerDocumento, listarTriggersPrevia } from "../src/api/workflows-write.js";
+import { WF_EDITAR_ACOES, aplicarOperacao } from "../src/cli/workflow-editar.js";
+
+test("configuracao é uma ação da CLI crua", () => {
+  assert.ok((WF_EDITAR_ACOES as readonly string[]).includes("configuracao"));
+});
+
+test("--acao configuracao recusa sem --campo e --valor", () => {
+  const doc = { workflowData: { templates: [] } } as unknown as Documento;
+  assert.throws(
+    () => aplicarOperacao(doc, { location: "LOC1", id: "WF1", acao: "configuracao" } as never),
+    /--acao configuracao exige --campo e --valor/,
+  );
+});
 
 const opts = (extra: { publicado?: boolean } = {}) => ({ location: "LOC1", id: "WF1", ...extra });
 

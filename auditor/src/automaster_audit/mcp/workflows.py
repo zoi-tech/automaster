@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from ..loader import sobrepor_entidades
 from ..validacao_escrita import validar_edicao
 from . import base
 from .base import _LOC, _SNAP, ToolError
@@ -92,6 +93,7 @@ WF_EDITAR_ACOES = (
     "step-criar",
     "step-remover",
     "step-mover",
+    "configuracao",
 )
 
 # ações que mexem no corpo do workflow e por isso passam pela validação das 18 regras
@@ -107,6 +109,16 @@ _WF_EDITAR_COM_CORPO = {
 }
 
 
+_SO_PARA_VALIDAR = ("documento", "documentoAntes", "entidades", "entidadesFalhas", "triggersAntesLista")
+
+
+def _sem_documento(r: dict) -> dict:
+    """O documento e as entidades servem à validação local e nunca voltam ao modelo."""
+    for chave in _SO_PARA_VALIDAR:
+        r.pop(chave, None)
+    return r
+
+
 def workflow_editar(
     loc: str,
     acao: str,
@@ -118,6 +130,7 @@ def workflow_editar(
     step: str | None = None,
     caminho: str | None = None,
     valor: str | None = None,
+    campo: str | None = None,
     trigger_acao: str | None = None,
     trigger_id: str | None = None,
     trigger_corpo: dict | str | None = None,
@@ -181,6 +194,7 @@ def workflow_editar(
             ("--step", step),
             ("--caminho", caminho),
             ("--valor", valor),
+            ("--campo", campo),
             ("--trigger-acao", trigger_acao),
             ("--trigger-id", trigger_id),
             ("--trigger-corpo", trigger_corpo),
@@ -200,30 +214,41 @@ def workflow_editar(
         return a
 
     if acao not in _WF_EDITAR_COM_CORPO:
-        return base._run_extractor(*_args(confirmo))
+        resultado = base._run_extractor(*_args(confirmo))
+        return _sem_documento(resultado)
 
     # O dump é checado ANTES da prévia: a prévia abre o Chrome inteiro, e workflow
     # recém-criado ou duplicado não está em dump nenhum — não pode virar exceção crua
-    # depois de todo esse trabalho.
+    # depois de todo esse trabalho. A ausência aqui não zera mais o ctx: se a prévia
+    # trouxer o documento de antes, o workflow entra no contexto montado ao vivo.
     ctx = meta = None
     sem_validacao = None
     try:
         ctx, meta = base._load(loc, snapshot)
     except ToolError:
         sem_validacao = "sem dump desta subconta em disco: as 18 regras não foram rodadas"
-    if ctx is not None and not any(getattr(w, "id", None) == id for w in getattr(ctx, "workflows", [])):
-        sem_validacao = (
-            f"workflow {id} não está no dump {meta['snapshot']} (criado ou duplicado depois da "
-            "última extração): as 18 regras não foram rodadas. Extraia a subconta de novo para validar."
-        )
-        ctx = None
 
     previa = base._run_extractor(*_args(False))
-    # M3: o documento inteiro do workflow não volta para o contexto do modelo. Ele existe
-    # para a validação local, e só.
-    documento = previa.pop("documento", None)
+    # M3: o documento inteiro do workflow e as entidades ao vivo não voltam para o
+    # contexto do modelo. Eles existem para a validação local, e só.
+    documento = previa.get("documento")
+    documento_antes = previa.get("documentoAntes")
+    entidades = previa.get("entidades") or {}
+    falhas = previa.get("entidadesFalhas") or []
+    triggers_antes_lista = previa.get("triggersAntesLista")
+    _sem_documento(previa)
     versao = previa.get("versao")
     triggers_antes = previa.get("triggersAntes")
+
+    fora_do_dump = ctx is not None and not any(getattr(w, "id", None) == id for w in getattr(ctx, "workflows", []))
+    if fora_do_dump and documento_antes is None:
+        sem_validacao = (
+            f"workflow {id} não está no dump {meta['snapshot']} (criado ou duplicado depois da "
+            "última extração) e a prévia não trouxe o documento de antes: as 18 regras não foram rodadas."
+        )
+        ctx = None
+    if ctx is not None and entidades:
+        ctx = sobrepor_entidades(ctx, entidades)
 
     if ctx is None:
         previa["validacao"] = {"rodou": False, "motivo": sem_validacao}
@@ -232,7 +257,7 @@ def workflow_editar(
         # a falta de dump não pode travar a escrita
         resultado = base._run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
-        return resultado
+        return _sem_documento(resultado)
 
     if documento is None:
         # nada a validar (ex: "nada a mudar: a operação não encontrou alvo"). Mesmo aqui a
@@ -246,26 +271,38 @@ def workflow_editar(
             return previa
         resultado = base._run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
-        return resultado
+        return _sem_documento(resultado)
 
     try:
-        resultado_validacao = validar_edicao(ctx, id, documento, previa.get("triggers"))
+        resultado_validacao = validar_edicao(
+            ctx,
+            id,
+            documento,
+            previa.get("triggers"),
+            doc_antes=documento_antes,
+            triggers_antes=triggers_antes_lista,
+        )
     except ValueError as e:
         previa["validacao"] = {"rodou": False, "motivo": str(e)}
         if not confirmo:
             return previa
         resultado = base._run_extractor(*_args(True, versao, triggers_antes))
         resultado["validacao"] = previa["validacao"]
-        return resultado
+        return _sem_documento(resultado)
 
+    origem = "entidades lidas ao vivo" if entidades else f"entidades do dump {meta['snapshot']}"
+    if falhas:
+        origem += f" (do dump, por falha de leitura: {', '.join(falhas)})"
     validacao = {
         "rodou": True,
         "snapshot": meta["snapshot"],
         "pode_gravar": resultado_validacao.pode_gravar,
         "erros_novos": resultado_validacao.erros_novos,
         "erros_resolvidos": resultado_validacao.erros_resolvidos,
-        "aviso": f"as regras rodaram contra o dump {meta['snapshot']}; ele pode estar velho",
+        "aviso": f"as regras rodaram com {origem}; templates e formulários vêm do dump {meta['snapshot']}",
     }
+    if fora_do_dump:
+        validacao["aviso"] += "; workflow mais novo que o dump, validado a partir do documento ao vivo"
     if getattr(resultado_validacao, "triggers_do_dump", False):
         validacao["aviso"] += (
             "; a lista de triggers veio do dump (o comando não a devolveu), então achado de "
@@ -285,7 +322,7 @@ def workflow_editar(
 
     resultado = base._run_extractor(*_args(True, versao, triggers_antes))
     resultado["validacao"] = validacao
-    return resultado
+    return _sem_documento(resultado)
 
 
 TOOLS = {
@@ -344,6 +381,8 @@ TOOLS = {
             "atributo de step (`atributo`) e adiciona, remove ou substitui um trigger "
             "(`trigger`). Monta o canvas: insere um step (`step-criar`), remove um step vivo "
             "recosturando os ponteiros (`step-remover`) e muda um step de lugar (`step-mover`). "
+            "Altera configuração geral do workflow (`configuracao`: por ora só `allowMultiple`, a "
+            "reentrada). "
             "Sem `confirmo` devolve a PRÉVIA com o diff e não grava nada. "
             "Workflow publicado exige `publicado=true` junto. `criar` e `duplicar` exigem "
             "`pasta` — workflow fora de pasta não aparece na lista do app. A resposta traz "
@@ -364,6 +403,11 @@ TOOLS = {
             "step": {"type": "string", "description": "id do step (atributo, step-remover, step-mover)"},
             "caminho": {"type": "string", "description": "campo dentro de attributes, aninhado com ponto"},
             "valor": {"type": "string", "description": "valor novo; JSON válido vira JSON"},
+            "campo": {
+                "type": "string",
+                "enum": ["allowMultiple"],
+                "description": "configuracao: chave geral do workflow; allowMultiple = reentrada",
+            },
             "trigger_acao": {"type": "string", "enum": ["adicionar", "remover", "substituir"]},
             "trigger_id": {"type": "string", "description": "id do trigger que SAI (remover, substituir)"},
             "trigger_corpo": {

@@ -4,6 +4,7 @@
  */
 import type { Step, Documento } from "./tipos.js";
 import { porId, igual } from "./tipos.js";
+import { CONFIG_CAMPOS } from "./documento.js";
 
 export interface DiffWorkflow {
   nome?: { antes?: string; depois?: string };
@@ -13,6 +14,8 @@ export interface DiffWorkflow {
   triggersAdicionados: { id: string; nome?: string }[];
   triggersRemovidos: { id: string; nome?: string }[];
   triggersAlterados: { id: string; nome?: string }[];
+  /** Chaves de CONFIG_CAMPOS que mudaram; ausente quando nenhuma mudou. */
+  configuracao?: Record<string, { antes: unknown; depois: unknown }>;
   vazio: boolean;
 }
 
@@ -56,12 +59,16 @@ export function diffWorkflow(antes: Documento, depois: Documento): DiffWorkflow 
     .map(rotuloTrigger);
 
   const nome = antes.name === depois.name ? undefined : { antes: antes.name, depois: depois.name };
+  const mudouConfig = CONFIG_CAMPOS.filter((c) => !igual(antes[c], depois[c]));
+  const configuracao = mudouConfig.length
+    ? Object.fromEntries(mudouConfig.map((c) => [c, { antes: antes[c], depois: depois[c] }]))
+    : undefined;
   const vazio =
-    !nome && !stepsAdicionados.length && !stepsRemovidos.length && !stepsAlterados.length &&
+    !nome && !configuracao && !stepsAdicionados.length && !stepsRemovidos.length && !stepsAlterados.length &&
     !triggersAdicionados.length && !triggersRemovidos.length && !triggersAlterados.length;
   return {
     nome, stepsAdicionados, stepsRemovidos, stepsAlterados,
-    triggersAdicionados, triggersRemovidos, triggersAlterados, vazio,
+    triggersAdicionados, triggersRemovidos, triggersAlterados, configuracao, vazio,
   };
 }
 
@@ -125,6 +132,21 @@ export function conferirTriggersEsperados(
     `agora ${atual.join(", ") || "nenhum"}). Apagar trigger não mexe no version, então esta é a única ` +
     "guarda deste caminho. Nada foi gravado: rode de novo para ver o estado atual.",
   );
+}
+
+/**
+ * Workflow criado por API nasce com `allowMultiple: false`. Em gatilho de tag ADICIONADA
+ * isso quebra em silêncio: o contato que já passou uma vez não entra de novo quando
+ * recebe a tag outra vez (descoberto na Cliente A, 2026-09-22). Tag removida fica de
+ * fora: `contact_tag` cobre as duas, e o que as separa é `condition.field`.
+ */
+export function avisoReentrada(trigger: Record<string, unknown>, allowMultiple: unknown): string | undefined {
+  if (trigger?.type !== "contact_tag" || allowMultiple !== false) return undefined;
+  const conds = (trigger.conditions as { field?: string }[] | undefined) ?? [];
+  const deTag = conds.filter((c) => c?.field === "tagsAdded" || c?.field === "tagsRemoved");
+  if (deTag.length && !deTag.some((c) => c.field === "tagsAdded")) return undefined;
+  return "reentrada desligada neste workflow: o contato que já passou por ele não entra de novo " +
+    "quando receber a tag outra vez. Ligue com --acao configuracao --campo allowMultiple --valor true.";
 }
 
 export function conferirVersaoEsperada(o: { versaoEsperada?: string }, versaoAgora: number | undefined): void {

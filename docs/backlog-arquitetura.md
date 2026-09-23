@@ -47,3 +47,42 @@ Levantado depois do A1–A8, na mesma revisão. Todos fechados.
   `auditor/tests/test_versoes.py`, que também exige a seção no `CHANGELOG.md`.
 - [x] **B4 — Documentação com número errado.** O `plugin.json` dizia 35 tools (são 32
   desde a 0.24.0) e o `CLAUDE.md` dizia 347 testes.
+
+## Rodada de 2026-09-22 — o que a investigação da Cliente A expôs
+
+Uso real, não revisão de código: uma reclamação de lead trocando de dono na Cliente A
+(`HNEdypCYlMDyGCKSkTGQ`) e, na sequência, uma automação de transferência por tag montada do
+zero pelas tools. Cada item abaixo custou tempo ou um desvio para fora do automaster.
+
+- [x] **C1 — Configuração geral do workflow não tem porta.** Workflow criado por API nasce
+  com `allowMultiple: false` (reentrada desligada). Em workflow disparado por tag, que é
+  feito para rodar de novo no mesmo contato, isso quebra em silêncio: a segunda vez não
+  entra, sem erro. Foi ligado por script avulso sobre `salvarWorkflow`, fora das tools.
+  Fechado em 0.26.0.
+- [x] **C2 — As 18 regras não validam o que o automaster cria.** Workflow mais novo que o
+  dump sai com `validacao.rodou: false` em toda edição — 13 de 13 na montagem da Cliente A.
+  Pior, latente também em workflow antigo: a regra compara contra as entidades do dump, então
+  uma tag criada depois da extração vira `broken_tag_ref` e a edição que a cita seria
+  RECUSADA. As três tags da Cliente A foram criadas dois minutos depois da extração.
+  Fechado em 0.26.0.
+- [ ] **C3 — Não há leitura ao vivo de usuários.** Duas vendedoras novas não estavam no dump
+  de 3 dias; só uma extração inteira as trouxe.
+- [ ] **C4 — "Quem mudou o dono e por quê" é trabalho braçal.** Não existe "contatos com
+  atividade hoje" nem busca por mudança de `assignedTo`. A investigação foi: inscritos de um
+  workflow (395 linhas, estourou o teto de resposta do MCP: faltam filtro por data e resumo)
+  e o audit log de 56 contatos um por um, um Chrome por contato, ~10 min. O audit log quase
+  nunca traz o `before.assignedTo`, e integração aparece como id de app OAuth
+  (`source: INTEGRATION`, `channel: OAUTH`), sem nome — o `sourceWorkflowName` já resolve
+  workflow, integração não. Foi justamente o que deixou a causa sem nome.
+- [ ] **C5 — Erro de perfil ocupado é ilegível.** Um Chrome fora do automaster (com
+  `--remote-debugging-port=9223`) segurava o perfil; o `chrome.lock` só conhece processos do
+  próprio automaster, e o erro que chegou foi `Target page, context or browser has been
+  closed`. Deveria dizer "perfil em uso pelo pid X" lendo o `SingletonLock`.
+- [ ] **C6 — Ramificar por gatilho: padrão promissor, sem prova.** Um workflow com N
+  triggers e um `if_else` com `conditionType: "trigger"` e `conditionValue: <triggerId>` em
+  cada ramo (formato copiado do "Entrada - Novos Leads", que já roda assim). Montado na
+  Cliente A (`a6e9784b-2d9a-44ab-aa0d-ed67cdc90800`), publicado, mas nenhum contato passou por
+  ele até esta anotação. Só vira doc de skill depois do primeiro uso real.
+
+Nota de disciplina, não de código: duas `tag_acao` saíram em paralelo por engano. As duas
+gravaram; não se sabe se foi o `chrome.lock` esperando ou sorte.
