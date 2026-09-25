@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+from collections import Counter
 
 import pytest
 from conftest import tag_cond, trig, wf
@@ -1026,3 +1027,59 @@ def test_conversas_sem_contato_e_sem_busca_diz_o_que_falta(root, monkeypatch):
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: pytest.fail("não podia chamar o extractor"))
     with pytest.raises(srv.ToolError, match="busca"):
         srv.conversas(LOC)
+
+
+def _wf_achados(out):
+    return {w["id"]: w["achados"] for w in out["workflows"]}
+
+
+def test_inventario_workflows_conta_achados_so_no_workflow_quebrado(root):
+    quebrado = [{"id": "s1", "type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["sumida"]}}]
+    limpo = [{"id": "s1", "type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["a"]}}]
+    root(workflows=[wf(steps=quebrado), wf(id="wf2", name="[Solar] Outro → Limpo", steps=limpo)], tags=["a"])
+    got = _wf_achados(srv.inventario(LOC, "workflows"))
+    assert got["wf1"]["ERROR"] == 1
+    assert got["wf2"]["ERROR"] == 0
+
+
+def test_inventario_workflows_achados_bate_com_tool_achados(root):
+    quebrado = [{"id": "s1", "type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["sumida"]}}]
+    root(workflows=[wf(steps=quebrado), wf(id="wf2", name="[Solar] Outro → Limpo")], tags=[])
+    esperado = {"wf1": Counter(), "wf2": Counter()}
+    for a in srv.achados(LOC)["achados"]:
+        if a["workflow_id"] in esperado:
+            esperado[a["workflow_id"]][a["severity"]] += a["n"]
+    got = _wf_achados(srv.inventario(LOC, "workflows"))
+    for wid, c in esperado.items():
+        assert got[wid] == {s: c[s] for s in ("ERROR", "WARN", "INFO")}
+
+
+def test_inventario_workflows_zeros_presentes(root):
+    root(workflows=[wf()], tags=[])
+    for w in srv.inventario(LOC, "workflows")["workflows"]:
+        assert set(w["achados"]) == {"ERROR", "WARN", "INFO"}
+        assert all(isinstance(n, int) for n in w["achados"].values())
+
+
+def test_inventario_workflows_achado_sem_workflow_id_nao_quebra(root, monkeypatch):
+    from automaster_audit.finding import Finding
+
+    quebrado = [{"id": "s1", "type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["sumida"]}}]
+    root(workflows=[wf(steps=quebrado)], tags=[])
+    real = mcp_base.rules.run_all
+    monkeypatch.setattr(
+        mcp_base.rules, "run_all", lambda ctx: [*real(ctx), Finding(rule="global", severity="ERROR", detail="x")]
+    )
+    mcp_base._findings.cache_clear()
+    got = _wf_achados(srv.inventario(LOC, "workflows"))
+    assert got["wf1"]["ERROR"] == 1
+
+
+def test_inventario_workflows_repetido_nao_acumula_nem_suja_o_cache(root):
+    quebrado = [{"id": "s1", "type": "add_contact_tag", "name": "Add", "attributes": {"tags": ["sumida"]}}]
+    root(workflows=[wf(steps=quebrado)], tags=[])
+    primeira = _wf_achados(srv.inventario(LOC, "workflows"))
+    segunda = _wf_achados(srv.inventario(LOC, "workflows"))
+    assert primeira == segunda and segunda["wf1"]["ERROR"] == 1
+    ctx, _ = mcp_base._load(LOC, None)
+    assert all("achados" not in w for w in mcp_base._dash(str(ctx.path))["workflows"])
