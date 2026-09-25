@@ -1083,3 +1083,26 @@ def test_inventario_workflows_repetido_nao_acumula_nem_suja_o_cache(root):
     assert primeira == segunda and segunda["wf1"]["ERROR"] == 1
     ctx, _ = mcp_base._load(LOC, None)
     assert all("achados" not in w for w in mcp_base._dash(str(ctx.path))["workflows"])
+
+
+def test_inventario_forms_e_templates(root):
+    cond = {"operator": "is-any-of", "field": "form.id", "value": ["F1"], "title": "Form is", "type": "string"}
+    sms = {"id": "s1", "type": "sms", "name": "Sms", "attributes": {"template_id": "T1"}}
+    root(
+        workflows=[wf(steps=[sms], triggers=[trig("form_submission", "wf1", conditions=[cond])])],
+        forms=[{"_id": "F1", "name": "Contato"}],
+        surveys=[{"_id": "S1", "name": "Pesquisa"}],
+        message_templates=[{"id": "T1", "name": "Follow-up"}],
+    )
+    forms = {f["id"]: f for f in srv.inventario(LOC, "forms")["forms"]}
+    assert forms["F1"]["tipo"] == "form" and forms["F1"]["orphan"] is False
+    assert forms["F1"]["usos"][0]["papeis"] == ["dispara"]
+    assert forms["S1"]["tipo"] == "survey" and forms["S1"]["orphan"] is True
+    (t,) = srv.inventario(LOC, "templates")["templates"]
+    assert t["id"] == "T1" and t["canal"] == "message" and t["usos"][0]["papeis"] == ["envia"]
+
+
+def test_inventario_forms_e_templates_sem_listas_no_dump(root):
+    root(workflows=[wf()], tags=[])
+    assert srv.inventario(LOC, "forms")["forms"] == []
+    assert srv.inventario(LOC, "templates")["templates"] == []
