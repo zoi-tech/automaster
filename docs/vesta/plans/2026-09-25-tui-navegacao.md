@@ -134,3 +134,13 @@ precisar dela e faça o `test_mcp_tools.py` usar a do conftest. Nada de reescrev
 - Como fazer: seção nova no topo do `CHANGELOG.md` no formato das anteriores (TUI, fatias novas `forms`/`templates`,
   `usos` e `achados` no inventário). No `CLAUDE.md`: o `tui/` na lista de módulos do auditor, a linha
   `.venv/bin/automaster-audit tui` nos comandos com `pip install -e '.[tui]'`, e a nova contagem de testes.
+
+## Etapa 10 — Workflow com id real do GHL abre o detalhe
+
+- Tela: não (conserto; a tela não muda).
+- Arquivos: `auditor/src/automaster_audit/tui/detalhe.py`, `auditor/tests/test_tui.py`.
+- O que prova: abrir o detalhe de um workflow cujo id é um UUID que começa com número
+  (`88bf986f-4905-4582-8369-2874b963b398`, formato real do GHL) mostra o cabeçalho, sem erro; o mesmo para a
+  entidade cujo id começa com número. Achado no teste com a Instaltech: `DetalheWorkflow.__init__` grava o id do
+  workflow em `self.id`, que no Textual é o id do widget e recusa identificador começado por número.
+- Como fazer: renomeie o atributo para `self.wid` (e o equivalente na entidade), sem tocar no `id` do widget.
