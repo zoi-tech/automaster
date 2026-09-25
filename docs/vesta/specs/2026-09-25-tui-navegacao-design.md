@@ -20,8 +20,7 @@ Chrome e escreve na subconta.
 Pacote `auditor/src/automaster_audit/tui/`, subcomando `automaster-audit tui` em `cli.py`.
 
 Textual como dependência opcional: extra `tui` no `pyproject.toml`. Sem o extra, o
-subcomando sai com mensagem pedindo `pip install -e .[tui]`. O servidor MCP e o CI
-principal não carregam o Textual.
+subcomando sai com mensagem pedindo `pip install -e .[tui]`. O servidor MCP não carrega o Textual; o CI instala `.[dev,tui]` no job do auditor.
 
 A TUI não lê o dump direto: chama as funções de `mcp/dump.py` (`dumps`, `inventario`,
 `workflow`, `achados`, `buscar`, `comparar`), as mesmas que o servidor MCP expõe. Nenhuma
@@ -51,7 +50,8 @@ mockup.
 Quatro elementos, todos obrigatórios:
 
 1. Abertura de impacto: entrada animada de 1 a 2 segundos (marca, varredura, contagem do
-   dump carregado).
+   dump carregado), feita com `textualeffects` (efeitos do terminaltexteffects no Textual),
+   no extra `tui`.
 2. Transições animadas entre telas, e números que sobem até o valor.
 3. Visual de sala de comando: bordas, cabeçalhos grandes, barra de status permanente.
 4. Momentos dramáticos: achado ERROR com destaque pulsante; o diff se revela como linha do
@@ -63,12 +63,23 @@ quebrar a leitura. Animação nunca atrasa um dado: a tela já é navegável enq
 
 ## Erros
 
-Dump recusado pelo schema ou ilegível: aparece na tela de seleção como indisponível, com a
-mensagem do `DumpError`; os outros seguem navegáveis. Subconta com um snapshot só: a aba
+Dump recusado pelo schema ou ilegível: o erro aparece ao escolher o snapshot, com a
+mensagem do `ToolError`, e a seleção continua aberta para escolher outro. Subconta com um snapshot só: a aba
 Diff diz que não há com o que comparar.
 
 ## Testes
 
 `App.run_test()` (piloto do Textual) sobre dumps montados por `conftest.make_dump(...)`:
 seleção abre a principal, cada aba renderiza, Enter num workflow abre o detalhe, Enter
-numa tag abre a entidade. Os testes pulam (`importorskip`) sem o Textual instalado.
+numa tag abre a entidade. Os testes pulam (`importorskip`) sem o Textual instalado, e rodam com
+`TEXTUAL_ANIMATIONS=none`.
+
+## Decisões do grill
+
+- **A4** — A TUI lê os passos direto de `flow.py` (árvore navegável), exceção à regra de ler só por `mcp/dump.py`. Motivo: `workflow()` devolve texto cortado em `PATHS_MAX_CHARS` (`mcp/dump.py:78-81`), sem árvore nem referência clicável.
+- **A2** — Papel por workflow estendido a tags, campos, funis e usuários, devolvido por workflow (não somado) no `inventario`; o MCP ganha junto. Motivo: hoje só tags têm `papeis`, e somados (`dashboard.py:109-120`); `_wf_refs` (`dashboard.py:36`) já varre as quatro.
+- **A3** — Formulários e templates (WhatsApp, SMS, e-mail) entram no `inventario` como fatias novas, com quem os usa; aparecem na aba Entidades e no MCP. Motivo: não estão em `FATIAS` (`mcp/base.py:32`), e são alvo de `broken_form_ref`/`broken_template_ref`.
+- **A1** — Contagem de achados por severidade entra em cada workflow da fatia `workflows` do `inventario`. Motivo: nenhum campo traz esse número hoje (`dashboard.py:131-147`); contar no auditor evita lógica na TUI e o MCP ganha junto.
+- **A6** — Erro de dump aparece ao escolher, não na lista. Motivo: `dumps()` não valida (`mcp/base.py:43-47`); marcar de antemão exigiria abrir todos os snapshots e estouraria o cache de 8.
+- **A7** — CI instala `.[dev,tui]` no job do auditor. Motivo: `ci.yml` instala só `.[dev]`, e os testes da TUI seriam pulados em silêncio.
+- **A11** — Abertura com `textualeffects`, decisão do usuário contra a recomendação de fazer à mão. Compatibilidade com o Textual 8 não confirmada: a primeira etapa do plano prova que as duas versões convivem, fixando-as no extra `tui`; se não conviverem, volta ao usuário.
