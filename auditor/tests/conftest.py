@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from itertools import count
 from pathlib import Path
 
@@ -137,3 +138,23 @@ def wf(id="wf1", name="[Solar] Compra → Boas-vindas", status="published", step
             "triggers": triggers if triggers is not None else [{"id": "t1", "name": "Trigger"}],
         },
     }
+
+
+LOC = "TESTLOC"
+
+
+@pytest.fixture
+def root(make_dump, tmp_path, monkeypatch):
+    """Monta <root>/<loc>/<snapshot>/ a partir do make_dump e aponta o servidor pra lá."""
+    from automaster_audit.mcp import base as mcp_base
+
+    def _build(snapshot="2026-06-10_0000", **kw):
+        d = make_dump(**kw)
+        dest = tmp_path / "root" / LOC / snapshot
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(d), str(dest))
+        monkeypatch.setenv("AUTOMASTER_DUMPS", str(tmp_path / "root"))
+        mcp_base._ctx.cache_clear()
+        return dest
+
+    return _build

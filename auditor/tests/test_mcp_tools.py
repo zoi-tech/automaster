@@ -1,12 +1,11 @@
 """Contrato e teto das seis tools offline do servidor MCP."""
 
 import json
-import shutil
 import subprocess
 from collections import Counter
 
 import pytest
-from conftest import tag_cond, trig, wf
+from conftest import LOC, tag_cond, trig, wf
 
 from automaster_audit import mcp_server as srv
 from automaster_audit.mcp import base as mcp_base
@@ -77,25 +76,6 @@ def test_run_extractor_timeout_becomes_tool_error(monkeypatch, tmp_path):
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
         srv._run_extractor("contato-editar")
     assert "tool `contato`" in str(e.value)
-
-
-LOC = "TESTLOC"
-
-
-@pytest.fixture
-def root(make_dump, tmp_path, monkeypatch):
-    """Monta <root>/<loc>/<snapshot>/ a partir do make_dump e aponta o servidor pra lá."""
-
-    def _build(snapshot="2026-06-10_0000", **kw):
-        d = make_dump(**kw)
-        dest = tmp_path / "root" / LOC / snapshot
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(d), str(dest))
-        monkeypatch.setenv("AUTOMASTER_DUMPS", str(tmp_path / "root"))
-        srv._ctx.cache_clear()
-        return dest
-
-    return _build
 
 
 def _steps_tag(tag):
