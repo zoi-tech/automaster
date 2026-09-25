@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from ..finding import ERROR, Finding
 from ..loader import DumpContext
-from ._helpers import steps_of_type
+from ._helpers import step_template_id, steps_of_type
 
 # `template_id: "0"` é o próprio app dizendo "None - Free form message" (o rótulo
 # sai assim em /whatsapp/workflow/options/template_id). Não é referência quebrada.
@@ -38,8 +38,7 @@ def check(ctx: DumpContext) -> list[Finding]:
         conhecidos = ctx.template_ids.get(canal)
         if not conhecidos:  # lista ausente ou vazia: nada a cruzar
             continue
-        attrs = step.get("attributes", {}) or {}
-        tid = str(attrs.get("template_id") or attrs.get("templateId") or "").strip()
+        tid = step_template_id(step)
         if tid in SEM_TEMPLATE:
             continue  # mensagem livre: o corpo está em `message`
         if tid and tid not in conhecidos:

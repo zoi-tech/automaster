@@ -29,7 +29,7 @@ CONTATO_NOISE = (
     "externalChange",
 )  # 40% do payload bruto, nada que o agente use
 EXTRACTOR_DIR = Path(os.environ.get("CLAUDE_PLUGIN_ROOT") or Path(__file__).resolve().parents[4]) / "extractor"
-FATIAS = ("workflows", "tags", "fields", "pipelines", "users", "calendars", "custom_values")
+FATIAS = ("workflows", "tags", "fields", "pipelines", "users", "calendars", "custom_values", "forms", "templates")
 
 
 class ToolError(Exception):

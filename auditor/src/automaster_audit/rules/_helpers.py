@@ -40,3 +40,9 @@ def email_template_id(step: dict) -> str:
     url = unquote(str(attrs.get("previewUrl") or ""))
     m = _PREVIEW_ID.search(url)
     return m.group(1) if m else ""
+
+
+def step_template_id(step: dict) -> str:
+    """Id do template SMS/WhatsApp citado por um step (`template_id` ou `templateId`)."""
+    attrs = step.get("attributes", {}) or {}
+    return str(attrs.get("template_id") or attrs.get("templateId") or "").strip()

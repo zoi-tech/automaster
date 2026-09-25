@@ -12,7 +12,9 @@ import re
 from collections import Counter
 
 from .loader import DumpContext, Workflow
-from .rules._helpers import add_to_workflow_targets
+from .rules._helpers import add_to_workflow_targets, email_template_id, step_template_id
+from .rules.broken_form_ref import TRIGGER, _citados
+from .rules.broken_template_ref import CANAL_DO_STEP, SEM_TEMPLATE
 
 CHANNEL_TYPES = ("sms", "email", "whatsapp", "internal_notification", "webhook", "drip", "manual-call")
 _CV_TOKEN = re.compile(r"custom_values\.([a-zA-Z0-9_]+)")
@@ -144,6 +146,22 @@ def build_dashboard(ctx: DumpContext) -> dict:
             uso("user", uid, papeis)
         for cv in r["cvs"]:
             cv_users.setdefault(cv, []).append(wf.name)
+        forms_wf: set[str] = set()
+        for trigger in wf.triggers:
+            alvo = TRIGGER.get(trigger.get("type"))
+            for cond in (trigger.get("conditions") or []) if alvo else []:
+                if cond.get("field") == alvo[1]:
+                    forms_wf.update(_citados(cond))
+        for fid in sorted(forms_wf):
+            uso("form", fid, ["dispara"])
+        tpls_wf: set[str] = set()
+        for step in wf.steps:
+            if step.get("type") in CANAL_DO_STEP:
+                tpls_wf.add(step_template_id(step))
+            elif step.get("type") == "email":
+                tpls_wf.add(email_template_id(step))
+        for tid in sorted(tpls_wf - SEM_TEMPLATE):
+            uso("template", tid, ["envia"])
 
     workflows = []
     for wf in ctx.workflows:
@@ -239,6 +257,17 @@ def build_dashboard(ctx: DumpContext) -> dict:
         key=lambda x: x["name"].lower(),
     )
 
+    def _itens(kind, grupos, rotulo, nomes):
+        itens = []
+        for grupo, ids in grupos.items():
+            for iid in sorted(ids):
+                u = [] if iid in SEM_TEMPLATE else _ordenar(usos.get((kind, iid), []))
+                itens.append({"id": iid, rotulo: grupo, "name": nomes.get(iid, iid), "usos": u, "orphan": not u})
+        return itens
+
+    forms = _itens("form", ctx.form_ids, "tipo", ctx.form_names)
+    templates = _itens("template", ctx.template_ids, "canal", ctx.template_names)
+
     summary = {
         "workflows": len(ctx.workflows),
         "published": sum(1 for w in ctx.workflows if w.status == "published"),
@@ -263,4 +292,6 @@ def build_dashboard(ctx: DumpContext) -> dict:
         "users": users,
         "calendars": calendars,
         "custom_values": custom_values,
+        "forms": forms,
+        "templates": templates,
     }
