@@ -55,14 +55,14 @@ class Principal(Screen):
     )
 
     class AbrirWorkflow(Message):
-        """Enter num workflow; a etapa 7 conecta à tela de detalhe."""
+        """Enter num workflow; a app empurra o detalhe."""
 
         def __init__(self, id: str) -> None:
             super().__init__()
             self.id = id
 
     class AbrirEntidade(Message):
-        """Enter numa entidade; a etapa 7 conecta à tela de detalhe."""
+        """Enter numa entidade; a app empurra o detalhe."""
 
         def __init__(self, fatia: str, nome: str) -> None:
             super().__init__()
@@ -141,8 +141,10 @@ class Principal(Screen):
         )
         t = self.query_one("#tabela-achados", DataTable)
         t.clear()
+        self.ids_achados = []
         for g in self.grupos:
             if g["severity"] in self.sevs:
+                self.ids_achados.append(g["workflow_id"])
                 t.add_row(g["severity"], g["rule"], g["workflow"] or "—", g["detail"], str(g["n"]))
 
     def action_sev(self, sev: str) -> None:
@@ -227,6 +229,8 @@ class Principal(Screen):
         key = ev.row_key.value or ""
         if ev.data_table.id == "tabela-workflows":
             self.post_message(self.AbrirWorkflow(key))
+        elif ev.data_table.id == "tabela-achados" and self.ids_achados[ev.cursor_row]:
+            self.post_message(self.AbrirWorkflow(self.ids_achados[ev.cursor_row]))
         elif ev.data_table.id == "resultados-busca" and key.startswith("wf:"):
             self.post_message(self.AbrirWorkflow(key[3:]))
         elif ev.data_table.id == "tabela-entidades":

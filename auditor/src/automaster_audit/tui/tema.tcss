@@ -28,3 +28,12 @@ ErroDump { align: center middle; background: $background 70%; }
 #tipo-entidade, #sevs { color: $secondary; padding: 0 1; }
 #diff { padding: 1 2; color: $foreground; }
 TabbedContent Tabs { background: $surface; }
+#cabecalho-workflow, #cabecalho-entidade { color: $primary; text-style: bold; padding: 0 1; }
+#triggers { color: $secondary; padding: 0 1; }
+#aviso-corte { color: $warning; padding: 0 1; }
+#col-arvore { width: 3fr; }
+#col-lado { width: 2fr; }
+Tree { background: $background; border: solid $rule; }
+Tree:focus { border: solid $primary; }
+#sem-passos { color: $dim; padding: 1 2; }
+#achados-workflow { height: auto; border: solid $error; color: $foreground; padding: 0 1; }

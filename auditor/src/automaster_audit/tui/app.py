@@ -4,6 +4,8 @@ from textual.app import App
 from textual.binding import Binding
 from textual.theme import Theme
 
+from .detalhe import DetalheEntidade, DetalheWorkflow
+from .principal import Principal
 from .telas import Selecao
 
 TEMA = Theme(
@@ -37,3 +39,9 @@ class AutomasterApp(App):
 
     def on_mount(self) -> None:
         self.push_screen(Selecao())
+
+    def on_principal_abrir_workflow(self, ev: Principal.AbrirWorkflow) -> None:
+        self.push_screen(DetalheWorkflow(self.screen.loc, self.screen.snapshot, ev.id))
+
+    def on_principal_abrir_entidade(self, ev: Principal.AbrirEntidade) -> None:
+        self.push_screen(DetalheEntidade(self.screen.loc, self.screen.snapshot, ev.fatia, ev.nome))
