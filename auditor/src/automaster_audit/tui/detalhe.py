@@ -27,14 +27,14 @@ class DetalheWorkflow(Screen):
 
     def __init__(self, loc: str, snapshot: str, id: str) -> None:
         super().__init__()
-        self.loc, self.snapshot, self.id = loc, snapshot, id
+        self.loc, self.snapshot, self.wid = loc, snapshot, id
 
     def compose(self) -> ComposeResult:
-        d = workflow(self.loc, self.id, self.snapshot)
+        d = workflow(self.loc, self.wid, self.snapshot)
         m, self.achados = d["meta"], d["achados"]
         self.chamadores = m["called_by"]
         ctx, _ = base._load(self.loc, self.snapshot)
-        wf = next(w for w in ctx.workflows if w.id == self.id)
+        wf = next(w for w in ctx.workflows if w.id == self.wid)
         self.ctx, self.by_id = ctx, {s.get("id"): s for s in wf.steps}
         self.com_erro = {m_.group(1) for a in self.achados if (m_ := _STEP.match(a["detail"]))}
         yield Static(f"WORKFLOW · {m['name']}", classes="barra", markup=False)
@@ -81,7 +81,7 @@ class DetalheWorkflow(Screen):
         refs.add_columns("tipo", "nome")
         for fatia, rotulo in TIPOS:
             for e in inventario(self.loc, fatia, self.snapshot)[fatia]:
-                if any(u["workflow_id"] == self.id for u in e.get("usos") or []):
+                if any(u["workflow_id"] == self.wid for u in e.get("usos") or []):
                     refs.add_row(rotulo, e["name"], key=f"{fatia}:{e['name']}")
         ids = {w.name: w.id for w in self.ctx.workflows}
         for nome in self.chamadores:
