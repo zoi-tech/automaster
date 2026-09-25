@@ -4,6 +4,20 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.27.0 — TUI de navegação do dump
+
+- **TUI `automaster-audit tui`** (Textual + textualeffects, extra opcional `tui`:
+  `pip install -e '.[tui]'`). Só leitura do dump: seleção de subconta e snapshot, tela
+  principal com 4 abas (workflows, achados, entidades, diff) e busca, detalhe do workflow em
+  árvore com o passo quebrado marcado e `n` para o próximo erro, entidade com o papel em cada
+  workflow.
+- **Camada cinematográfica**: abertura animada, transições, contadores e pulso; desliga com
+  `--sem-animacao` ou `TEXTUAL_ANIMATIONS=none`.
+- **Inventário (também na tool MCP `inventario`)**: `achados` por workflow; `usos` com o papel
+  por workflow em tags, campos, funis e usuários (escreve, cria, busca, atribui, notifica);
+  fatias novas `forms` e `templates`.
+- CI instala `.[dev,tui]`. Spec em `docs/vesta/specs/2026-09-25-tui-navegacao-design.md`.
+
 ## 0.26.0 — configuração do workflow e validação ao vivo
 
 - **Ação `configuracao`** em `workflow-editar` (só `allowMultiple` por enquanto): recusa

@@ -33,7 +33,7 @@ Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plu
 
 **A saída `--json` da CLI é um envelope** (`extractor/src/saida.ts`): `{ok, data}` ou `{ok:false, error:{code, message}}`, mais `escrita:{tentada, rastros}` quando um PUT/POST/DELETE saiu de verdade. É o contrato que o servidor MCP lê (`mcp/base.py:_run_extractor`, que desembrulha `data`); comando novo emite por `emitir(opts.json, dado)` e erra por `.catch(falhar)`, nunca por `console.log(JSON.stringify(...))`. Sem `--json` a saída segue pretty, para gente.
 
-Módulos do auditor: `mcp/` (as tools do servidor MCP), `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`).
+Módulos do auditor: `mcp/` (as tools do servidor MCP), `loader.py` (monta `DumpContext`), `flow.py` (grafo de execução dos steps), `rules/` (registry via `pkgutil`, 1 arquivo por regra, severidade ERROR/WARN/INFO, função `check(ctx)->list[Finding]`), `report.py`, `graph.py`+`graph_html.py`, `dashboard.py`+`dashboard_html.py`, `journey.py`+`journey_html.py` (árvore de jornada do contato), `theme.py` (tokens Carbon + `topbar()`/`sidebar()`/`shell_meta()` compartilhados + fontes embutidas em `assets/`), `tui/` (TUI Textual de navegação do dump, só leitura; exceção à regra de ler só pelo `mcp/`: lê os passos direto de `flow.py`).
 
 **Índice reverso com papel:** `dashboard._wf_refs` varre steps **e** triggers; cada tag tem `papeis` (`dispara`/`adiciona`/`remove`/`condicao`). Tag só citada em trigger ou condição não é órfã.
 
@@ -95,7 +95,8 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit journey dumps/<loc>/<ts>/      # journey.html (árvore de jornada)
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
-.venv/bin/python -m pytest -q                             # suíte (372 testes)
+.venv/bin/pip install -e '.[tui]' && .venv/bin/automaster-audit tui   # TUI de navegação do dump (só leitura)
+.venv/bin/python -m pytest -q                             # suíte (454 testes)
 .venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests  # lint + formatação
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
