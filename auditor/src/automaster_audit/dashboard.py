@@ -52,10 +52,10 @@ def _wf_refs(wf: Workflow) -> dict:
                 for x in v if isinstance(v, list) else [v]:
                     if isinstance(x, str):
                         tag(x, "condicao")
-    fields: set[str] = set()
-    pipelines: set[str] = set()
+    fields: dict[str, set[str]] = {}
+    pipelines: dict[str, set[str]] = {}
     calls: set[str] = set()
-    users: set[str] = set()
+    users: dict[str, set[str]] = {}
     cvs: set[str] = set()
     channels: Counter = Counter()
     for s in wf.steps:
@@ -72,22 +72,25 @@ def _wf_refs(wf: Workflow) -> dict:
         elif t == "update_contact_field":
             for f in a.get("fields", []) or []:
                 if f.get("field"):
-                    fields.add(f["field"])
+                    fields.setdefault(f["field"], set()).add("escreve")
         elif t == "find_opportunity":
             for inp in a.get("__customInputFields__", []) or []:
                 if inp.get("filterField") == "pipeline_id" and inp.get("secondValue"):
-                    pipelines.add(inp["secondValue"])
+                    pipelines.setdefault(inp["secondValue"], set()).add("busca")
         elif t == "internal_create_opportunity":
             if a.get("pipelineId"):
-                pipelines.add(a["pipelineId"])
+                pipelines.setdefault(a["pipelineId"], set()).add("cria")
         elif t == "add_to_workflow":
             if a.get("workflow_id"):
                 calls.add(a["workflow_id"])
         elif t == "assign_user":
-            users.update((a.get("traffic_weightage") or {}).keys())
-            users.update(ti["id"] for ti in a.get("traffic_index", []) or [] if ti.get("id"))
+            for uid in [*(a.get("traffic_weightage") or {})] + [
+                ti["id"] for ti in a.get("traffic_index", []) or [] if ti.get("id")
+            ]:
+                users.setdefault(uid, set()).add("atribui")
         elif t == "internal_notification":
-            users.update((a.get("sms") or {}).get("selectedUser", []) or [])
+            for uid in (a.get("sms") or {}).get("selectedUser", []) or []:
+                users.setdefault(uid, set()).add("notifica")
         cvs.update(m.lower() for m in _CV_TOKEN.findall(json.dumps(a, ensure_ascii=False)))
     return {
         "tags": tags,
@@ -98,6 +101,10 @@ def _wf_refs(wf: Workflow) -> dict:
         "cvs": cvs,
         "channels": channels,
     }
+
+
+def _ordenar(usos: list[dict]) -> list[dict]:
+    return sorted(usos, key=lambda u: (u["workflow"].lower(), u["workflow_id"]))
 
 
 def build_dashboard(ctx: DumpContext) -> dict:
@@ -112,20 +119,29 @@ def build_dashboard(ctx: DumpContext) -> dict:
     called_by: dict[str, list[str]] = {}
     user_users: dict[str, list[str]] = {}
     cv_users: dict[str, list[str]] = {}
+    usos: dict[tuple[str, str], list[dict]] = {}
+
+    def uso(kind, key, papeis):
+        usos.setdefault((kind, key), []).append({"workflow_id": wf.id, "workflow": wf.name, "papeis": sorted(papeis)})
+
     for wf in ctx.workflows:
         r = refs[wf.id]
         for tag, papeis in r["tags"].items():
             key = tag.strip().lower()
             tag_users.setdefault(key, []).append(wf.name)
             tag_papeis.setdefault(key, set()).update(papeis)
-        for fid in r["fields"]:
+            uso("tag", key, papeis)
+        for fid, papeis in r["fields"].items():
             field_users.setdefault(fid, []).append(wf.name)
-        for pid in r["pipelines"]:
+            uso("field", fid, papeis)
+        for pid, papeis in r["pipelines"].items():
             pipe_users.setdefault(pid, []).append(wf.name)
+            uso("pipe", pid, papeis)
         for tid in r["calls"]:
             called_by.setdefault(tid, []).append(wf.name)
-        for uid in r["users"]:
+        for uid, papeis in r["users"].items():
             user_users.setdefault(uid, []).append(wf.name)
+            uso("user", uid, papeis)
         for cv in r["cvs"]:
             cv_users.setdefault(cv, []).append(wf.name)
 
@@ -155,6 +171,7 @@ def build_dashboard(ctx: DumpContext) -> dict:
             "used_by": sorted(tag_users.get(name, [])),
             "orphan": name not in tag_users,
             "papeis": sorted(tag_papeis.get(name, ())),
+            "usos": _ordenar(usos.get(("tag", name), [])),
         }
         for name in sorted(ctx.tag_names)
     ]
@@ -163,11 +180,16 @@ def build_dashboard(ctx: DumpContext) -> dict:
             "name": ctx.field_names.get(fid, fid),
             "used_by": sorted(field_users.get(fid, [])),
             "orphan": fid not in field_users,
+            "usos": _ordenar(usos.get(("field", fid), [])),
         }
         for fid in sorted(ctx.field_ids, key=lambda x: ctx.field_names.get(x, x).lower())
     ]
     pipelines = [
-        {"name": ctx.pipeline_names.get(pid, pid), "used_by": sorted(pipe_users.get(pid, []))}
+        {
+            "name": ctx.pipeline_names.get(pid, pid),
+            "used_by": sorted(pipe_users.get(pid, [])),
+            "usos": _ordenar(usos.get(("pipe", pid), [])),
+        }
         for pid in sorted(ctx.pipeline_ids)
     ]
 
@@ -183,6 +205,7 @@ def build_dashboard(ctx: DumpContext) -> dict:
                 "deleted": bool(u.get("deleted")),
                 "used_by": used,
                 "orphan": not used,
+                "usos": _ordenar(usos.get(("user", uid), [])),
             }
         )
     users.sort(key=lambda x: x["name"].lower())
