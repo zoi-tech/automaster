@@ -39,6 +39,32 @@ Etapa 6 — tela principal (substitui o placeholder, mantém `#titulo-principal`
 - `/` foca `#busca` (Input); Enter nele preenche `#resultados-busca` (DataTable) com uma linha por
   resultado de `buscar`, o nome numa célula.
 - Esc volta à seleção.
+
+Etapa 7 — detalhe do workflow e da entidade (`tui/detalhe.py`):
+
+- Enter num workflow de `#tabela-workflows`, `#tabela-achados` (linha do achado leva ao seu workflow) ou
+  `#resultados-busca` empurra o detalhe do workflow. Enter numa linha de `#tabela-entidades` empurra a entidade.
+- Detalhe do workflow, dados por `mcp.dump.workflow` e `achados`:
+  - `#cabecalho-workflow` (Static): nome, status e nº de passos.
+  - `#triggers` (Static): o nome de cada trigger.
+  - `#arvore` (Tree): os passos, de `flow.enumerate_paths` agrupados por prefixo (`path_report._trie`), com
+    rótulos de `path_report.describe_step`. Cada nó de passo tem `data` = id do step.
+  - Passo com achado: `Finding` não tem id de passo, então o critério é o `detail` do achado do workflow que
+    começa com `step '<nome do step>'` (nome, ou o `type` se não tiver nome — como as regras escrevem). O rótulo
+    desse nó leva `✗` (e cor de erro); os outros não levam `✗`.
+  - `n` move o cursor de `#arvore` para o próximo passo com achado, na ordem da árvore.
+  - Workflow sem passos: `#sem-passos` (Static) com o texto "sem passos". Só existe nesse caso.
+  - `enumerate_paths` devolveu corte (cap padrão atingido): `#aviso-corte` (Static) cujo texto cita "caminhos".
+    Só existe nesse caso.
+  - `#achados-workflow` (Static): o `detail` de cada achado do workflow, e só dele.
+  - `#referencias` (DataTable, cursor de linha): uma linha por referência — tags, campos, usuários notificados,
+    funis, formulários, templates, com o NOME numa célula — e uma linha por workflow que o chama (`called_by`).
+    Enter numa linha de entidade empurra a entidade.
+- Entidade, dados pelos `usos` de `inventario`:
+  - `#cabecalho-entidade` (Static): o nome da entidade.
+  - `#usos` (DataTable, colunas "workflow" e "papel"): uma linha por workflow, com os papéis DAQUELE workflow
+    (nunca a soma dos papéis de todos). Enter numa linha empurra o detalhe daquele workflow.
+- Esc volta uma tela (entidade → detalhe → principal), sem fechar a app.
 """
 
 import asyncio
@@ -462,5 +488,260 @@ def test_esc_volta_a_selecao(root):
         await pilot.pause()
         assert app.screen.query("#subcontas")
         assert not app.screen.query("#abas")
+
+    _run(corpo)
+
+
+# --- etapa 7: detalhe do workflow e da entidade ---------------------------------
+
+
+def _passo(id, tipo, nome, pai=None, prox=None, **attrs):
+    s = {"id": id, "type": tipo, "name": nome, "attributes": attrs}
+    if pai:
+        s["parent"] = pai
+    if prox:
+        s["next"] = prox
+    return s
+
+
+def _diamante(n=10):
+    """if_else encadeados com os dois ramos no mesmo nó: 2**n caminhos, acima do cap padrão (500)."""
+    return [
+        _passo(f"d{i}", "if_else", f"Cond {i}", pai=f"d{i - 1}" if i else None, prox=[f"d{i + 1}"] * 2)
+        for i in range(n)
+    ]
+
+
+def _dump_detalhe(root):
+    alfa = [
+        _passo("s1", "add_contact_tag", "Um", prox="s2", tags=["usada"]),
+        _passo("s2", "add_contact_tag", "Dois", pai="s1", prox="s3", tags=["sumida-a"]),
+        _passo("s3", "update_contact_field", "Tres", pai="s2", prox="s4", fields=[{"field": "F1"}]),
+        _passo("s4", "internal_notification", "Quatro", pai="s3", prox="s5", sms={"selectedUser": ["U1"]}),
+        _passo("s5", "add_contact_tag", "Cinco", pai="s4", tags=["sumida-b"]),
+    ]
+    trig_beta = [{"id": "tb", "name": "Trig Beta", "conditions": [{"field": "contact.tags", "value": ["usada"]}]}]
+    root(
+        workflows=[
+            wf(id="wa", name="Alfa", steps=alfa),
+            wf(
+                id="wb",
+                name="Beta",
+                steps=[_passo("b1", "add_to_workflow", "Chama", workflow_id="wa")],
+                triggers=trig_beta,
+            ),
+            wf(id="wv", name="Vazio", steps=[]),
+            wf(id="wx", name="Corte", steps=_diamante()),
+        ],
+        tags=["usada"],
+        fields=[{"id": "F1", "name": "Campo Um"}],
+        users=[{"id": "U1", "name": "Ana Nota"}],
+    )
+
+
+async def _enter_em(pilot, tabela, pred):
+    linhas = _linhas(tabela)
+    i = next(i for i, x in enumerate(linhas) if pred(x))
+    tabela.move_cursor(row=i)
+    tabela.focus()
+    await pilot.pause()
+    await pilot.press("enter")
+    await pilot.pause()
+
+
+async def _detalhe(app, pilot, nome):
+    await _abrir(pilot)
+    await _enter_em(pilot, app.screen.query_one("#tabela-workflows"), lambda x: x.startswith(nome + " "))
+
+
+def _nos(tree):
+    pilha, out = list(tree.root.children), []
+    while pilha:
+        no = pilha.pop(0)
+        out.append(no)
+        pilha[:0] = list(no.children)
+    return out
+
+
+def _no(app, sid):
+    return next(n for n in _nos(app.screen.query_one("#arvore")) if n.data == sid)
+
+
+def test_detalhe_cabecalho_e_triggers(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        cab = _texto(app, "#cabecalho-workflow")
+        assert "Alfa" in cab and "published" in cab and re.search(r"\b5\b", cab)
+        assert "Trigger" in _texto(app, "#triggers")
+
+    _run(corpo)
+
+
+def test_detalhe_arvore_com_rotulos_de_describe_step(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        assert {n.data for n in _nos(app.screen.query_one("#arvore"))} >= {"s1", "s2", "s3", "s4", "s5"}
+        assert "update field Campo Um" in str(_no(app, "s3").label)
+        assert "notificar Ana Nota" in str(_no(app, "s4").label)
+        assert not app.screen.query("#sem-passos") and not app.screen.query("#aviso-corte")
+
+    _run(corpo)
+
+
+def test_detalhe_passo_com_achado_leva_x(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        for sid in ("s2", "s5"):
+            assert "✗" in str(_no(app, sid).label), sid
+        for sid in ("s1", "s3", "s4"):
+            assert "✗" not in str(_no(app, sid).label), sid
+
+    _run(corpo)
+
+
+def test_detalhe_n_pula_para_proximo_erro(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        tree = app.screen.query_one("#arvore")
+        await pilot.press("n")
+        await pilot.pause()
+        assert tree.cursor_node.data == "s2"
+        await pilot.press("n")
+        await pilot.pause()
+        assert tree.cursor_node.data == "s5"
+
+    _run(corpo)
+
+
+def test_detalhe_painel_de_achados_so_do_workflow(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        txt = _texto(app, "#achados-workflow")
+        assert "sumida-a" in txt and "sumida-b" in txt
+        assert "Beta" not in txt and "Vazio" not in txt
+
+    _run(corpo)
+
+
+def test_detalhe_referencias(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        linhas = _linhas(app.screen.query_one("#referencias"))
+        for nome in ("usada", "Campo Um", "Ana Nota", "Beta"):
+            assert any(nome in x for x in linhas), nome
+
+    _run(corpo)
+
+
+def test_detalhe_sem_passos(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Vazio")
+        assert "sem passos" in _texto(app, "#sem-passos")
+
+    _run(corpo)
+
+
+def test_detalhe_aviso_de_corte(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Corte")
+        assert "caminhos" in _texto(app, "#aviso-corte")
+
+    _run(corpo)
+
+
+def test_referencia_abre_entidade_com_papel_por_workflow(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        await _enter_em(pilot, app.screen.query_one("#referencias"), lambda x: "usada" in x)
+        assert "usada" in _texto(app, "#cabecalho-entidade")
+        usos = app.screen.query_one("#usos")
+        linhas = _linhas(usos)
+        assert len(linhas) == 2
+        alfa = next(x for x in linhas if "Alfa" in x)
+        beta = next(x for x in linhas if "Beta" in x)
+        assert "adiciona" in alfa and "condicao" not in alfa
+        assert "condicao" in beta and "adiciona" not in beta
+
+    _run(corpo)
+
+
+def test_entidade_enter_abre_workflow_e_esc_volta_uma_tela(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Alfa")
+        await _enter_em(pilot, app.screen.query_one("#referencias"), lambda x: "usada" in x)
+        await _enter_em(pilot, app.screen.query_one("#usos"), lambda x: "Beta" in x)
+        assert "Beta" in _texto(app, "#cabecalho-workflow")
+        await pilot.press("escape")
+        await pilot.pause()
+        assert "usada" in _texto(app, "#cabecalho-entidade")
+        await pilot.press("escape")
+        await pilot.pause()
+        assert "Alfa" in _texto(app, "#cabecalho-workflow")
+        await pilot.press("escape")
+        await pilot.pause()
+        assert app.screen.query("#abas") and not app.screen.query("#cabecalho-workflow")
+        assert app.is_running
+
+    _run(corpo)
+
+
+def test_enter_nos_achados_abre_workflow(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _abrir(pilot)
+        await pilot.press("2")
+        await pilot.pause()
+        await _enter_em(pilot, app.screen.query_one("#tabela-achados"), lambda x: "sumida-a" in x)
+        assert "Alfa" in _texto(app, "#cabecalho-workflow")
+
+    _run(corpo)
+
+
+def test_enter_na_busca_abre_workflow(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _abrir(pilot)
+        await pilot.press("/")
+        await pilot.pause()
+        await pilot.press(*"Beta", "enter")
+        await pilot.pause()
+        await _enter_em(pilot, app.screen.query_one("#resultados-busca"), lambda x: "Beta" in x)
+        assert "Beta" in _texto(app, "#cabecalho-workflow")
+
+    _run(corpo)
+
+
+def test_enter_nas_entidades_abre_entidade(root):
+    _dump_detalhe(root)
+
+    async def corpo(app, pilot):
+        await _abrir(pilot)
+        await pilot.press("3")
+        await pilot.pause()
+        await _enter_em(pilot, app.screen.query_one("#tabela-entidades"), lambda x: "usada" in x)
+        assert "usada" in _texto(app, "#cabecalho-entidade")
+        assert len(_linhas(app.screen.query_one("#usos"))) == 2
 
     _run(corpo)
