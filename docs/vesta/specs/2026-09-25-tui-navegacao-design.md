@@ -42,6 +42,25 @@ lógica de leitura ou auditoria nova.
 
 Esc volta uma tela; `q` sai.
 
+## Direção visual: cinematográfica
+
+Identidade própria, sem ligação com o "Sala de Controle" dos HTMLs: sala de comando de
+ficção científica, fundo escuro, paleta âmbar, ciano e verde fósforo. A paleta exata sai do
+mockup.
+
+Quatro elementos, todos obrigatórios:
+
+1. Abertura de impacto: entrada animada de 1 a 2 segundos (marca, varredura, contagem do
+   dump carregado).
+2. Transições animadas entre telas, e números que sobem até o valor.
+3. Visual de sala de comando: bordas, cabeçalhos grandes, barra de status permanente.
+4. Momentos dramáticos: achado ERROR com destaque pulsante; o diff se revela como linha do
+   tempo.
+
+Travas de uso diário: qualquer tecla pula a animação em andamento; `--sem-animacao`
+desliga todas; terminal sem suporte a cor verdadeira cai para a paleta de 256 cores sem
+quebrar a leitura. Animação nunca atrasa um dado: a tela já é navegável enquanto anima.
+
 ## Erros
 
 Dump recusado pelo schema ou ilegível: aparece na tela de seleção como indisponível, com a
