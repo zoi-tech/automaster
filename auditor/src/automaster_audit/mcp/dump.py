@@ -40,6 +40,17 @@ def inventario(loc: str, fatia: str | None = None, snapshot: str | None = None) 
         return {"summary": dash["summary"], "_snapshot": meta}
     if fatia not in FATIAS:
         raise ToolError(f"fatia {fatia!r} inválida; use uma de {FATIAS}")
+    if fatia == "workflows":
+        por_wf: dict[str, Counter] = {}
+        for f in _findings(str(ctx.path)):
+            if f.workflow_id:
+                por_wf.setdefault(f.workflow_id, Counter())[f.severity] += 1
+        vazio = Counter()
+        wfs = [
+            {**w, "achados": {s: por_wf.get(w["id"], vazio)[s] for s in ("ERROR", "WARN", "INFO")}}
+            for w in dash["workflows"]
+        ]
+        return {"workflows": wfs, "_snapshot": meta}
     return {fatia: dash[fatia], "_snapshot": meta}
 
 
