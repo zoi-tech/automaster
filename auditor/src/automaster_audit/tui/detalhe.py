@@ -13,6 +13,7 @@ from ..flow import enumerate_paths
 from ..mcp import base
 from ..mcp.dump import inventario, workflow
 from ..path_report import _trie, describe_step
+from .abertura import entrar
 from .principal import TIPOS, Principal
 
 _STEP = re.compile(r"^step '(.*?)'")
@@ -75,6 +76,7 @@ class DetalheWorkflow(Screen):
             self._montar(pai.add(self._rotulo(sid, ramo), data=sid, expand=True), filho)
 
     def on_mount(self) -> None:
+        entrar(self)
         refs = self.query_one("#referencias", DataTable)
         refs.add_columns("tipo", "nome")
         for fatia, rotulo in TIPOS:
@@ -133,6 +135,7 @@ class DetalheEntidade(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        entrar(self)
         e = next(x for x in inventario(self.loc, self.fatia, self.snapshot)[self.fatia] if x["name"] == self.nome)
         t = self.query_one("#usos", DataTable)
         t.add_columns("workflow", "papel")

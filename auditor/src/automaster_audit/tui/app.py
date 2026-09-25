@@ -4,6 +4,7 @@ from textual.app import App
 from textual.binding import Binding
 from textual.theme import Theme
 
+from .abertura import Abertura
 from .detalhe import DetalheEntidade, DetalheWorkflow
 from .principal import Principal
 from .telas import Selecao
@@ -34,11 +35,11 @@ class AutomasterApp(App):
         # antes do CSS ser lido: o tcss usa $rule e $dim, que só existem neste tema
         self.register_theme(TEMA)
         self.theme = "automaster"
-        # explícito nos dois sentidos: a flag da CLI manda, não o TEXTUAL_ANIMATIONS
-        self.animation_level = "full" if animacao else "none"
+        if not animacao:  # sem a flag, vale o TEXTUAL_ANIMATIONS do ambiente
+            self.animation_level = "none"
 
     def on_mount(self) -> None:
-        self.push_screen(Selecao())
+        self.push_screen(Abertura() if self.animation_level == "full" else Selecao())
 
     def on_principal_abrir_workflow(self, ev: Principal.AbrirWorkflow) -> None:
         self.push_screen(DetalheWorkflow(self.screen.loc, self.screen.snapshot, ev.id))

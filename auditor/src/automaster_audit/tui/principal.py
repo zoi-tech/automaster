@@ -6,10 +6,12 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
+from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static, TabbedContent, TabPane
 
 from ..mcp.dump import achados, buscar, comparar, inventario
+from .abertura import entrar
 
 ABAS = ("workflows", "achados", "entidades", "diff")
 SEVS = ("ERROR", "WARN", "INFO")
@@ -38,6 +40,25 @@ class PaneDiff(TabPane):
 
     def render(self) -> Text:
         return Text(self.texto)
+
+
+class Kpi(Static):
+    """Contador que sobe de 0 ao total; com animação desligada nasce no total."""
+
+    valor = reactive(0)
+
+    def __init__(self, rotulo: str, total: int, id: str) -> None:
+        super().__init__(id=id, classes="kpi")
+        self.rotulo, self.total = rotulo, total
+
+    def on_mount(self) -> None:
+        if self.app.animation_level == "full":
+            self.animate("valor", self.total, duration=0.9, easing="out_cubic")
+        else:
+            self.valor = self.total
+
+    def watch_valor(self, valor: float) -> None:
+        self.update(f"{self.rotulo}\n{round(valor)}")
 
 
 class Principal(Screen):
@@ -84,10 +105,10 @@ class Principal(Screen):
         titulo = f"{self.titulo.upper()} · {_quando(self.snapshot)}"
         yield Static(titulo, id="titulo-principal", classes="barra", markup=False)
         with Horizontal(id="kpis"):
-            yield Static(f"erro\n{n['ERROR']}", id="kpi-erro", classes="kpi")
-            yield Static(f"aviso\n{n['WARN']}", id="kpi-aviso", classes="kpi")
-            yield Static(f"info\n{n['INFO']}", id="kpi-info", classes="kpi")
-            yield Static(f"workflows\n{len(self.wfs)}", id="kpi-workflows", classes="kpi")
+            yield Kpi("erro", n["ERROR"], id="kpi-erro")
+            yield Kpi("aviso", n["WARN"], id="kpi-aviso")
+            yield Kpi("info", n["INFO"], id="kpi-info")
+            yield Kpi("workflows", len(self.wfs), id="kpi-workflows")
         with Vertical(id="painel-busca"):
             yield Input(placeholder="buscar workflows, tags, campos, funis, usuários", id="busca")
             yield DataTable(id="resultados-busca", cursor_type="row")
@@ -114,6 +135,10 @@ class Principal(Screen):
         self._achados()
         self._entidades()
         self.query_one("#tabela-workflows", DataTable).focus()
+        entrar(self)
+        erro = self.query_one("#kpi-erro", Kpi)
+        if self.app.animation_level == "full" and erro.total:
+            self.set_interval(0.4, lambda: erro.toggle_class("pulso"))
 
     # --- workflows -----------------------------------------------------------
 

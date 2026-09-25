@@ -7,6 +7,7 @@ from textual.widgets import DataTable, Footer, Static
 from ..mcp import base
 from ..mcp.base import ToolError
 from ..mcp.dump import dumps
+from .abertura import entrar
 from .principal import Principal, _quando
 
 
@@ -34,6 +35,7 @@ class Selecao(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        entrar(self)
         if not self.subcontas:
             return
         t = self.query_one("#subcontas", DataTable)

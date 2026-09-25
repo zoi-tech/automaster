@@ -37,3 +37,9 @@ Tree { background: $background; border: solid $rule; }
 Tree:focus { border: solid $primary; }
 #sem-passos { color: $dim; padding: 1 2; }
 #achados-workflow { height: auto; border: solid $error; color: $foreground; padding: 0 1; }
+Abertura { align: center middle; }
+#abertura { width: auto; height: auto; align-horizontal: center; }
+#marca { color: $success; text-style: bold; }
+#linha-abertura { color: $warning; width: auto; }
+#contagem-abertura { color: $foreground; width: auto; margin-top: 1; }
+#kpi-erro.pulso { color: $error 50%; border: solid $error; }
