@@ -967,3 +967,55 @@ def test_sem_animacao_nao_ha_pulso(root):
             await pilot.pause(0.1)
 
     _run(corpo)
+
+
+# --- etapa 10: id real do GHL (UUID começado por número) ---
+
+WID_NUM = "88bf986f-4905-4582-8369-2874b963b398"
+WID_NUM_B = "12ab34cd-0000-4000-8000-000000000001"
+FID_NUM = "9AkbAIoxcORSn9CELCij"
+
+
+def _dump_ids_numericos(root):
+    root(
+        workflows=[
+            wf(
+                id=WID_NUM,
+                name="Numerico",
+                steps=[
+                    _passo("s1", "add_contact_tag", "Um", prox="s2", tags=["usada"]),
+                    _passo("s2", "update_contact_field", "Dois", pai="s1", fields=[{"field": FID_NUM}]),
+                ],
+            ),
+            wf(
+                id=WID_NUM_B,
+                name="Outro",
+                steps=[_passo("b1", "update_contact_field", "Campo", fields=[{"field": FID_NUM}])],
+            ),
+        ],
+        tags=["usada"],
+        fields=[{"id": FID_NUM, "name": "Campo Numerico"}],
+    )
+
+
+def test_detalhe_abre_workflow_com_id_numerico(root):
+    _dump_ids_numericos(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Numerico")
+        assert "Numerico" in _texto(app, "#cabecalho-workflow")
+
+    _run(corpo)
+
+
+def test_entidade_de_id_numerico_abre_e_leva_a_workflow_numerico(root):
+    _dump_ids_numericos(root)
+
+    async def corpo(app, pilot):
+        await _detalhe(app, pilot, "Numerico")
+        await _enter_em(pilot, app.screen.query_one("#referencias"), lambda x: "Campo Numerico" in x)
+        assert "Campo Numerico" in _texto(app, "#cabecalho-entidade")
+        await _enter_em(pilot, app.screen.query_one("#usos"), lambda x: "Outro" in x)
+        assert "Outro" in _texto(app, "#cabecalho-workflow")
+
+    _run(corpo)
