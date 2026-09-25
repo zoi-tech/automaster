@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Automaster TUI · mockup</title>
+<!-- Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050706; --panel:#0a0e0c; --rule:#1d2a24; --dim:#5d6f66; --text:#c9d6cf;
+  --amber:#ffb000; --amber-dim:#7a5500; --cyan:#3fd6e6; --green:#39ff88; --green-dim:#145c33;
+  --err:#ff4d4d; --warn:#ffb000; --info:#3fd6e6;
+  --font:"JetBrains Mono",ui-monospace,monospace;
+}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:clip}
+body{padding:24px 16px 64px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:15px;font-weight:800;letter-spacing:.2em;color:var(--amber);margin:0 0 4px;text-transform:uppercase}
+.note{color:var(--dim);font-size:13px;margin:0 0 20px;max-width:70ch;line-height:1.55}
+nav.pick{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+nav.pick button{font:inherit;font-size:12px;background:transparent;color:var(--dim);border:1px solid var(--rule);padding:6px 10px;cursor:pointer;white-space:nowrap}
+nav.pick button[aria-pressed=true]{color:var(--bg);background:var(--amber);border-color:var(--amber)}
+nav.pick button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.term{background:var(--panel);border:1px solid var(--rule);font-size:13px;line-height:1.45;overflow-x:auto;position:relative}
+.term::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.18) 2px 3px)}
+.screen{display:none;min-width:820px;min-height:520px}
+.screen.on{display:block;animation:in .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+.bar{display:flex;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--rule);color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+.bar b{color:var(--amber)}
+.foot{display:flex;gap:18px;flex-wrap:wrap;padding:6px 14px;border-top:1px solid var(--rule);color:var(--dim);font-size:12px;position:absolute;left:0;right:0;bottom:0;min-width:820px;box-sizing:border-box}
+.foot k{color:var(--bg);background:var(--cyan);padding:0 5px;margin-right:4px;font-style:normal}
+.body{padding:16px 14px 48px}
+.big{font-size:40px;font-weight:800;color:var(--amber);letter-spacing:.06em;line-height:1}
+.glow{text-shadow:0 0 8px currentColor}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--rule);margin:0 -14px 12px;padding:0 14px}
+.tabs span{padding:6px 14px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;font-size:12px}
+.tabs span.on{color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber)}
+table{border-collapse:collapse;width:100%}
+td,th{padding:3px 10px 3px 0;text-align:left;white-space:nowrap;vertical-align:top}
+th{color:var(--dim);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.12em;border-bottom:1px solid var(--rule)}
+tr.sel td{background:var(--green-dim);color:#eafff1}
+.n{text-align:right;font-variant-numeric:tabular-nums}
+.err{color:var(--err)} .warn{color:var(--warn)} .info{color:var(--info)} .ok{color:var(--green)} .dim{color:var(--dim)} .cy{color:var(--cyan)} .am{color:var(--amber)}
+.pulse{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35;text-shadow:none}}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 14px}
+.kpis div{background:var(--panel);padding:10px 12px}
+.kpis small{display:block;color:var(--dim);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.kpis strong{font-size:26px;font-weight:800}
+pre{margin:0;font:inherit;white-space:pre}
+.split{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px}
+.box{border:1px solid var(--rule);padding:8px 10px}
+.box h3{margin:0 0 6px;font-size:11px;font-weight:400;color:var(--dim);letter-spacing:.14em;text-transform:uppercase}
+.tl{border-left:1px solid var(--cyan);margin-left:6px;padding-left:14px}
+.tl p{margin:0 0 10px;position:relative}
+.tl p::before{content:"";position:absolute;left:-19px;top:6px;width:9px;height:9px;background:var(--cyan)}
+.tl p.chg::before{background:var(--amber)}
+.modal{border:1px solid var(--err);background:#140707;padding:12px 14px;max-width:560px;margin:40px auto}
+#splash{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:520px;gap:18px}
+#logo{font-size:12px;color:var(--green);line-height:1.1}
+.count{font-size:13px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase}
+.count b{color:var(--amber);font-size:18px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body><div class="wrap">
+<h1>Automaster · TUI · mockup</h1>
+<p class="note">Terminal de 120×32 simulado. Dados reais do snapshot 2026-09-20_0856 da Instaltech. Os atalhos no rodapé de cada tela são a proposta de teclado. As animações daqui ilustram a intenção; no terminal elas saem do Textual e do textualeffects.</p>
+<nav class="pick" aria-label="Telas">
+<button data-s="splash" aria-pressed="true">0 · abertura</button>
+<button data-s="sel">1 · seleção</button>
+<button data-s="wfs">2 · workflows</button>
+<button data-s="ach">2 · achados</button>
+<button data-s="ent">2 · entidades</button>
+<button data-s="diff">2 · diff</button>
+<button data-s="det">3 · detalhe do workflow</button>
+<button data-s="tag">4 · entidade</button>
+<button data-s="erro">erro de dump</button>
+</nav>
+<div class="term">
+
+<section class="screen on" id="s-splash"><div id="splash">
+<pre id="logo" class="glow"></pre>
+<div class="count">workflows <b data-to="72">0</b> · achados <b data-to="182">0</b> · subcontas <b data-to="11">0</b></div>
+<div class="dim" style="font-size:12px">qualquer tecla pula</div>
+</div></section>
+
+<section class="screen" id="s-sel">
+<div class="bar"><span><b>AUTOMASTER</b> · seleção</span><span>~/.automaster/dumps</span></div>
+<div class="body"><table>
+<tr><th>subconta</th><th>id</th><th class="n">snapshots</th><th>mais recente</th></tr>
+<tr><td>clientec Odontologia</td><td class="dim">6ICT3KsGLmamzMUI7VQS</td><td class="n">2</td><td>2026-09-19 19:18</td></tr>
+<tr class="sel"><td>▶ Instaltech</td><td>Xb9gDxwxYhdqtprGcb5E</td><td class="n">5</td><td>2026-09-20 08:56</td></tr>
+<tr><td class="dim">(sem nome)</td><td class="dim">HNEdypCYlMDyGCKSkTGQ</td><td class="n">3</td><td>2026-09-22 21:04</td></tr>
+<tr><td class="dim">(sem nome)</td><td class="dim">1eKYxrInmQStj5EqGI5f</td><td class="n">2</td><td>2026-09-19 19:17</td></tr>
+</table>
+<p class="dim" style="margin:18px 0 6px">SNAPSHOTS · Instaltech</p>
+<pre><span class="am">▶ 2026-09-20 08:56</span>   <span class="dim">72 workflows</span>
+  2026-09-19 19:09   <span class="dim">72 workflows</span>
+  2026-09-19 18:04
+  2026-09-18 14:39
+  2026-07-30 12:21</pre></div>
+<div class="foot"><span><k>↑↓</k>mover</span><span><k>→</k>snapshots</span><span><k>enter</k>abrir</span><span><k>/</k>buscar</span><span><k>q</k>sair</span></div>
+</section>
+
+<section class="screen" id="s-wfs">
+<div class="bar"><span><b>INSTALTECH</b> · 2026-09-20 08:56</span><span>72 workflows</span></div>
+<div class="body">
+<div class="kpis"><div><small>erro</small><strong class="err glow pulse" data-to="31">0</strong></div><div><small>aviso</small><strong class="warn" data-to="19">0</strong></div><div><small>info</small><strong class="info" data-to="132">0</strong></div><div><small>workflows</small><strong class="am" data-to="72">0</strong></div></div>
+<div class="tabs"><span class="on">1 workflows</span><span>2 achados</span><span>3 entidades</span><span>4 diff</span></div>
+<table>
+<tr><th>workflow</th><th>status</th><th class="n">passos</th><th class="n">err</th><th class="n">avi</th><th>trigger</th></tr>
+<tr class="sel"><td>▶ Automação - Classificação Cliente | DM INSTA</td><td class="ok">published</td><td class="n">65</td><td class="n err">2</td><td class="n dim">·</td><td>Instagram - Comentários Em Uma Publicação</td></tr>
+<tr><td>Automação - Classificação Cliente | DM INSTA | VENDAS</td><td class="ok">published</td><td class="n">65</td><td class="n err">2</td><td class="n dim">·</td><td>Instagram - Comentário(s) Em Uma Publicação</td></tr>
+<tr><td>1A - Fluxo de prospecção ativa (IA da Zoi)</td><td class="ok">published</td><td class="n">—</td><td class="n err">1</td><td class="n dim">·</td><td class="dim">—</td></tr>
+<tr><td>test.cmd</td><td class="dim">draft</td><td class="n">—</td><td class="n err">1</td><td class="n dim">·</td><td>Formulário Enviado</td></tr>
+<tr><td>Motivo de Perca - Atribuição de Tag</td><td class="ok">published</td><td class="n">7</td><td class="n dim">·</td><td class="n dim">·</td><td>Oportunidade Alterada</td></tr>
+<tr><td>2B - Não compareceu a Reunião -> Faz fluxo de Reagendamento</td><td class="ok">published</td><td class="n">102</td><td class="n dim">·</td><td class="n dim">·</td><td>Appointment Status</td></tr>
+<tr><td>Handoff</td><td class="dim">draft</td><td class="n">0</td><td class="n dim">·</td><td class="n dim">·</td><td class="dim">—</td></tr>
+</table>
+<p class="dim" style="font-size:12px">ordenado por erros · passos e contagens marcados — são ilustrativos onde o dado não foi conferido</p></div>
+<div class="foot"><span><k>1-4</k>aba</span><span><k>enter</k>detalhe</span><span><k>f</k>filtrar</span><span><k>s</k>ordenar</span><span><k>/</k>buscar</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-ach">
+<div class="bar"><span><b>INSTALTECH</b> · 2026-09-20 08:56</span><span>filtro: ERROR</span></div>
+<div class="body">
+<div class="tabs"><span>1 workflows</span><span class="on">2 achados</span><span>3 entidades</span><span>4 diff</span></div>
+<p style="margin:0 0 10px"><span class="err">■ ERROR 31</span>   <span class="dim">□ WARN 19   □ INFO 132</span></p>
+<table>
+<tr><th>sev</th><th>regra</th><th>workflow</th><th>detalhe</th></tr>
+<tr class="sel"><td class="err glow pulse">ERROR</td><td>broken_field_ref</td><td>Classificação Cliente | DM INSTA</td><td>campo inexistente: 'Possui time comercial?'</td></tr>
+<tr><td class="err">ERROR</td><td>broken_field_ref</td><td>Classificação Cliente | DM INSTA | VENDAS</td><td>campo inexistente: 'Possui time comercial?'</td></tr>
+<tr><td class="err">ERROR</td><td>broken_field_ref</td><td>1A - Oportunidade marcada como ganha…</td><td>campo inexistente: 'Contact type'</td></tr>
+<tr><td class="err">ERROR</td><td>broken_form_ref</td><td>test.cmd</td><td>formulário inexistente: bblZYCoXk6rf3xl7ehyO</td></tr>
+<tr><td class="err">ERROR</td><td>broken_template_ref</td><td>1A - Fluxo de prospecção ativa (IA da Zoi)</td><td>template whatsapp inexistente: 1391544742908102</td></tr>
+</table></div>
+<div class="foot"><span><k>e</k>erro</span><span><k>w</k>aviso</span><span><k>i</k>info</span><span><k>enter</k>abrir workflow</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-ent">
+<div class="bar"><span><b>INSTALTECH</b> · 2026-09-20 08:56</span><span>tags</span></div>
+<div class="body">
+<div class="tabs"><span>1 workflows</span><span>2 achados</span><span class="on">3 entidades</span><span>4 diff</span></div>
+<p style="margin:0 0 10px"><span class="am">[tags]</span> <span class="dim">campos · funis · usuários · formulários · templates</span></p>
+<table>
+<tr><th>tag</th><th class="n">workflows</th><th>papéis</th></tr>
+<tr class="sel"><td>▶ apresentação promo encerrada</td><td class="n">4</td><td>adiciona · condição</td></tr>
+<tr><td>api-não oficial</td><td class="n">1</td><td>adiciona</td></tr>
+<tr><td class="dim">[device] - pré atendimento</td><td class="n dim">0</td><td class="dim">órfã</td></tr>
+<tr><td class="dim">aconteceu-joinville</td><td class="n dim">0</td><td class="dim">órfã</td></tr>
+</table></div>
+<div class="foot"><span><k>←→</k>tipo</span><span><k>o</k>só órfãs</span><span><k>enter</k>quem usa</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-diff">
+<div class="bar"><span><b>INSTALTECH</b> · diff</span><span>2026-09-19 19:09 → 2026-09-20 08:56</span></div>
+<div class="body">
+<div class="tabs"><span>1 workflows</span><span>2 achados</span><span>3 entidades</span><span class="on">4 diff</span></div>
+<div class="tl">
+<p><span class="cy">2026-09-19 19:09</span> <span class="dim">· 72 workflows</span></p>
+<p class="chg"><span class="am">alterado</span>  test.cmd [review]<br><span class="dim">  triggers: 1 → 1 (conteúdo alterado)</span></p>
+<p><span class="dim">0 adicionados · 0 removidos · entidades sem mudança</span></p>
+<p><span class="cy">2026-09-20 08:56</span> <span class="dim">· 72 workflows</span></p>
+</div></div>
+<div class="foot"><span><k>[ ]</k>snapshot anterior/próximo</span><span><k>enter</k>abrir workflow</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-det">
+<div class="bar"><span><b>WORKFLOW</b> · Automação - Classificação Cliente | DM INSTA</span><span class="ok">published · 65 passos</span></div>
+<div class="body split">
+<div class="box"><h3>passos</h3><pre><span class="dim">trigger</span> Instagram - Comentários Em Uma Publicação
+▾ workflow_split
+  ▾ Path A → respond_on_comment → ig_interactive_messenger
+    · Default Timeout → [fim]
+    ▾ Confirmação (Sim) → instagram-dm → Wait
+      → update field <span class="cy">Segmento</span> → ig_interactive_messenger
+      ▾ Produtos → update field <span class="cy">tipo de oferta</span>
+        ▾ -100 → update field <span class="cy">leads por mês</span> → …
+          ▾ Sim → update field <span class="err glow pulse">▶ Possui time comercial? ✗</span>
+            ▸ Sim → … → notificar Felipe Remor → [fim]
+            ▸ Não → … → goto a8a59432 → …
+          ▸ Não → update field <span class="err">Possui time comercial? ✗</span></pre></div>
+<div><div class="box" style="border-color:var(--err)"><h3 class="err">2 erros</h3>
+<p style="margin:0 0 8px"><span class="err">broken_field_ref</span><br>'Possui time comercial?' foi apagado da subconta. O passo roda e não grava nada.</p>
+<p class="dim" style="margin:0">id k0F6L3qYBKQt3jssxjzs · 2 passos</p></div>
+<div class="box" style="margin-top:10px"><h3>referências</h3><pre><span class="cy">campos</span>  7   <span class="dim">(1 quebrado)</span>
+<span class="cy">tags</span>    0
+<span class="cy">notifica</span> Felipe Remor
+<span class="dim">chamado por  —</span></pre></div></div>
+</div>
+<div class="foot"><span><k>↑↓</k>mover</span><span><k>←→</k>recolher/abrir</span><span><k>enter</k>abrir entidade</span><span><k>n</k>próximo erro</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-tag">
+<div class="bar"><span><b>TAG</b> · apresentação promo encerrada</span><span>4 workflows</span></div>
+<div class="body"><table>
+<tr><th>workflow</th><th>papel</th></tr>
+<tr class="sel"><td>▶ 1B - Lead entrou no Follow-up & Respondeu > Segue o fluxo</td><td class="am">condição</td></tr>
+<tr><td>2B - Fluxo de contatos | Carlos</td><td class="ok">adiciona</td></tr>
+<tr><td>2B - Fluxo de contatos | Evelyn</td><td class="ok">adiciona</td></tr>
+<tr><td>2B - Fluxo de contatos | Jéssica</td><td class="ok">adiciona</td></tr>
+</table>
+<p class="dim" style="font-size:12px">papel por workflow é ilustrativo: hoje o auditor só dá a união (decisão A2)</p></div>
+<div class="foot"><span><k>enter</k>abrir workflow</span><span><k>esc</k>voltar</span></div>
+</section>
+
+<section class="screen" id="s-erro">
+<div class="bar"><span><b>AUTOMASTER</b> · seleção</span><span>~/.automaster/dumps</span></div>
+<div class="body"><div class="modal"><p class="err glow" style="margin:0 0 8px">SNAPSHOT RECUSADO</p>
+<p style="margin:0 0 8px">HNEdypCYlMDyGCKSkTGQ · 2026-09-15 17:24</p>
+<p class="dim" style="margin:0 0 12px">[mensagem do auditor sobre o motivo, verbatim]</p>
+<p style="margin:0"><span class="cy">enter</span> escolher outro snapshot</p></div></div>
+<div class="foot"><span><k>enter</k>voltar à seleção</span><span><k>q</k>sair</span></div>
+</section>
+</div></div>
+<script>
+const logo=[" █████  ██    ██ ████████  ██████  ███    ███  █████  ███████ ████████ ███████ ██████",
+"██   ██ ██    ██    ██    ██    ██ ████  ████ ██   ██ ██         ██    ██      ██   ██",
+"███████ ██    ██    ██    ██    ██ ██ ████ ██ ███████ ███████    ██    █████   ██████",
+"██   ██ ██    ██    ██    ██    ██ ██  ██  ██ ██   ██      ██    ██    ██      ██   ██",
+"██   ██  ██████     ██     ██████  ██      ██ ██   ██ ███████    ██    ███████ ██   ██"].join("\n");
+const G="!<>-_\\/[]{}=+*^?#░▒▓";
+function decode(el,txt){let f=0;const tot=40;const t=setInterval(()=>{f++;el.textContent=[...txt].map((c,i)=>c===" "||c==="\n"||(i%97)/97<f/tot?c:G[Math.random()*G.length|0]).join("");if(f>=tot){clearInterval(t);el.textContent=txt}},30)}
+function count(root){root.querySelectorAll("[data-to]").forEach(el=>{const to=+el.dataset.to,t0=performance.now();(function s(n){const p=Math.min(1,(n-t0)/900);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(s)})(t0)})}
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id==="s-"+id));document.querySelectorAll("nav.pick button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.s===id));const s=document.getElementById("s-"+id);count(s);if(id==="splash")decode(document.getElementById("logo"),logo)}
+document.querySelectorAll("nav.pick button").forEach(b=>b.onclick=()=>show(b.dataset.s));
+show("splash");
+</script></body></html>
