@@ -1,0 +1,18 @@
+Screen { background: $background; color: $foreground; }
+.barra { height: 1; background: $surface; color: $primary; padding: 0 1; border-bottom: none; }
+.dim { color: $dim; }
+#vazio { color: $dim; padding: 1 2; }
+DataTable { background: $background; border: solid $rule; }
+DataTable:focus { border: solid $primary; }
+DataTable > .datatable--header { background: $surface; color: $dim; text-style: none; }
+DataTable > .datatable--cursor { background: $rule; color: $primary; text-style: bold; }
+#subcontas { width: 2fr; }
+#lado { width: 1fr; }
+#titulo-snapshots { color: $secondary; padding: 0 1; }
+Footer { background: $surface; }
+FooterKey .footer-key--key { color: $secondary; background: $surface; }
+FooterKey .footer-key--description { color: $dim; }
+ErroDump { align: center middle; background: $background 70%; }
+#modal { width: 70; height: auto; border: heavy $error; background: $surface; padding: 1 2; }
+#modal-titulo { color: $error; text-style: bold; }
+#erro { color: $foreground; margin-top: 1; }

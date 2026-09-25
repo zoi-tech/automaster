@@ -227,6 +227,17 @@ def run_workflow_editar(args: argparse.Namespace) -> int:
     return 3 if aplicado == "duvidoso" else 1
 
 
+def run_tui(args: argparse.Namespace) -> int:
+    # lazy de propósito: o Textual é extra opcional (`[tui]`).
+    try:
+        from .tui.app import AutomasterApp
+    except ImportError:
+        print("a TUI precisa do Textual: pip install -e '.[tui]'", file=sys.stderr)
+        return 1
+    AutomasterApp(animacao=not args.sem_animacao).run()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automaster-audit", description="Audita um dump de workflows GHL.")
     sub = parser.add_subparsers(required=True)
@@ -321,6 +332,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_we.add_argument("--publicado", action="store_true", help="obrigatório junto de --confirmo em workflow publicado")
     p_we.add_argument("--snapshot", help="snapshot do dump usado na validação (default: o último)")
     p_we.set_defaults(func=run_workflow_editar)
+
+    p_tui = sub.add_parser("tui", help="navega pelos dumps no terminal (extra [tui])")
+    p_tui.add_argument("--sem-animacao", action="store_true", help="desliga as animações")
+    p_tui.set_defaults(func=run_tui)
     return parser
 
 
@@ -341,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
             "journey",
             "diff",
             "workflow-editar",
+            "tui",
             "-h",
             "--help",
         )

@@ -17,8 +17,8 @@ automaster-audit = "automaster_audit.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/automaster_audit"]
-# o schema do dump é lido em tempo de execução pelo loader: vai no wheel
-artifacts = ["src/automaster_audit/dump_schema.json"]
+# lidos em tempo de execução (schema pelo loader, tcss pela TUI): vão no wheel
+artifacts = ["src/automaster_audit/dump_schema.json", "src/automaster_audit/tui/tema.tcss"]
 
 [tool.ruff]
 # 120 e não o padrão 88: o código escreve longo de propósito (descrições de tool,
