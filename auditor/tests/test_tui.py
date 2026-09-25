@@ -65,6 +65,24 @@ Etapa 7 — detalhe do workflow e da entidade (`tui/detalhe.py`):
   - `#usos` (DataTable, colunas "workflow" e "papel"): uma linha por workflow, com os papéis DAQUELE workflow
     (nunca a soma dos papéis de todos). Enter numa linha empurra o detalhe daquele workflow.
 - Esc volta uma tela (entidade → detalhe → principal), sem fechar a app.
+
+Etapa 8 — camada cinematográfica (`tui/abertura.py`):
+
+- Nível de animação: `AutomasterApp(animacao=False)` dá `"none"`; o padrão (`animacao=True`) NÃO força nada e
+  respeita o `TEXTUAL_ANIMATIONS` do ambiente (lido pelo Textual em `textual.constants.TEXTUAL_ANIMATIONS`).
+  Isto substitui o "força full" da etapa 5.
+- Com `animation_level == "full"`, a app abre pela tela `Abertura` (id `#abertura`) antes da seleção:
+  - `#marca`: `EffectLabel` do `textualeffects` com o texto AUTOMASTER.
+  - `#contagem-abertura` (Static): o texto traz "<n> subconta", "<n> snapshot" e "<n> workflow" (plural livre);
+    workflows = soma, por subconta, dos workflows do snapshot mais recente.
+  - Segue sozinha para a seleção em até ~3 s; qualquer tecla pula na hora.
+- Com animação diferente de `"full"` a abertura nem monta: a app começa na seleção.
+- Transição: toda tela nova termina com `styles.opacity == 1` e `styles.offset` zerado.
+- Contadores `#kpi-erro`/`#kpi-aviso`/`#kpi-info`/`#kpi-workflows` têm o atributo `valor` (reactive int) que sobe
+  até o total; ao fim da animação `valor` e o texto batem com o total. Com animação `"none"` já nascem no total.
+- A tela é navegável durante a animação: `1`–`4` surtem efeito logo após abrir a principal.
+- Pulso: com ERROR > 0 e animação `"full"`, a classe `pulso` é alternada (liga e desliga, período ≤ 1 s) em
+  `#kpi-erro`. Com animação `"none"`, nenhum widget tem a classe `pulso`.
 """
 
 import asyncio
@@ -135,9 +153,22 @@ def test_parser_aceita_sem_animacao():
     assert cli.build_parser().parse_args(["tui"]).sem_animacao is False
 
 
-def test_sem_animacao_desliga_animacao():
+def _full(monkeypatch):
+    pytest.importorskip("textual")
+    monkeypatch.setattr("textual.constants.TEXTUAL_ANIMATIONS", "full")
+
+
+def test_sem_animacao_desliga_animacao(monkeypatch):
+    _full(monkeypatch)
     assert _app(animacao=False).animation_level == "none"
-    assert _app().animation_level != "none"
+
+
+def test_padrao_respeita_ambiente(monkeypatch):
+    pytest.importorskip("textual")
+    monkeypatch.setattr("textual.constants.TEXTUAL_ANIMATIONS", "none")
+    assert _app().animation_level == "none"
+    monkeypatch.setattr("textual.constants.TEXTUAL_ANIMATIONS", "full")
+    assert _app().animation_level == "full"
 
 
 def test_selecao_lista_subcontas(root):
@@ -743,5 +774,196 @@ def test_enter_nas_entidades_abre_entidade(root):
         await _enter_em(pilot, app.screen.query_one("#tabela-entidades"), lambda x: "usada" in x)
         assert "usada" in _texto(app, "#cabecalho-entidade")
         assert len(_linhas(app.screen.query_one("#usos"))) == 2
+
+    _run(corpo)
+
+
+# --- etapa 8: camada cinematográfica ----------------------------------------
+
+
+def _dump_abertura(root):
+    ws = [wf(id=f"w{i}", name=f"W{i}", steps=_add("usada", 1, f"s{i}_")) for i in range(3)]
+    root(snapshot=BOM, workflows=ws, tags=["usada"])
+    root(snapshot=RUIM, workflows=ws, tags=["usada"], extracted_at="2026-06-11T00:00:00+00:00")
+
+
+async def _ate(pilot, cond, segundos=3.0):
+    for _ in range(int(segundos * 10)):
+        if cond():
+            return True
+        await pilot.pause(0.1)
+    return cond()
+
+
+def test_full_abre_pela_abertura_com_marca_e_contagem(root, monkeypatch):
+    _dump_abertura(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        from textualeffects.widgets import EffectLabel
+
+        assert app.screen.query("#abertura")
+        assert not app.screen.query("#subcontas")
+        assert isinstance(app.screen.query_one("#marca"), EffectLabel)
+        txt = _texto(app, "#contagem-abertura")
+        assert re.search(r"\b1 subconta", txt), txt
+        assert re.search(r"\b2 snapshot", txt), txt
+        assert re.search(r"\b3 workflow", txt), txt
+
+    _run(corpo, _app())
+
+
+def test_abertura_segue_sozinha_para_selecao(root, monkeypatch):
+    _dump_abertura(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        assert app.screen.query("#abertura")
+        assert await _ate(pilot, lambda: bool(app.screen.query("#subcontas")))
+        assert not app.screen.query("#abertura")
+
+    _run(corpo, _app())
+
+
+def test_tecla_pula_abertura(root, monkeypatch):
+    _dump_abertura(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        assert app.screen.query("#abertura")
+        await pilot.press("x")
+        await pilot.pause()
+        assert app.screen.query("#subcontas")
+        assert not app.screen.query("#abertura")
+
+    _run(corpo, _app())
+
+
+def test_sem_animacao_comeca_na_selecao_mesmo_com_ambiente_full(root, monkeypatch):
+    _dump_abertura(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        assert not app.screen.query("#abertura")
+        assert app.screen.query("#subcontas")
+
+    _run(corpo, _app(animacao=False))
+
+
+def test_ambiente_none_comeca_na_selecao(root, monkeypatch):
+    _dump_abertura(root)
+    monkeypatch.setattr("textual.constants.TEXTUAL_ANIMATIONS", "none")
+
+    async def corpo(app, pilot):
+        assert not app.screen.query("#abertura")
+        assert app.screen.query("#subcontas")
+
+    _run(corpo, _app())
+
+
+def test_cli_sem_animacao_passa_animacao_false(monkeypatch):
+    pytest.importorskip("textual")
+    from automaster_audit.tui import app as mod
+
+    visto = {}
+
+    class Falsa:
+        def __init__(self, animacao=True):
+            visto["animacao"] = animacao
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr(mod, "AutomasterApp", Falsa)
+    cli.main(["tui", "--sem-animacao"])
+    assert visto == {"animacao": False}
+
+
+async def _principal_full(app, pilot):
+    await pilot.press("space")  # pula a abertura
+    await pilot.pause()
+    await _abrir(pilot)
+
+
+def test_contadores_terminam_no_valor_certo(root, monkeypatch):
+    _dump_principal(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        await _principal_full(app, pilot)
+        await pilot.wait_for_animation()
+        await _ate(pilot, lambda: app.screen.query_one("#kpi-workflows").valor == 4, 2.0)
+        for sel, n in (("#kpi-erro", 3), ("#kpi-aviso", 1), ("#kpi-info", 3), ("#kpi-workflows", 4)):
+            w = app.screen.query_one(sel)
+            assert w.valor == n, (sel, w.valor)
+            assert re.search(rf"\b{n}\b", _num(app, sel)), (sel, _num(app, sel))
+
+    _run(corpo, _app())
+
+
+def test_contadores_sem_animacao_nascem_no_total(root):
+    _dump_principal(root)
+
+    async def corpo(app, pilot):
+        await _abrir(pilot)
+        for sel, n in (("#kpi-erro", 3), ("#kpi-aviso", 1), ("#kpi-info", 3), ("#kpi-workflows", 4)):
+            assert app.screen.query_one(sel).valor == n
+
+    _run(corpo)
+
+
+def test_transicao_termina_opaca_e_no_lugar(root, monkeypatch):
+    _dump_principal(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        await _principal_full(app, pilot)
+        await pilot.wait_for_animation()
+        await pilot.pause(0.4)
+        tela = app.screen
+        assert tela.query("#titulo-principal")
+        assert tela.styles.opacity == 1
+        assert (tela.styles.offset.x.value, tela.styles.offset.y.value) == (0, 0)
+
+    _run(corpo, _app())
+
+
+def test_aba_responde_durante_animacao(root, monkeypatch):
+    _dump_principal(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        await _principal_full(app, pilot)
+        await pilot.press("2")
+        await pilot.pause()
+        assert app.screen.query_one("#abas").active == "achados"
+
+    _run(corpo, _app())
+
+
+def test_pulso_alterna_no_erro_com_animacao(root, monkeypatch):
+    _dump_principal(root)
+    _full(monkeypatch)
+
+    async def corpo(app, pilot):
+        await _principal_full(app, pilot)
+        kpi = app.screen.query_one("#kpi-erro")
+        vistos = set()
+        for _ in range(25):
+            vistos.add(kpi.has_class("pulso"))
+            await pilot.pause(0.1)
+        assert vistos == {True, False}
+
+    _run(corpo, _app())
+
+
+def test_sem_animacao_nao_ha_pulso(root):
+    _dump_principal(root)
+
+    async def corpo(app, pilot):
+        await _abrir(pilot)
+        for _ in range(15):
+            assert not app.screen.query(".pulso")
+            await pilot.pause(0.1)
 
     _run(corpo)
