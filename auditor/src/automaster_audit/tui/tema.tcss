@@ -16,3 +16,15 @@ ErroDump { align: center middle; background: $background 70%; }
 #modal { width: 70; height: auto; border: heavy $error; background: $surface; padding: 1 2; }
 #modal-titulo { color: $error; text-style: bold; }
 #erro { color: $foreground; margin-top: 1; }
+#kpis { height: 4; }
+.kpi { width: 1fr; height: 4; border: solid $rule; padding: 0 1; text-style: bold; }
+#kpi-erro { color: $error; }
+#kpi-aviso { color: $warning; }
+#kpi-info { color: $secondary; }
+#kpi-workflows { color: $primary; }
+#painel-busca { display: none; height: auto; max-height: 12; }
+#resultados-busca { height: auto; max-height: 10; }
+#filtro { display: none; }
+#tipo-entidade, #sevs { color: $secondary; padding: 0 1; }
+#diff { padding: 1 2; color: $foreground; }
+TabbedContent Tabs { background: $surface; }

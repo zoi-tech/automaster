@@ -7,12 +7,7 @@ from textual.widgets import DataTable, Footer, Static
 from ..mcp import base
 from ..mcp.base import ToolError
 from ..mcp.dump import dumps
-
-
-def _quando(snap: str) -> str:
-    """'2026-09-20_0856' -> '2026-09-20 08:56'."""
-    dia, _, hora = snap.partition("_")
-    return f"{dia} {hora[:2]}:{hora[2:]}" if len(hora) == 4 else snap
+from .principal import Principal, _quando
 
 
 def _barra(tela: str) -> Static:
@@ -70,26 +65,16 @@ class Selecao(Screen):
             self.action_snapshots()
             return
         s = self._atual()
-        snap = s["snapshots"][ev.cursor_row]
+        i = ev.cursor_row
+        snap = s["snapshots"][i]
+        anterior = s["snapshots"][i + 1] if i + 1 < len(s["snapshots"]) else None  # lista vem decrescente
         try:
             path, _ = base._snapshot(s["loc"], snap)
             base._ctx(str(path))
         except ToolError as e:
             self.app.push_screen(ErroDump(s["loc"], snap, str(e)))
             return
-        self.app.push_screen(Principal(s["nome"] or s["loc"], snap))
-
-
-class Principal(Screen):
-    """Placeholder da tela principal; as abas entram na etapa 6."""
-
-    def __init__(self, titulo: str, snapshot: str) -> None:
-        super().__init__()
-        self.titulo, self.snapshot = titulo, snapshot
-
-    def compose(self) -> ComposeResult:
-        yield Static(f"[b]{self.titulo.upper()}[/b] · {_quando(self.snapshot)}", id="titulo-principal", classes="barra")
-        yield Footer()
+        self.app.push_screen(Principal(s["nome"] or s["loc"], s["loc"], snap, anterior))
 
 
 class ErroDump(ModalScreen):
