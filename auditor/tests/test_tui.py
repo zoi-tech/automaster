@@ -210,7 +210,7 @@ _ORFAO = [
 
 
 def _dump_principal(root):
-    """ERROR 3 (2 em [Z], 1 em [M]), WARN 1 ([W]), INFO 2 (aaa limpo), 4 workflows.
+    """ERROR 3 (2 em [Z], 1 em [M]), WARN 1 ([W]), INFO 3 (2 em aaa limpo, unused_form em Form Um), 4 workflows.
 
     Ordem alfabética (aaa, [M], [W], [Z]) difere da ordem por erros ([Z], [M], ...).
     """
@@ -245,7 +245,7 @@ def test_principal_mostra_contadores(root):
 
     async def corpo(app, pilot):
         await _abrir(pilot)
-        for sel, n in (("#kpi-erro", 3), ("#kpi-aviso", 1), ("#kpi-info", 2), ("#kpi-workflows", 4)):
+        for sel, n in (("#kpi-erro", 3), ("#kpi-aviso", 1), ("#kpi-info", 3), ("#kpi-workflows", 4)):
             assert re.search(rf"\b{n}\b", _num(app, sel)), (sel, _num(app, sel))
 
     _run(corpo)
@@ -318,7 +318,7 @@ def test_achados_abrem_com_tres_severidades(root):
         await pilot.press("2")
         await pilot.pause()
         assert _sevs(app) == {"ERROR", "WARN", "INFO"}
-        assert app.screen.query_one("#tabela-achados").row_count == 5
+        assert app.screen.query_one("#tabela-achados").row_count == 6
 
     _run(corpo)
 
