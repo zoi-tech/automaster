@@ -1,0 +1,14 @@
+{
+  "workflow": "Cria oportunidades!",
+  "casos": [
+    {
+      "nome": "contato sem oportunidade → cria em Novo lead",
+      "dado": { "oportunidade_encontrada": false },
+      "espera": {
+        "acoes_contem": ["criar oportunidade", "stage novo lead"],
+        "termina_em": "exit",
+        "nao_faz": []
+      }
+    }
+  ]
+}

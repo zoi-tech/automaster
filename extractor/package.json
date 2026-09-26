@@ -1,0 +1,64 @@
+{
+  "name": "automaster-extractor",
+  "version": "0.27.0",
+  "description": "Extrai workflows GHL de uma subconta via API interna",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "automaster-extract": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "extract": "tsx src/cli.ts extract",
+    "discover": "tsx src/cli.ts discover",
+    "timeline": "tsx src/cli.ts timeline",
+    "contato-editar": "tsx src/cli.ts contato-editar",
+    "conversas": "tsx src/cli.ts conversas",
+    "conversas-enviar": "tsx src/cli.ts conversas-enviar",
+    "conversas-marcar": "tsx src/cli.ts conversas-marcar",
+    "conversas-rascunho": "tsx src/cli.ts conversas-rascunho",
+    "conversas-mensagem": "tsx src/cli.ts conversas-mensagem",
+    "conversas-buscar": "tsx src/cli.ts conversas-buscar",
+    "conversas-anexar": "tsx src/cli.ts conversas-anexar",
+    "whatsapp": "tsx src/cli.ts whatsapp",
+    "whatsapp-enviar": "tsx src/cli.ts whatsapp-enviar",
+    "config": "tsx src/cli.ts config",
+    "grupo": "tsx src/cli.ts grupo",
+    "oportunidades": "tsx src/cli.ts oportunidades",
+    "oportunidade-acao": "tsx src/cli.ts oportunidade-acao",
+    "pipeline": "tsx src/cli.ts pipeline",
+    "agenda": "tsx src/cli.ts agenda",
+    "workflows-ao-vivo": "tsx src/cli.ts workflows-ao-vivo",
+    "workflow-acao": "tsx src/cli.ts workflow-acao",
+    "workflow-editar": "tsx src/cli.ts workflow-editar",
+    "formularios": "tsx src/cli.ts formularios",
+    "formulario-acao": "tsx src/cli.ts formulario-acao",
+    "formulario-estilo": "tsx src/cli.ts formulario-estilo",
+    "anotacoes": "tsx src/cli.ts anotacoes",
+    "anotacao-acao": "tsx src/cli.ts anotacao-acao",
+    "tags": "tsx src/cli.ts tags",
+    "tag-acao": "tsx src/cli.ts tag-acao",
+    "agenda-acao": "tsx src/cli.ts agenda-acao",
+    "smoke": "tsx src/cli.ts smoke",
+    "test": "tsx --test test/*.test.ts",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.9.0",
+    "eslint": "^10.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.70.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.0": true
+  }
+}

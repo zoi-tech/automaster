@@ -1,0 +1,7 @@
+{
+  // Typecheck e lint cobrem src e test; o tsconfig.json de build fica só com src,
+  // porque o rootDir dele define o layout de dist/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

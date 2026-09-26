@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  extractor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extractor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extractor/package-lock.json
+      # Sem browser do Playwright de propósito: nenhum teste abre Chrome.
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  auditor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auditor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[dev,tui]'
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: pytest -q
+        env:
+          TEXTUAL_ANIMATIONS: none

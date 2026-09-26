@@ -1,0 +1,21 @@
+dumps/
+spike/
+spike-*.json
+.playwright-mcp/
+node_modules/
+__pycache__/
+*.egg-info/
+.venv/
+build/
+dist/
+spike/realdump/
+.DS_Store
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+_temp/
+*.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

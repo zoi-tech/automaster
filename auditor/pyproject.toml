@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "automaster-audit"
+version = "0.27.0"
+description = "Auditor de workflows GHL extraídos pelo Automaster v2"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+tui = ["textual>=8,<9", "textualeffects==0.2.0"]
+
+[project.scripts]
+automaster-audit = "automaster_audit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/automaster_audit"]
+# lidos em tempo de execução (schema pelo loader, tcss pela TUI): vão no wheel
+artifacts = ["src/automaster_audit/dump_schema.json", "src/automaster_audit/tui/tema.tcss"]
+
+[tool.ruff]
+# 120 e não o padrão 88: o código escreve longo de propósito (descrições de tool,
+# literais de HTML). Com 88, 1210 linhas seriam quebradas; com 120, 60.
+line-length = 120
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

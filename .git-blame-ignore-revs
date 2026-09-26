@@ -1,0 +1,6 @@
+# Commits só de formatação. O git ignora estes ao calcular o blame:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (o GitHub lê o arquivo sozinho)
+
+# style(auditor): ruff format, 82 arquivos
+9658c0309d84c9690c5dcc4a3d9fdc437cfa2f1e

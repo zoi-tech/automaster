@@ -1,0 +1,1168 @@
+{
+  "gravadoEm": "2026-09-21T23:53:29.522Z",
+  "respostas": {
+    "workflows/lista": [
+      {
+        "rows": [
+          {
+            "_id": "x",
+            "locationId": "x",
+            "name": "x",
+            "status": "published",
+            "dataVersion": 0,
+            "permission": 0,
+            "type": "workflow",
+            "parentId": "x",
+            "updatedBy": "x",
+            "createdAt": "x",
+            "updatedAt": "x",
+            "deleted": false,
+            "permissionMeta": {
+              "canRead": true,
+              "canWrite": true
+            },
+            "id": "x"
+          }
+        ],
+        "count": 0,
+        "isLocationRateLimited": false
+      }
+    ],
+    "workflows/detalhe": [
+      {
+        "_id": "x",
+        "locationId": "x",
+        "companyId": "x",
+        "companyAge": 0,
+        "name": "x",
+        "status": "published",
+        "version": 0,
+        "dataVersion": 0,
+        "allowMultiple": true,
+        "timezone": "x",
+        "removeContactFromLastStep": true,
+        "filePath": "x",
+        "fileUrl": "x",
+        "stopOnResponse": false,
+        "autoMarkAsRead": false,
+        "permission": 0,
+        "type": "workflow",
+        "parentId": "x",
+        "updatedBy": "x",
+        "createdAt": "x",
+        "updatedAt": "x",
+        "deleted": false,
+        "allowMultipleOpportunity": true,
+        "creationSource": "x",
+        "isTriggerBucketMigrated": true,
+        "originType": "x",
+        "__v": 0,
+        "eventStartDate": null,
+        "window": null,
+        "workflowNote": null,
+        "triggersFilePath": null,
+        "id": "x",
+        "workflowData": {
+          "templates": [
+            {
+              "id": "x",
+              "order": 0,
+              "attributes": {
+                "type": "remove_from_workflow",
+                "allWorkflows": true,
+                "includeCurrent": true
+              },
+              "name": "x",
+              "type": "remove_from_workflow"
+            }
+          ]
+        },
+        "permissionMeta": {
+          "canRead": true,
+          "canWrite": true
+        },
+        "scheduledPauseDates": []
+      },
+      {
+        "templates": [
+          {
+            "id": "x",
+            "order": 0,
+            "attributes": {
+              "type": "remove_from_workflow",
+              "allWorkflows": true,
+              "includeCurrent": true
+            },
+            "name": "x",
+            "type": "remove_from_workflow"
+          }
+        ]
+      },
+      []
+    ],
+    "entidades/pipelines": [
+      {
+        "pipelines": [
+          {
+            "id": "x",
+            "name": "x",
+            "showInFunnel": true,
+            "showInPieChart": true,
+            "useOpportunityProbability": false,
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "stages": [
+              {
+                "id": "x",
+                "name": "x",
+                "showInFunnel": true,
+                "showInPieChart": true,
+                "position": 0,
+                "stageWinProbability": 0,
+                "color": "x"
+              }
+            ],
+            "locationId": "x",
+            "originId": "x",
+            "colorRenderMode": "x"
+          }
+        ],
+        "traceId": "x"
+      }
+    ],
+    "entidades/custom_fields": [
+      {
+        "customFields": [
+          {
+            "_id": "x",
+            "allowCustomOption": false,
+            "dataType": "TEXT",
+            "dateAdded": "x",
+            "description": "x",
+            "documentType": "x",
+            "fieldKey": "x",
+            "locationId": "x",
+            "model": "contact",
+            "parentId": "x",
+            "placeholder": "x",
+            "position": 0,
+            "showInForms": true,
+            "standard": false,
+            "fieldsCount": 0,
+            "id": "x",
+            "name": "x"
+          }
+        ],
+        "totalItems": 0,
+        "traceId": "x"
+      }
+    ],
+    "entidades/tags": [
+      {
+        "tags": [
+          {
+            "_id": "x",
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "locationId": "x",
+            "name": "x"
+          }
+        ],
+        "total": 0,
+        "traceId": "x"
+      }
+    ],
+    "entidades/users": [
+      {
+        "users": [
+          {
+            "id": "x",
+            "deleted": false,
+            "email": "x",
+            "firstName": "x",
+            "lastName": "x",
+            "name": "x",
+            "permissions": {
+              "adPublishingEnabled": true,
+              "adPublishingReadOnly": true,
+              "adwordsReportingEnabled": true,
+              "affiliateManagerEnabled": true,
+              "agentReportingEnabled": true,
+              "appointmentsEnabled": true,
+              "assignedDataOnly": false,
+              "attributionsReportingEnabled": true,
+              "bloggingEnabled": true,
+              "botService": false,
+              "bulkRequestsEnabled": true,
+              "campaignsEnabled": true,
+              "campaignsReadOnly": false,
+              "cancelSubscriptionEnabled": true,
+              "certificatesEnabled": true,
+              "communitiesEnabled": true,
+              "contactsEnabled": true,
+              "contentAiEnabled": true,
+              "conversationsEnabled": true,
+              "customMenuLinkReadOnly": true,
+              "customMenuLinkWrite": true,
+              "dashboardStatsEnabled": true,
+              "exportPaymentsEnabled": true,
+              "facebookAdsReportingEnabled": true,
+              "funnelsEnabled": true,
+              "gokollabEnabled": true,
+              "invoiceEnabled": true,
+              "leadValueEnabled": true,
+              "marketingEnabled": true,
+              "mediaStorageEnabled": true,
+              "membershipEnabled": true,
+              "onlineListingsEnabled": true,
+              "opportunitiesBulkActionsEnabled": true,
+              "opportunitiesEnabled": true,
+              "paymentsEnabled": true,
+              "phoneCallEnabled": true,
+              "recordPaymentEnabled": true,
+              "refundsEnabled": true,
+              "reportingEnabled": true,
+              "reviewsEnabled": true,
+              "settingsEnabled": true,
+              "socialPlanner": true,
+              "tagsEnabled": true,
+              "triggersEnabled": true,
+              "websitesEnabled": true,
+              "wordpressEnabled": true,
+              "workflowsEnabled": true,
+              "workflowsReadOnly": false
+            },
+            "phone": "x",
+            "roles": {
+              "type": "account",
+              "role": "admin",
+              "locationIds": [
+                "x"
+              ],
+              "restrictSubAccount": false
+            },
+            "defaultRingAllChannel": {
+              "idTeste0000000000004": "x"
+            },
+            "defaultIVRChannel": {
+              "idTeste0000000000004": "x"
+            },
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "platformLanguage": "x",
+            "locations": {
+              "idTeste0000000000004": "x"
+            },
+            "lastLoginTime": "x",
+            "scopes": [],
+            "permissionTemplateId": "x",
+            "dialMobileApp": {
+              "idTeste0000000000004": true
+            },
+            "dialWebApp": {
+              "idTeste0000000000004": true
+            },
+            "dialPhoneNumber": {
+              "idTeste0000000000004": true
+            },
+            "dialSip": {
+              "idTeste0000000000004": true
+            }
+          }
+        ],
+        "count": 0,
+        "traceId": "x"
+      }
+    ],
+    "entidades/calendars": [
+      {
+        "calendars": [
+          {
+            "id": "x",
+            "availabilities": [],
+            "addServiceActiveStep": "x",
+            "allowBookingAfter": 0,
+            "allowBookingAfterUnit": "x",
+            "allowBookingFor": 0,
+            "allowBookingForUnit": "x",
+            "allowCancellation": false,
+            "allowReschedule": true,
+            "appoinmentPerDay": 0,
+            "appoinmentPerSlot": 0,
+            "autoConfirm": true,
+            "calendarCoverImage": "x",
+            "calendarType": "personal",
+            "cancellationPreference": {
+              "expiryTimeUnit": "x",
+              "expiryTime": null
+            },
+            "codeBlock": "x",
+            "consentLabel": "x",
+            "createdBy": {
+              "userId": "x",
+              "channel": "APP",
+              "source": "x",
+              "timestamp": "x",
+              "traceId": "x"
+            },
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "deleted": false,
+            "description": "x",
+            "enableConsentCheck": false,
+            "enableChargeGuests": false,
+            "enableGuests": true,
+            "enableMandatoryGuestType": false,
+            "enableOfficeHours": true,
+            "enableRecurring": false,
+            "enableSameUserAssignment": false,
+            "enableSameUserAssignmentForReschedule": false,
+            "enableStaffSelection": false,
+            "eventColor": "x",
+            "eventTitle": "x",
+            "eventType": "RoundRobin_OptimizeForAvailability",
+            "formId": "x",
+            "formSubmitRedirectUrl": "x",
+            "formSubmitThanksMessage": "x",
+            "formSubmitType": "x",
+            "googleInvitationEmails": true,
+            "guestType": "x",
+            "isSystemGenerated": false,
+            "isActive": true,
+            "isLivePaymentMode": false,
+            "lastUpdatedBy": {
+              "userId": "x",
+              "channel": "APP",
+              "source": "x",
+              "timestamp": "x",
+              "traceId": "x"
+            },
+            "linkedCalendars": {
+              "clio": {},
+              "drchrono": {},
+              "google": {},
+              "calendly": {}
+            },
+            "locationId": "x",
+            "locationConfigurations": [],
+            "lookBusyConfig": {
+              "enabled": false,
+              "lookBusyPercentage": 0
+            },
+            "name": "x",
+            "notes": "x",
+            "openHours": [],
+            "order": 0,
+            "pixelId": "x",
+            "preBufferUnit": "x",
+            "providerId": "x",
+            "recurring": {
+              "count": 0,
+              "bookingOption": "x",
+              "bookingOverlapDefaultStatus": "x",
+              "interval": null,
+              "freq": "x",
+              "monthDays": [],
+              "weekDays": []
+            },
+            "reschedulePreference": {
+              "expiryTimeUnit": "x",
+              "expiryTime": 0
+            },
+            "reserveService": false,
+            "shouldAssignContactToTeamMember": true,
+            "shouldSendCustomForm": false,
+            "shouldSkipAssigningContactForExisting": false,
+            "showSeatsPerSlot": false,
+            "slotBufferUnit": "x",
+            "slotDuration": 0,
+            "slotDurationUnit": "x",
+            "slotInterval": 0,
+            "slotIntervalUnit": "x",
+            "stickyContact": true,
+            "stripe": {},
+            "teamMembers": [
+              {
+                "priority": 0,
+                "selected": true,
+                "userId": "x",
+                "isZoomAdded": "x",
+                "zoomOauthId": "x",
+                "meetingLocation": "x",
+                "locationConfigurations": [
+                  {
+                    "location": "x",
+                    "position": 0,
+                    "kind": "x",
+                    "zoomOauthId": "x",
+                    "meetingId": "x"
+                  }
+                ],
+                "isPrimary": true
+              }
+            ],
+            "version": 0,
+            "widgetConfig": {
+              "primarySettings": {
+                "primaryColor": "x",
+                "backgroundColor": "x",
+                "buttonText": "x",
+                "showCalendarTitle": true,
+                "showCalendarDescription": true,
+                "showCalendarDetails": true
+              },
+              "default": false,
+              "pageOrder": [
+                {
+                  "kind": "x",
+                  "position": 0
+                }
+              ]
+            },
+            "widgetLogo": {
+              "shape": "x",
+              "url": "x"
+            },
+            "widgetSlug": "x",
+            "widgetType": "default",
+            "appointmentPerSlot": 0,
+            "appointmentPerDay": 0,
+            "groupId": "x",
+            "enableClientPortalBooking": false
+          }
+        ],
+        "traceId": "x"
+      }
+    ],
+    "entidades/custom_values": [
+      {
+        "customValues": [
+          {
+            "id": "x",
+            "name": "x",
+            "fieldKey": "x",
+            "value": "x",
+            "locationId": "x",
+            "documentType": "x"
+          }
+        ],
+        "traceId": "x"
+      }
+    ],
+    "entidades/message_templates": [
+      {
+        "templates": [
+          {
+            "dateAdded": "x",
+            "locationId": "x",
+            "name": "x",
+            "template": {
+              "attachments": [],
+              "body": "x"
+            },
+            "type": "sms",
+            "urlAttachments": [],
+            "id": "x"
+          }
+        ],
+        "totalCount": 0,
+        "traceId": "x"
+      }
+    ],
+    "formularios/lista": [
+      {
+        "forms": [
+          {
+            "_id": "x",
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "deleted": false,
+            "locationId": "x",
+            "name": "x",
+            "productType": "x",
+            "updatedBy": "x",
+            "version": 0,
+            "updatedAt": "x",
+            "versionHistory": [
+              {
+                "formDataDownloadUrl": "x",
+                "formDataUrl": "x",
+                "updatedAt": "x",
+                "updatedBy": "x",
+                "updatedByUser": "x",
+                "versionId": "x"
+              }
+            ],
+            "lowerName": "x"
+          }
+        ],
+        "total": 0,
+        "traceId": "x"
+      }
+    ],
+    "surveys/lista": [
+      {
+        "surveys": [
+          {
+            "_id": "x",
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "deleted": false,
+            "locationId": "x",
+            "name": "x",
+            "updatedBy": "x",
+            "version": 0,
+            "updatedAt": "x",
+            "versionHistory": [
+              {
+                "surveyDataDownloadUrl": "x",
+                "surveyDataUrl": "x",
+                "updatedAt": "x",
+                "updatedBy": "x",
+                "updatedByUser": "x",
+                "versionId": "x"
+              }
+            ],
+            "parentId": "x",
+            "lowerName": "x"
+          }
+        ],
+        "total": 0,
+        "traceId": "x"
+      }
+    ],
+    "emails/builder": [
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      },
+      {
+        "builders": [
+          {
+            "name": "x",
+            "updatedBy": "x",
+            "isPlainText": false,
+            "lastUpdated": "x",
+            "dateAdded": "x",
+            "previewUrl": "x",
+            "id": "x",
+            "version": "x",
+            "templateType": "builder",
+            "parentId": "x"
+          }
+        ],
+        "total": [
+          {
+            "total": 0
+          }
+        ]
+      }
+    ],
+    "agenda/calendarios": [
+      {
+        "calendars": [
+          {
+            "id": "x",
+            "availabilities": [],
+            "addServiceActiveStep": "x",
+            "allowBookingAfter": 0,
+            "allowBookingAfterUnit": "x",
+            "allowBookingFor": 0,
+            "allowBookingForUnit": "x",
+            "allowCancellation": false,
+            "allowReschedule": true,
+            "appoinmentPerDay": 0,
+            "appoinmentPerSlot": 0,
+            "autoConfirm": true,
+            "calendarCoverImage": "x",
+            "calendarType": "personal",
+            "cancellationPreference": {
+              "expiryTimeUnit": "x",
+              "expiryTime": null
+            },
+            "codeBlock": "x",
+            "consentLabel": "x",
+            "createdBy": {
+              "userId": "x",
+              "channel": "APP",
+              "source": "x",
+              "timestamp": "x",
+              "traceId": "x"
+            },
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "deleted": false,
+            "description": "x",
+            "enableConsentCheck": false,
+            "enableChargeGuests": false,
+            "enableGuests": true,
+            "enableMandatoryGuestType": false,
+            "enableOfficeHours": true,
+            "enableRecurring": false,
+            "enableSameUserAssignment": false,
+            "enableSameUserAssignmentForReschedule": false,
+            "enableStaffSelection": false,
+            "eventColor": "x",
+            "eventTitle": "x",
+            "eventType": "RoundRobin_OptimizeForAvailability",
+            "formId": "x",
+            "formSubmitRedirectUrl": "x",
+            "formSubmitThanksMessage": "x",
+            "formSubmitType": "x",
+            "googleInvitationEmails": true,
+            "guestType": "x",
+            "isSystemGenerated": false,
+            "isActive": true,
+            "isLivePaymentMode": false,
+            "lastUpdatedBy": {
+              "userId": "x",
+              "channel": "APP",
+              "source": "x",
+              "timestamp": "x",
+              "traceId": "x"
+            },
+            "linkedCalendars": {
+              "clio": {},
+              "drchrono": {},
+              "google": {},
+              "calendly": {}
+            },
+            "locationId": "x",
+            "locationConfigurations": [],
+            "lookBusyConfig": {
+              "enabled": false,
+              "lookBusyPercentage": 0
+            },
+            "name": "x",
+            "notes": "x",
+            "openHours": [],
+            "order": 0,
+            "pixelId": "x",
+            "preBufferUnit": "x",
+            "providerId": "x",
+            "recurring": {
+              "count": 0,
+              "bookingOption": "x",
+              "bookingOverlapDefaultStatus": "x",
+              "interval": null,
+              "freq": "x",
+              "monthDays": [],
+              "weekDays": []
+            },
+            "reschedulePreference": {
+              "expiryTimeUnit": "x",
+              "expiryTime": 0
+            },
+            "reserveService": false,
+            "shouldAssignContactToTeamMember": true,
+            "shouldSendCustomForm": false,
+            "shouldSkipAssigningContactForExisting": false,
+            "showSeatsPerSlot": false,
+            "slotBufferUnit": "x",
+            "slotDuration": 0,
+            "slotDurationUnit": "x",
+            "slotInterval": 0,
+            "slotIntervalUnit": "x",
+            "stickyContact": true,
+            "stripe": {},
+            "teamMembers": [
+              {
+                "priority": 0,
+                "selected": true,
+                "userId": "x",
+                "isZoomAdded": "x",
+                "zoomOauthId": "x",
+                "meetingLocation": "x",
+                "locationConfigurations": [
+                  {
+                    "location": "x",
+                    "position": 0,
+                    "kind": "x",
+                    "zoomOauthId": "x",
+                    "meetingId": "x"
+                  }
+                ],
+                "isPrimary": true
+              }
+            ],
+            "version": 0,
+            "widgetConfig": {
+              "primarySettings": {
+                "primaryColor": "x",
+                "backgroundColor": "x",
+                "buttonText": "x",
+                "showCalendarTitle": true,
+                "showCalendarDescription": true,
+                "showCalendarDetails": true
+              },
+              "default": false,
+              "pageOrder": [
+                {
+                  "kind": "x",
+                  "position": 0
+                }
+              ]
+            },
+            "widgetLogo": {
+              "shape": "x",
+              "url": "x"
+            },
+            "widgetSlug": "x",
+            "widgetType": "default",
+            "appointmentPerSlot": 0,
+            "appointmentPerDay": 0,
+            "groupId": "x",
+            "enableClientPortalBooking": false
+          }
+        ],
+        "traceId": "x"
+      }
+    ],
+    "agenda/eventos": [
+      {
+        "events": [],
+        "traceId": "x"
+      }
+    ],
+    "oportunidades/pipelines": [
+      {
+        "pipelines": [
+          {
+            "id": "x",
+            "name": "x",
+            "showInFunnel": true,
+            "showInPieChart": true,
+            "useOpportunityProbability": false,
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "stages": [
+              {
+                "id": "x",
+                "name": "x",
+                "showInFunnel": true,
+                "showInPieChart": true,
+                "position": 0,
+                "stageWinProbability": 0,
+                "color": "x"
+              }
+            ],
+            "locationId": "x",
+            "originId": "x",
+            "colorRenderMode": "x"
+          }
+        ],
+        "traceId": "x"
+      }
+    ],
+    "workflows-ao-vivo/lista": [
+      {
+        "rows": [
+          {
+            "_id": "x",
+            "locationId": "x",
+            "name": "x",
+            "status": "published",
+            "dataVersion": 0,
+            "permission": 0,
+            "type": "workflow",
+            "parentId": "x",
+            "updatedBy": "x",
+            "createdAt": "x",
+            "updatedAt": "x",
+            "deleted": false,
+            "permissionMeta": {
+              "canRead": true,
+              "canWrite": true
+            },
+            "id": "x"
+          }
+        ],
+        "count": 0,
+        "isLocationRateLimited": false
+      }
+    ],
+    "tags/lista": [
+      {
+        "tags": [
+          {
+            "_id": "x",
+            "dateAdded": "x",
+            "dateUpdated": "x",
+            "locationId": "x",
+            "name": "x"
+          }
+        ],
+        "total": 0,
+        "traceId": "x"
+      }
+    ],
+    "whatsapp/templates": [
+      [
+        {
+          "locationId": "x",
+          "whatsAppBusinessAccountId": "x",
+          "name": "x",
+          "__v": 0,
+          "category": "UTILITY",
+          "channelId": null,
+          "components": [
+            {
+              "type": "BODY",
+              "text": "x",
+              "customVariables": []
+            }
+          ],
+          "createdAt": "x",
+          "folderId": null,
+          "isSystemDefined": false,
+          "language": "x",
+          "parameterFormat": "x",
+          "status": "APPROVED",
+          "updatedAt": "x",
+          "id": "x",
+          "previous_category": "x"
+        }
+      ]
+    ],
+    "conversas/sla": [
+      {
+        "id": "x",
+        "dateUpdated": "x",
+        "dateAdded": "x",
+        "deleted": false,
+        "locationId": "x",
+        "enabled": true,
+        "scope": "x",
+        "channels": [
+          {
+            "enabled": true,
+            "type": "Call",
+            "rt": {
+              "dueAt": {
+                "value": 0,
+                "unit": "x"
+              },
+              "overdueAt": {
+                "value": 0,
+                "unit": "x"
+              }
+            }
+          }
+        ],
+        "automationPolicy": {
+          "type": "count_all"
+        },
+        "aiPolicy": {
+          "type": "count_all"
+        },
+        "traceId": "x"
+      }
+    ],
+    "contato/detalhe": [
+      {
+        "contact": {
+          "id": "x",
+          "dateAdded": "x",
+          "locationId": "x",
+          "email": "x",
+          "emailLowerCase": "x",
+          "country": "x",
+          "attributionSource": {
+            "sessionSource": "x",
+            "mediumId": "x",
+            "medium": "x",
+            "formId": "x",
+            "formName": "x",
+            "campaign": "x",
+            "utmCampaign": null,
+            "campaignId": null,
+            "utmMedium": "x",
+            "utmContent": "x",
+            "adSetId": null,
+            "adId": null,
+            "utmSource": "x",
+            "source": "x",
+            "referrer": "x",
+            "keyword": null,
+            "adSource": "x"
+          },
+          "lastAttributionSource": {
+            "sessionSource": "x",
+            "mediumId": "x",
+            "medium": "x",
+            "formId": "x",
+            "formName": "x",
+            "campaign": "x",
+            "utmCampaign": null,
+            "campaignId": null,
+            "utmMedium": "x",
+            "utmContent": "x",
+            "adSetId": null,
+            "adId": null,
+            "utmSource": "x",
+            "source": "x",
+            "referrer": "x",
+            "keyword": null,
+            "adSource": "x"
+          },
+          "internalSource": {
+            "id": "x",
+            "type": "facebook_form_lead",
+            "pageName": "x",
+            "formId": "x",
+            "pageId": "x"
+          },
+          "createdBy": {
+            "source": "x",
+            "channel": "ISTIO_MESH",
+            "sourceId": "x",
+            "timestamp": "x"
+          },
+          "validEmail": true,
+          "facebookLeadId": "x",
+          "companyName": "x",
+          "source": "x",
+          "additionalPhones": [],
+          "fullNameLowerCase": "x",
+          "lastName": "x",
+          "type": "customer",
+          "firstNameLowerCase": "x",
+          "lastNameLowerCase": "x",
+          "firstName": "x",
+          "followers": [],
+          "tags": [
+            "x"
+          ],
+          "dateUpdated": "x",
+          "customFields": [
+            {
+              "id": "x",
+              "value": "x"
+            }
+          ],
+          "additionalEmails": []
+        },
+        "traceId": "x"
+      }
+    ],
+    "conversas/busca": [
+      {
+        "conversations": [
+          {
+            "id": "x",
+            "lastMessageDate": 0,
+            "dateUpdated": 0,
+            "contactId": "x",
+            "type": "TYPE_PHONE",
+            "lastMessageType": "x",
+            "lastMessageBody": "x",
+            "locationId": "x",
+            "unreadCount": 0,
+            "starred": false,
+            "email": "x",
+            "contactName": "x",
+            "scoring": [],
+            "attributed": true,
+            "lastMessageDirection": "x",
+            "tags": [
+              "x"
+            ],
+            "messageTypes": [
+              0
+            ],
+            "isLastMessageInternalComment": true,
+            "dateAdded": 0,
+            "followers": [],
+            "fullName": "x",
+            "mentions": [],
+            "companyName": "x",
+            "lastOutboundMessageAction": "x",
+            "lastInternalComment": "x",
+            "opportunities": [],
+            "sort": [
+              0
+            ]
+          }
+        ],
+        "total": 0,
+        "traceId": "x"
+      }
+    ],
+    "anotacoes/notas": [
+      {
+        "notes": [],
+        "traceId": "x"
+      }
+    ],
+    "contato/timeline": [
+      {
+        "logs": [
+          {
+            "documentType": "x",
+            "id": "x",
+            "secondaryId": "x",
+            "type": "UPDATED",
+            "after": {
+              "assignedTo": null
+            },
+            "before": {
+              "assignedTo": "x"
+            },
+            "shardId": "x",
+            "source": "x",
+            "sourceName": "x",
+            "sourceId": "x",
+            "apiVersion": "x",
+            "channel": "APP",
+            "documentName": "x",
+            "changedFields": [
+              "x"
+            ],
+            "externalChange": true,
+            "traceId": "x",
+            "createdAt": "x",
+            "commonPrimaryId": "x",
+            "chPublished": true,
+            "_id": "x"
+          }
+        ],
+        "mongoLogs": [],
+        "pagination": {
+          "page": 0,
+          "hasMore": false,
+          "pageStartCursor": [
+            0
+          ],
+          "pageEndCursor": [
+            0
+          ],
+          "upperBound": "x",
+          "cursorToken": "x"
+        },
+        "traceId": "x"
+      }
+    ]
+  }
+}

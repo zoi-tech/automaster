@@ -1,0 +1,612 @@
+import json
+import pathlib
+import tempfile
+
+import pytest
+from conftest import wf
+
+from automaster_audit import mcp_server
+from automaster_audit.loader import load_dump
+from automaster_audit.mcp import base as mcp_base
+from automaster_audit.mcp import workflows as mcp_workflows
+
+
+class _ResultadoFalso:
+    def __init__(self, pode_gravar, erros_novos=None, erros_resolvidos=None, triggers_do_dump=False):
+        self.pode_gravar = pode_gravar
+        self.erros_novos = erros_novos or []
+        self.erros_resolvidos = erros_resolvidos or []
+        self.triggers_do_dump = triggers_do_dump
+
+
+class _WfFalso:
+    def __init__(self, wid):
+        self.id = wid
+
+
+class _CtxFalso:
+    """Contexto mínimo: a tool só precisa saber se o workflow está no dump."""
+
+    def __init__(self, *ids):
+        self.workflows = [_WfFalso(i) for i in ids]
+
+
+def test_tool_esta_registrada():
+    assert "workflow_editar" in mcp_server.TOOLS
+    func, descricao, _schema, obrigatorios = mcp_server.TOOLS["workflow_editar"]
+    assert callable(func)
+    assert "loc" in obrigatorios and "acao" in obrigatorios
+    assert "ESCREVE" in descricao
+
+
+def test_acao_invalida_e_recusada_sem_chamar_o_extractor(monkeypatch):
+    chamou = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: chamou.append(a))
+    with pytest.raises(mcp_server.ToolError, match="acao"):
+        mcp_server.workflow_editar(loc="L1", acao="explodir", id="W1")
+    assert chamou == []
+
+
+def test_gravar_sem_confirmo_nao_chega_a_escrever(monkeypatch):
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        return {"aplicado": False, "motivo": "prévia: rode de novo com --confirmo para gravar"}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert r["aplicado"] is False
+    assert "--confirmo" not in vistos[0]
+
+
+def test_confirmo_true_passa_a_flag_para_o_extractor(monkeypatch):
+    # O alvo aqui é só a linha de comando montada, então o teste força o caminho
+    # "sem dump" em vez de depender de "L1" não existir em ~/.automaster/dumps: com um
+    # dump desse nome em disco ele mudaria de ramo e passaria a medir outra coisa.
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        return {"aplicado": True, "registro": "/tmp/x.json"}
+
+    def sem_dump(loc, snap):
+        raise mcp_server.ToolError("subconta sem dump")
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", sem_dump)
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["aplicado"] is True
+    assert any("--confirmo" in v for v in vistos)
+    assert any("--json" in v for v in vistos)
+    assert r["validacao"]["rodou"] is False
+
+
+def test_sem_dump_em_disco_nao_trava_a_escrita(monkeypatch):
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "diff": {"x": 1}, "documento": {"name": "wf"}}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+
+    def sem_dump(loc, snap):
+        raise mcp_server.ToolError("subconta sem dump")
+
+    monkeypatch.setattr(mcp_base, "_load", sem_dump)
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["aplicado"] is True
+    assert len(vistos) == 2
+    assert r["validacao"]["rodou"] is False
+
+
+def test_gravacao_recusada_por_erro_novo_nao_chama_a_segunda_vez(monkeypatch):
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        return {"aplicado": False, "motivo": "prévia", "diff": {"x": 1}, "documento": {"name": "wf"}}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+    monkeypatch.setattr(
+        mcp_workflows,
+        "validar_edicao",
+        lambda ctx, wid, doc, triggers=None, **k: _ResultadoFalso(pode_gravar=False, erros_novos=["broken_tag_ref: x"]),
+    )
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["aplicado"] is False
+    assert "broken_tag_ref" in r["motivo"]
+    assert r["validacao"]["pode_gravar"] is False
+    assert len(vistos) == 1  # só a prévia — a segunda chamada (--confirmo) não aconteceu
+    assert not any("--confirmo" in v for v in vistos)
+
+
+def test_gravacao_passa_pela_validacao_e_grava(monkeypatch):
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "diff": {"x": 1}, "documento": {"name": "wf"}}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+    monkeypatch.setattr(
+        mcp_workflows,
+        "validar_edicao",
+        lambda ctx, wid, doc, triggers=None, **k: _ResultadoFalso(pode_gravar=True),
+    )
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["aplicado"] is True
+    assert r["validacao"]["rodou"] is True
+    assert r["validacao"]["pode_gravar"] is True
+    assert len(vistos) == 2
+    assert any("--confirmo" in v for v in vistos)
+
+
+def test_workflow_fora_do_dump_nao_estoura_e_avisa_antes_do_chrome(monkeypatch):
+    """Workflow recém-criado ou duplicado não está no dump: antes isso era ValueError crua,
+    e a prévia (que abre o Chrome) já tinha rodado. Agora a checagem vem primeiro."""
+    ordem = []
+
+    def falso(*args):
+        ordem.append("extractor")
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"}}
+
+    def carrega(loc, snap):
+        ordem.append("dump")
+        return _CtxFalso("OUTRO"), {"snapshot": "2026-01-01_0000"}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", carrega)
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: pytest.fail("não devia validar"))
+
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert ordem[0] == "dump"  # o dump é lido antes de abrir o Chrome
+    assert r["aplicado"] is True
+    assert r["validacao"]["rodou"] is False
+    assert "não está no dump" in r["validacao"]["motivo"]
+
+
+def test_triggers_lidos_ao_vivo_chegam_na_validacao(monkeypatch):
+    """O documento do GHL não traz trigger; a lista autoritativa vem da prévia."""
+    recebidos = {}
+
+    def falso(*args):
+        if "--confirmo" in args:
+            return {"aplicado": True}
+        return {"aplicado": False, "documento": {"name": "wf"}, "triggers": [{"id": "T1", "name": "Form"}]}
+
+    def validar(ctx, wid, doc, triggers=None, **k):
+        recebidos["triggers"] = triggers
+        return _ResultadoFalso(pode_gravar=True)
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", validar)
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert recebidos["triggers"] == [{"id": "T1", "name": "Form"}]
+
+
+def test_validacao_sem_triggers_ao_vivo_diz_que_usou_o_dump(monkeypatch):
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {"aplicado": False, "documento": {"name": "wf"}})
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(
+        mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(pode_gravar=True, triggers_do_dump=True)
+    )
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "veio do dump" in r["validacao"]["aviso"]
+
+
+def test_schema_oferece_as_tres_acoes_de_trigger():
+    """A nota antiga dizia que criar trigger não tinha rota. Tem: o `POST .../trigger` com
+    `workflowId` em camelCase. Com `workflow_id` o trigger nasce órfão — e era isso que
+    fazia a rota passar por inexistente."""
+    _, _, schema, _ = mcp_server.TOOLS["workflow_editar"]
+    assert schema["trigger_acao"]["enum"] == ["adicionar", "remover", "substituir"]
+    assert "trigger_corpo" in schema
+
+
+def test_criar_e_duplicar_exigem_pasta(monkeypatch):
+    """Workflow fora de pasta não aparece na lista do app e o editor abre em branco. A
+    recusa vem antes de abrir o Chrome."""
+    chamou = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: chamou.append(a) or {})
+    for acao in ("criar", "duplicar"):
+        with pytest.raises(mcp_server.ToolError, match="pasta"):
+            mcp_server.workflow_editar(loc="L1", acao=acao, id="W1", nome="x")
+    assert chamou == [], "não pode abrir o Chrome para uma chamada que já se sabe errada"
+
+
+def test_trigger_corpo_vira_json_na_linha_de_comando(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: vistos.append(a) or {"aplicado": False})
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    mcp_server.workflow_editar(
+        loc="L1",
+        acao="trigger",
+        id="W1",
+        trigger_acao="adicionar",
+        trigger_corpo={"type": "appointment", "name": "Marcou"},
+    )
+    args = vistos[0]
+    corpo = args[args.index("--trigger-corpo") + 1]
+    assert json.loads(corpo) == {"type": "appointment", "name": "Marcou"}
+
+
+def _previa_trigger():
+    """Forma real da saída de `--acao trigger --trigger-acao remover` sem --confirmo:
+    documento lido (corpo intacto) + `triggers` já SEM o trigger removido."""
+    return {
+        "aplicado": False,
+        "motivo": "prévia: rode de novo com --confirmo para gravar",
+        "acao": "trigger",
+        "id": "W1",
+        "diff": {"triggersRemovidos": [{"id": "T1", "nome": "Formulário Enviado"}]},
+        "mudancas": ["trigger T1 removido"],
+        "documento": {"name": "wf", "workflowData": {"templates": []}},
+        "triggers": [],
+    }
+
+
+def test_remover_trigger_passa_pela_validacao_das_18_regras(monkeypatch):
+    """Remover trigger é o caso mais provável de `workflow_unreachable`: não pode gravar
+    sem validar. A saída da ação não tem o mesmo formato das outras — daí o teste próprio."""
+    vistos, recebidos = [], {}
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return _previa_trigger()
+
+    def validar(ctx, wid, doc, triggers=None, **k):
+        recebidos["triggers"] = triggers
+        return _ResultadoFalso(pode_gravar=False, erros_novos=["workflow_unreachable: sem entrada"])
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", validar)
+
+    r = mcp_server.workflow_editar(
+        loc="L1", acao="trigger", id="W1", trigger_acao="remover", trigger_id="T1", confirmo=True
+    )
+    assert recebidos["triggers"] == []  # a lista DEPOIS da remoção
+    assert r["validacao"]["rodou"] is True
+    assert r["aplicado"] is False
+    assert "workflow_unreachable" in r["motivo"]
+    assert len(vistos) == 1  # a gravação não aconteceu
+    assert not any("--confirmo" in v for v in vistos)
+
+
+def test_previa_de_trigger_sem_confirmo_traz_validacao(monkeypatch):
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: _previa_trigger())
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(pode_gravar=True))
+    r = mcp_server.workflow_editar(loc="L1", acao="trigger", id="W1", trigger_acao="remover", trigger_id="T1")
+    assert r["validacao"]["rodou"] is True and r["validacao"]["pode_gravar"] is True
+
+
+def test_sem_documento_a_resposta_diz_que_nao_validou(monkeypatch):
+    """ "nada a mudar": a chave `validacao` não pode simplesmente sumir."""
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {"aplicado": False, "motivo": "nada a mudar"})
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: pytest.fail("não há o que validar"))
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert r["validacao"]["rodou"] is False
+    assert "não devolveu documento" in r["validacao"]["motivo"]
+
+
+# --- I1: a prévia e a gravação são dois processos, com um Chrome subindo no meio ---
+
+
+def test_versao_da_previa_viaja_para_a_gravacao(monkeypatch):
+    """Sem carregar a `version` que a prévia leu, a guarda de concorrência não enxerga
+    nada do que mudou entre os dois processos — uma janela de dezenas de segundos."""
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        return {"aplicado": False, "documento": {"workflowData": {}}, "versao": 7}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert "--versao-esperada" not in vistos[0]  # a prévia não recebe a flag
+    assert "--versao-esperada" in vistos[1] and "7" in vistos[1]
+
+
+def test_sem_versao_na_previa_a_gravacao_nao_inventa_uma(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: vistos.append(a) or {"aplicado": False})
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+    assert "--versao-esperada" not in vistos[1]
+
+
+# --- M3: o documento inteiro não volta para o contexto do modelo ---
+
+
+def test_documento_sai_da_resposta_depois_de_validar(monkeypatch):
+    doc = {"workflowData": {"templates": [{"id": "s1"}]}}
+    monkeypatch.setattr(
+        mcp_base, "_run_extractor", lambda *a: {"aplicado": False, "documento": doc, "diff": {"vazio": False}}
+    )
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(True))
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "documento" not in r
+    assert r["validacao"]["rodou"] is True
+    assert r["diff"] == {"vazio": False}
+
+
+def test_documento_sai_da_resposta_tambem_sem_dump(monkeypatch):
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: {"aplicado": False, "documento": {"x": 1}})
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "documento" not in r and r["validacao"]["rodou"] is False
+
+
+# --- M2: a dica do timeout tem que apontar para a tool certa ---
+
+
+def test_timeout_de_workflow_manda_conferir_com_a_tool_de_workflow(monkeypatch, tmp_path):
+    import subprocess
+
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True)
+    tsx.touch()
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
+
+    def estoura(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="tsx", timeout=600, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", estoura)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server._run_extractor("workflow-editar", "-l", "L1")
+    assert "workflows_ao_vivo" in str(e.value) and "`contato`" not in str(e.value)
+
+
+# --- uma ação, um teste ---------------------------------------------------------------
+#
+# A ação `trigger` passou meses sem validação sem ninguém notar porque os testes cobriam
+# `trocar-tag` e nada mais: ação nova nascia no schema e entrava no mesmo código sem que
+# nada fixasse o caminho dela. Os dois testes abaixo cobrem TODAS as ações de uma vez, e
+# uma ação nova sem entrada aqui quebra a suíte em vez de passar em silêncio.
+
+_ARGS_POR_ACAO = {
+    "trocar-ref": {"id": "W1", "de": "abc123abc123abc123ab", "para": "xyz789xyz789xyz789xy"},
+    "trocar-tag": {"id": "W1", "de": "tag velha", "para": "tag nova"},
+    "limpar-orfaos": {"id": "W1"},
+    "atributo": {"id": "W1", "step": "s1", "caminho": "attributes.message", "valor": "oi"},
+    "trigger": {"id": "W1", "trigger_acao": "remover", "trigger_id": "t1"},
+    "criar": {"nome": "Novo", "pasta": "P1"},
+    "renomear": {"id": "W1", "nome": "Outro"},
+    "mover": {"id": "W1", "pasta": "P2"},
+    "duplicar": {"id": "W1", "nome": "Cópia", "pasta": "P1"},
+    "apagar": {"id": "W1"},
+    "historico": {"id": "W1"},
+    "step-criar": {"id": "W1", "corpo": {"type": "sms"}, "depois_de": "s1"},
+    "step-remover": {"id": "W1", "step": "s1", "com_subarvore": True},
+    "step-mover": {"id": "W1", "step": "s1", "depois_de": "s2"},
+    "configuracao": {"id": "W1", "campo": "allowMultiple", "valor": "true"},
+}
+
+
+def test_toda_acao_da_tool_tem_caso_de_teste():
+    assert set(_ARGS_POR_ACAO) == set(mcp_server.WF_EDITAR_ACOES), (
+        "ação nova em WF_EDITAR_ACOES sem entrada em _ARGS_POR_ACAO: escreva o caso dela"
+    )
+
+
+@pytest.mark.parametrize("acao", sorted(_ARGS_POR_ACAO))
+def test_cada_acao_monta_a_linha_de_comando_e_valida_quando_deve(acao, monkeypatch):
+    chamadas = []
+
+    def falso(*args):
+        chamadas.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"}, "triggers": [], "versao": 7}
+
+    validou = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: (validou.append(a), _ResultadoFalso(True))[1])
+
+    r = mcp_server.workflow_editar(loc="L1", acao=acao, confirmo=True, **_ARGS_POR_ACAO[acao])
+
+    assert r["aplicado"] is True
+    primeira = chamadas[0]
+    assert primeira[0] == "workflow-editar"
+    assert "--acao" in primeira and acao in primeira
+    assert "--json" in primeira
+    for chave, valor in _ARGS_POR_ACAO[acao].items():
+        if valor is True:
+            # booleano vira flag sem valor: `com_subarvore=True` → `--com-subarvore`
+            assert f"--{chave.replace('_', '-')}" in primeira, f"{chave} virou flag nenhuma"
+        elif isinstance(valor, dict):
+            # dict é serializado pela tool, como `trigger_corpo` e `corpo`
+            assert json.dumps(valor, ensure_ascii=False) in primeira, f"{chave} não foi serializado"
+        else:
+            assert valor in primeira, f"{valor!r} não chegou na linha de comando"
+
+    com_corpo = acao in mcp_server._WF_EDITAR_COM_CORPO
+    assert bool(validou) is com_corpo, (
+        f"ação {acao!r}: validação das 18 regras {'devia' if com_corpo else 'não devia'} ter rodado"
+    )
+    if com_corpo:
+        # prévia e gravação são duas invocações, e a `version` da prévia viaja para a segunda
+        assert len(chamadas) == 2
+        assert "--versao-esperada" in chamadas[1]
+        assert r["validacao"]["rodou"] is True
+    else:
+        assert len(chamadas) == 1
+        assert "validacao" not in r
+
+
+def _extractor_que_falha(monkeypatch):
+    """Dublê de subprocess.run: código 1 e stderr, como um comando recusado pelo extractor."""
+
+    class _R:
+        returncode = 1
+        stdout = ""
+        stderr = "o step s1 é um ramo (transition) de um container"
+
+    # O `tsx` do extractor não existe em máquina limpa (o CI provou): sem este dublê a
+    # guarda de "extractor não provisionado" responde antes de o comando falhar.
+    falso = pathlib.Path(tempfile.mkdtemp()) / "extractor"
+    (falso / "node_modules" / ".bin").mkdir(parents=True)
+    (falso / "node_modules" / ".bin" / "tsx").write_text("")
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", falso)
+    monkeypatch.setattr(mcp_base.subprocess, "run", lambda *a, **k: _R())
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "2026-01-01_0000"}))
+
+
+def test_previa_recusada_nao_diz_que_producao_pode_ter_mudado(monkeypatch):
+    _extractor_que_falha(monkeypatch)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server.workflow_editar(loc="L1", acao="step-remover", id="W1", step="s1")
+    assert "parcialmente aplicada" not in str(e.value)
+
+
+def test_gravacao_que_falha_ainda_manda_conferir_o_estado(monkeypatch):
+    # `apagar` não tem prévia: a única invocação já leva `--confirmo`, e aí produção PODE
+    # ter mudado antes da falha.
+    _extractor_que_falha(monkeypatch)
+    with pytest.raises(mcp_server.ToolError) as e:
+        mcp_server.workflow_editar(loc="L1", acao="apagar", id="W1", confirmo=True)
+    assert "parcialmente aplicada" in str(e.value)
+
+
+def test_ramos_vira_json_e_depois_de_pode_faltar(monkeypatch):
+    """Primeiro step de um workflow do zero: sem `depois_de`, e com ramos como lista."""
+    vistos = []
+    monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: vistos.append(a) or {"aplicado": False})
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    mcp_server.workflow_editar(
+        loc="L1", acao="step-criar", id="W1", corpo={"type": "if_else"}, ramos=[{"name": "Sim"}, {"else": True}]
+    )
+    args = vistos[0]
+    assert json.loads(args[args.index("--ramos") + 1]) == [{"name": "Sim"}, {"else": True}]
+    assert "--depois-de" not in args
+
+
+def test_gravacao_carrega_sem_regras_e_previa_nao(monkeypatch):
+    """Esta porta É a guarda; a camada crua recusa gravar sem a flag.
+
+    Se um dia a flag sumir daqui, a gravação passa a falhar em vez de passar por fora da
+    validação sem ninguém notar — mas o teste pega antes, e a prévia não pode carregá-la.
+    """
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {"aplicado": False, "motivo": "prévia", "documento": {"name": "wf"}, "versao": 7}
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(True))
+    mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
+
+    previa = next(v for v in vistos if "--confirmo" not in v)
+    gravacao = next(v for v in vistos if "--confirmo" in v)
+    assert "--sem-regras" not in previa
+    assert "--sem-regras" in gravacao
+
+
+def test_triggers_da_previa_viram_guarda_da_gravacao(monkeypatch):
+    """Apagar trigger não mexe no `version`: a lista de ids é a única guarda da janela."""
+    vistos = []
+
+    def falso(*args):
+        vistos.append(args)
+        if "--confirmo" in args:
+            return {"aplicado": True, "registro": "/tmp/x.json"}
+        return {
+            "aplicado": False,
+            "motivo": "prévia",
+            "documento": {"name": "wf"},
+            "versao": 7,
+            "triggersAntes": ["t1", "t2"],
+        }
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (_CtxFalso("W1"), {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(True))
+    mcp_server.workflow_editar(
+        loc="L1", acao="trigger", id="W1", trigger_acao="remover", trigger_id="t1", confirmo=True
+    )
+
+    gravacao = list(next(v for v in vistos if "--confirmo" in v))
+    assert gravacao[gravacao.index("--triggers-esperados") + 1] == "t1,t2"
+
+
+# --- entidades ao vivo, workflow fora do dump e configuracao --------------------------
+
+
+def test_workflow_novo_e_validado_com_documento_e_entidades_ao_vivo(monkeypatch, make_dump):
+    ctx = load_dump(make_dump(workflows=[wf(id="OUTRO")], tags=[]))
+    recebido = {}
+
+    def falso(*args):
+        if "--confirmo" in args:
+            return {"aplicado": True}
+        return {
+            "aplicado": False,
+            "documento": {"name": "n", "workflowData": {"templates": []}},
+            "documentoAntes": {"name": "n", "workflowData": {"templates": []}},
+            "entidades": {"tags": {"tags": [{"name": "transferir-luana"}]}},
+            "triggers": [],
+            "versao": 3,
+        }
+
+    def validar(c, wid, doc, triggers=None, doc_antes=None, triggers_antes=None):
+        recebido.update(tem_tag=c.has_tag("transferir-luana"), doc_antes=doc_antes)
+        return _ResultadoFalso(pode_gravar=True)
+
+    monkeypatch.setattr(mcp_base, "_run_extractor", falso)
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (ctx, {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", validar)
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W9", de="a", para="b", confirmo=True)
+    assert r["validacao"]["rodou"] is True
+    assert recebido["tem_tag"] is True
+    assert recebido["doc_antes"] is not None
+    assert "documentoAntes" not in r and "entidades" not in r and "documento" not in r
+
+
+def test_entidade_que_falhou_cai_no_dump_e_diz_qual(monkeypatch, make_dump):
+    ctx = load_dump(make_dump(workflows=[wf(id="W1")], tags=["x"]))
+    monkeypatch.setattr(
+        mcp_base,
+        "_run_extractor",
+        lambda *a: {
+            "aplicado": False,
+            "documento": {"name": "n"},
+            "documentoAntes": {"name": "n"},
+            "entidades": {},
+            "entidadesFalhas": ["users"],
+            "triggers": [],
+        },
+    )
+    monkeypatch.setattr(mcp_base, "_load", lambda loc, snap: (ctx, {"snapshot": "S"}))
+    monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: _ResultadoFalso(pode_gravar=True))
+    r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b")
+    assert "users" in r["validacao"]["aviso"]
+
+
+def test_configuracao_nao_devolve_documento(monkeypatch):
+    monkeypatch.setattr(
+        mcp_base,
+        "_run_extractor",
+        lambda *a: {"aplicado": False, "documento": {"x": 1}, "documentoAntes": {}, "entidades": {}},
+    )
+    r = mcp_server.workflow_editar(loc="L1", acao="configuracao", id="W1", campo="allowMultiple", valor="true")
+    assert "documento" not in r and "documentoAntes" not in r and "entidades" not in r
+    assert "validacao" not in r

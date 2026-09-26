@@ -1,0 +1,180 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { avisoPublicado, guardaPublicado } from "../src/api/workflows-live.js";
+import {
+  trocarReferencia, pareceId, conferirEscrita, conferirVersaoEsperada, conferirCamadaCrua,
+  type Documento,
+} from "../src/api/workflow-edit.js";
+import { lerDocumento, listarTriggersPrevia } from "../src/api/workflows-write.js";
+import { WF_EDITAR_ACOES, aplicarOperacao } from "../src/cli/workflow-editar.js";
+
+test("configuracao é uma ação da CLI crua", () => {
+  assert.ok((WF_EDITAR_ACOES as readonly string[]).includes("configuracao"));
+});
+
+test("--acao configuracao recusa sem --campo e --valor", () => {
+  const doc = { workflowData: { templates: [] } } as unknown as Documento;
+  assert.throws(
+    () => aplicarOperacao(doc, { location: "LOC1", id: "WF1", acao: "configuracao" } as never),
+    /--acao configuracao exige --campo e --valor/,
+  );
+});
+
+const opts = (extra: { publicado?: boolean } = {}) => ({ location: "LOC1", id: "WF1", ...extra });
+
+/** Cliente falso: devolve uma página de inscritos e nada mais. */
+function clienteInscritos(quantos: number, estrangulado = false) {
+  const statuses = Array.from({ length: quantos }, (_, i) => ({
+    _id: `i${i}`, id: `i${i}`, sid: `s${i}`, contactId: `c${i}`, status: "waiting", createdAt: "2026-01-01",
+  }));
+  return { getJson: () => Promise.resolve({ statuses, isLocationRateLimited: estrangulado }) } as never;
+}
+
+const silencio = () => {};
+
+// A guarda é o que separa "editei um rascunho" de "troquei o chão debaixo de quem está andando".
+test("guarda de publicado RECUSA sem --publicado", async () => {
+  const saida: Record<string, unknown> = {};
+  await assert.rejects(
+    () => guardaPublicado(clienteInscritos(3), opts(), saida, silencio, "gravar"),
+    /PUBLICADO com 3 contato\(s\).*repita com --publicado/s,
+  );
+});
+
+test("guarda de publicado DEIXA gravar com --publicado, e registra o aviso", async () => {
+  const saida: Record<string, unknown> = {};
+  await guardaPublicado(clienteInscritos(2), opts({ publicado: true }), saida, silencio, "gravar");
+  assert.match(String(saida.aviso), /PUBLICADO com 2 contato\(s\) dentro agora/);
+});
+
+// Contagem cortada ou estrangulada é PISO, nunca total: apresentar o número fechado
+// faria alguém decidir sobre uma base que não existe.
+test("contagem estrangulada vira mensagem de piso, não número fechado", async () => {
+  const saida: Record<string, unknown> = {};
+  await guardaPublicado(clienteInscritos(4, true), opts({ publicado: true }), saida, silencio, "apagar");
+  assert.match(String(saida.aviso), /pelo menos 4 contato\(s\)/);
+  assert.match(String(saida.aviso), /não há desfazer/);
+});
+
+test("avisoPublicado sem corte dá o número fechado", () => {
+  assert.match(avisoPublicado(7, false, "gravar"), /com 7 contato\(s\)/);
+  assert.doesNotMatch(avisoPublicado(7, false, "gravar"), /pelo menos/);
+});
+
+// I3: `--de` é texto livre, e trocarReferencia reescreve DENTRO de qualquer string.
+test("trocar-ref recusa --de que não tem cara de id", () => {
+  const doc = {
+    workflowData: { templates: [{ id: "s1", type: "sms", attributes: { message: "Olá, tudo bem?" } }] },
+  } as unknown as Documento;
+  assert.throws(() => trocarReferencia(doc, "Olá", "Oi"), /não parece um id/);
+  assert.equal(doc.workflowData.templates[0].attributes!.message, "Olá, tudo bem?");
+});
+
+test("pareceId aceita uuid, ObjectId e base62 do GHL; recusa texto", () => {
+  assert.ok(pareceId("57f93292-2152-4782-b703-6a4f691f6fe8"));
+  assert.ok(pareceId("idTeste0000000000058"));
+  assert.ok(pareceId("507f1f77bcf86cd799439011"));
+  assert.equal(pareceId("Olá"), false);
+  assert.equal(pareceId("Bom dia, tudo certo?"), false);
+  assert.equal(pareceId("curto123"), false);
+});
+
+// C1: 200 e bump de `version` não são prova nesta API.
+test("conferirEscrita aprova quando a releitura bate com o pedido", () => {
+  const d = { workflowData: { templates: [{ id: "s1", type: "sms" }] } } as unknown as Documento;
+  const relido = { ...JSON.parse(JSON.stringify(d)), version: 9, meta: {} } as Documento;
+  assert.equal(conferirEscrita(d, relido).ok, true);
+});
+
+test("conferirEscrita acusa duvidoso quando o servidor não gravou o que foi pedido", () => {
+  const pedido = { workflowData: { templates: [{ id: "s1", type: "sms", attributes: { message: "novo" } }] } } as unknown as Documento;
+  const relido = { workflowData: { templates: [{ id: "s1", type: "sms", attributes: { message: "velho" } }] } } as unknown as Documento;
+  const r = conferirEscrita(pedido, relido);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.residual.stepsAlterados[0].campos, ["attributes.message"]);
+});
+
+// I1: a janela entre prévia e gravação, que são dois processos.
+test("--versao-esperada aborta quando o workflow mudou entre prévia e gravação", () => {
+  assert.throws(() => conferirVersaoEsperada({ versaoEsperada: "5" }, 6), /mudou entre a prévia e a gravação/);
+  conferirVersaoEsperada({ versaoEsperada: "5" }, 5);
+  conferirVersaoEsperada({}, 99);
+});
+
+test("imprimir distingue os três estados de aplicado na saída humana", () => {
+  // Função inline (espelho da imprimir exportada em workflow-editar.ts)
+  function imprimir(saida: Record<string, unknown>, o: Record<string, unknown>, log: (m: string) => void): void {
+    if (o.json) console.log(JSON.stringify(saida));
+    else {
+      let status: string;
+      if (saida.aplicado === true) {
+        status = "ok";
+      } else if (saida.aplicado === "duvidoso") {
+        status = "duvidoso (releitura não confirmou)";
+      } else {
+        status = "sem gravar";
+      }
+      log(`${status} — ${o.acao}${saida.registro ? `; registro em ${saida.registro}` : ""}`);
+    }
+  }
+
+  const mensagens: string[] = [];
+  const log = (m: string) => mensagens.push(m);
+  const optsBase = { json: false, acao: "trocar-tag" };
+
+  // Estado: aplicado = true
+  imprimir({ aplicado: true, acao: "trocar-tag" }, optsBase, log);
+  assert.ok(mensagens[0].startsWith("ok —"));
+  assert.ok(mensagens[0].includes("trocar-tag"));
+
+  // Estado: aplicado = "duvidoso"
+  mensagens.length = 0;
+  imprimir({ aplicado: "duvidoso", acao: "atributo" }, { ...optsBase, acao: "atributo" }, log);
+  assert.ok(mensagens[0].includes("duvidoso"));
+  assert.ok(mensagens[0].includes("releitura não confirmou"));
+  assert.ok(mensagens[0].includes("atributo"));
+
+  // Estado: aplicado = false
+  mensagens.length = 0;
+  imprimir({ aplicado: false, acao: "renomear" }, { ...optsBase, acao: "renomear" }, log);
+  assert.ok(mensagens[0].startsWith("sem gravar —"));
+  assert.ok(mensagens[0].includes("renomear"));
+});
+
+// --- prévia que degrada: a rota de listagem de triggers pode cair sozinha --------------
+//
+// A prévia faz duas leituras. Perder a do documento é fatal (sem ele não há o que
+// validar); perder a lista de triggers, na ADIÇÃO, não é — ela só alimenta o diff.
+
+const clienteQueFalha = (msg: string) =>
+  ({ getJson: () => Promise.reject(new Error(msg)) }) as never;
+
+test("prévia de adicionar segue sem a lista de triggers, e diz que seguiu", async () => {
+  const r = await listarTriggersPrevia(clienteQueFalha("GET .../trigger → HTTP 503"), "LOC1", "WF1", true);
+  assert.equal(r.triggers, null, "lista ausente, NUNCA vazia: [] faria todo erro de trigger sair como resolvido");
+  assert.match(String(r.aviso), /lista de triggers não pôde ser lida/);
+  assert.match(String(r.aviso), /dump/);
+});
+
+test("quando a lista é indispensável (substituir, ou gravação) a falha continua fatal", async () => {
+  await assert.rejects(
+    () => listarTriggersPrevia(clienteQueFalha("HTTP 503"), "LOC1", "WF1", false),
+    /HTTP 503/,
+  );
+});
+
+test("falha ao ler o documento nomeia a chamada que caiu", async () => {
+  await assert.rejects(
+    () => lerDocumento(clienteQueFalha("GET https://interno/... → HTTP 500"), "LOC1", "WF1"),
+    /documento do workflow WF1/,
+  );
+});
+
+// A camada crua grava sem as 18 regras. Aviso em stderr some no log; a recusa não.
+test("camada crua RECUSA gravar sem --sem-regras", () => {
+  assert.throws(() => conferirCamadaCrua({ acao: "trocar-tag", confirmo: true }), /camada CRUA/);
+  // prévia não grava: a flag não faz falta
+  conferirCamadaCrua({ acao: "trocar-tag" });
+  // por fora de propósito: passa, e o aviso sai
+  conferirCamadaCrua({ acao: "trocar-tag", confirmo: true, semRegras: true });
+});
