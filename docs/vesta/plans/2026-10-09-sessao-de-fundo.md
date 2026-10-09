@@ -706,10 +706,10 @@ Terminal em `extractor/`:
 LOC=Xb9gDxwxYhdqtprGcb5E                   # Instaltech, subconta de teste
 PERFIL=$HOME/.automaster/chrome-profile
 pid_chrome() { ps -axo pid=,args= | grep -F "MacOS/Google Chrome " | grep -F -- "--user-data-dir=$1" | grep -v grep | awk '{print $1}' | head -1; }
-apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1)"; }
+apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1 and background only is false)"; }
 ```
 
-`apps_do_pid` conta se o macOS registrou o processo como app com interface: um Chrome com janela dá 1; o invisível dá 0. Na primeira vez o macOS pede para o Terminal controlar o "System Events": aceite.
+`apps_do_pid` conta se o macOS registrou o processo como app com interface: um Chrome com janela dá 1; o invisível dá 0. O filtro `background only is false` é necessário: o Chrome invisível também aparece no System Events, mas como processo `BackgroundOnly` (medido ao vivo em 2026-10-09). Na primeira vez o macOS pede para o Terminal controlar o "System Events": aceite.
 
 1. Partida fria: `npm run sessao -- --acao encerrar --json`. Depois `/usr/bin/time -p npm run sessao -- --acao tokens -l $LOC --json > /tmp/s1.json` e anote o `real`. A última linha de `/tmp/s1.json` tem `"ok":true`, `data.subcontaNaLista: true`, `data.expBearer` no futuro e `data.userAgent` sem `Headless`.
 2. `ps -o args= -p $(pid_chrome $PERFIL)` contém `--headless`. `npm run sessao -- --acao status --json` mostra `rodando: true`, `atualizado: true` e `perfil` igual a `$PERFIL`.
@@ -881,7 +881,7 @@ CONTATO=uWqujqll20tRuglV3mLt               # contato de teste da Instaltech
 export AUTOMASTER_DUMPS=~/.automaster/dumps     # onde estão os dumps da Instaltech (sem isso, contato-editar não acha o dump)
 PERFIL=$HOME/.automaster/chrome-profile
 pid_chrome() { ps -axo pid=,args= | grep -F "MacOS/Google Chrome " | grep -F -- "--user-data-dir=$1" | grep -v grep | awk '{print $1}' | head -1; }
-apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1)"; }
+apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1 and background only is false)"; }
 ```
 
 0. Sobra de rodada anterior: `npm run tags -- -l $LOC --termo teste-fundo --json` não pode listar nada. Se listar, apague antes: `npm run tag-acao -- -l $LOC --acao apagar --tag teste-fundo --confirmo --json`.
@@ -990,7 +990,7 @@ Prova pelo caminho exato do MCP, contra a Instaltech. **Nenhuma escrita nesta et
 LOC=Xb9gDxwxYhdqtprGcb5E                   # Instaltech, subconta de teste
 PERFIL=$HOME/.automaster/chrome-profile
 pid_chrome() { ps -axo pid=,args= | grep -F "MacOS/Google Chrome " | grep -F -- "--user-data-dir=$1" | grep -v grep | awk '{print $1}' | head -1; }
-apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1)"; }
+apps_do_pid() { osascript -e "tell application \"System Events\" to count (every process whose unix id is $1 and background only is false)"; }
 ```
 
 1. Plugin em uso: `for p in $(pgrep -f automaster_audit.mcp_server); do ps eww -p $p -o command= | tr ' ' '\n' | grep '^CLAUDE_PLUGIN_ROOT='; done | sort -u`. Tem de mostrar só a pasta deste repositório; anote-a. Se aparecer outra pasta (por exemplo uma cópia em `~/.claude/plugins/cache/`), rode `claude plugin marketplace update zoi && claude plugin install automaster@zoi`, reinicie as sessões e repita.
