@@ -1,7 +1,8 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import os from "node:os";
 import path from "node:path";
-import { travarChrome } from "./lock.js";
+import { donoDoPerfil } from "../fundo/chrome.js";
+import { lockPath, travarChrome } from "./lock.js";
 
 export interface Session {
   context: BrowserContext;
@@ -33,8 +34,10 @@ export function defaultUserDataDir(): string {
  * Abre Chrome com perfil persistente. Login manual na 1ª vez; depois a sessão
  * é reaproveitada. `launchPersistentContext` retorna o context (não a page).
  */
-export async function openSession(userDataDir = defaultUserDataDir()): Promise<Session> {
-  const soltar = travarChrome();
+export async function openSession(userDataDir = defaultUserDataDir(), rotulo = ""): Promise<Session> {
+  const dono = donoDoPerfil(userDataDir);
+  if (dono) throw new Error(`o perfil ${userDataDir} está aberto por outro Chrome (pid ${dono.pid}). Feche esse Chrome e repita.`);
+  const soltar = travarChrome(lockPath(), rotulo);
   try {
     const context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,

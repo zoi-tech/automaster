@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { chromium, type Browser } from "playwright";
 import path from "node:path";
 import { GhlClient } from "../api/client.js";
 import {
@@ -280,6 +281,35 @@ async function runFormularioAcao(opts: {
   }, { escrita: !!opts.confirmo });
 }
 
+/**
+ * Fotografa a página pública do widget num Chrome do sistema sem perfil, sem trava e sem
+ * processo de fundo: a página não exige login.
+ */
+export async function fotografarWidget(
+  url: string, destino: string,
+  abrir: () => Promise<Browser> = () => chromium.launch({ channel: "chrome", headless: true }),
+): Promise<void> {
+  const navegador = await abrir();
+  try {
+    const aba = await navegador.newPage({ viewport: { width: 480, height: 900 } });
+    // não é `networkidle`: medido nesta página, ele nunca resolve — o
+    // widget mantém alguma conexão de fundo aberta (analytics/chat)
+    await aba.goto(url, { waitUntil: "domcontentloaded" });
+    try {
+      await aba.waitForSelector("form, input, button", { timeout: 15000 });
+    } catch {
+      throw new Error(
+        `a página pública não renderizou nenhum campo em 15s — o formulário/survey ` +
+        `pode estar despublicado ou o --id errado. URL: ${url}`,
+      );
+    }
+    await aba.waitForTimeout(1500); // espera curta p/ fonte e CSS assentarem
+    await aba.screenshot({ path: destino, fullPage: true });
+  } finally {
+    await navegador.close();
+  }
+}
+
 const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas", "previa-visual"];
 
 /**
@@ -316,44 +346,26 @@ async function runFormularioEstilo(opts: {
   }
   if (opts.acao === "aplicar" && !opts.id) throw new Error("aplicar exige --id");
 
-  await withClient(opts.location, log, async (client, page) => {
+  if (opts.acao === "previa-visual") {
+    if (!opts.id) throw new Error("previa-visual exige --id");
+    const widget = tipo === "survey" ? "survey" : "form";
+    const versao = opts.versao ? `&versionId=${encodeURIComponent(opts.versao)}&nocache=true` : "";
+    // `notrack=true`: o preview não conta como visita na estatística do cliente
+    const url = `https://link.msgsndr.com/widget/${widget}/${encodeURIComponent(opts.id)}?notrack=true${versao}`;
+    const destino = opts.saida ?? path.join(os.tmpdir(), `formulario-${opts.id}.png`);
+    await fotografarWidget(url, destino);
+    if (opts.json) emitir(true, { url, arquivo: destino });
+    else log(`${url}\n${destino}`);
+    return;
+  }
+
+  await withClient(opts.location, log, async (client) => {
     if (opts.acao === "temas" || opts.acao === "paleta-ver") {
       const r = opts.acao === "temas"
         ? await temas(client, tipo, opts.location)
         : await paletaPadrao(client, opts.location);
       if (opts.json) emitir(true, { resultado: r });
       else log(JSON.stringify(r, null, 2));
-      return;
-    }
-
-    if (opts.acao === "previa-visual") {
-      if (!opts.id) throw new Error("previa-visual exige --id");
-      const widget = tipo === "survey" ? "survey" : "form";
-      const versao = opts.versao ? `&versionId=${encodeURIComponent(opts.versao)}&nocache=true` : "";
-      // `notrack=true`: o preview não conta como visita na estatística do cliente
-      const url = `https://link.msgsndr.com/widget/${widget}/${encodeURIComponent(opts.id)}?notrack=true${versao}`;
-      const destino = opts.saida ?? path.join(os.tmpdir(), `formulario-${opts.id}.png`);
-      const aba = await page.context().newPage();
-      try {
-        await aba.setViewportSize({ width: 480, height: 900 });
-        // não é `networkidle`: medido nesta página, ele nunca resolve — o
-        // widget mantém alguma conexão de fundo aberta (analytics/chat)
-        await aba.goto(url, { waitUntil: "domcontentloaded" });
-        try {
-          await aba.waitForSelector("form, input, button", { timeout: 15000 });
-        } catch {
-          throw new Error(
-            `a página pública não renderizou nenhum campo em 15s — o formulário/survey ` +
-            `pode estar despublicado ou o --id errado. URL: ${url}`,
-          );
-        }
-        await aba.waitForTimeout(1500); // espera curta p/ fonte e CSS assentarem
-        await aba.screenshot({ path: destino, fullPage: true });
-      } finally {
-        await aba.close();
-      }
-      if (opts.json) emitir(true, { url, arquivo: destino });
-      else log(`${url}\n${destino}`);
       return;
     }
 
