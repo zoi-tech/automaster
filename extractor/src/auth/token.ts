@@ -42,6 +42,22 @@ export function decodeUserId(bearer: string, tokenId: string): string {
   return "";
 }
 
+/** O GHL mandou a página para a tela de login (só com `pararNoLogin`). */
+export class PedidoDeLogin extends Error {
+  constructor(readonly url: string) {
+    super(`o GHL pediu login (${url})`);
+    this.name = "PedidoDeLogin";
+  }
+}
+
+/** O prazo acabou sem nenhum request autenticado. */
+export class SemTokens extends Error {
+  constructor() {
+    super("Não capturei os tokens. Faça login na janela do Chrome e abra a subconta, depois rode de novo.");
+    this.name = "SemTokens";
+  }
+}
+
 const WORKFLOWS_URL = (loc: string) =>
   `https://app.gohighlevel.com/v2/location/${loc}/automation/workflows`;
 
@@ -52,11 +68,19 @@ const WORKFLOWS_URL = (loc: string) =>
  * já dispara requests com ambos os tokens, então não dependemos de chegar à aba
  * de workflows. Espera até `timeoutMs` para dar tempo de login manual (inclui 2FA).
  * `aoVerLogin` é chamado uma vez, com a URL, se o GHL redirecionar para a tela de login.
+ * `pararNoLogin` troca a espera por `PedidoDeLogin` assim que a tela de login aparece;
+ * `cabecalhos` recebe os cabeçalhos do request em que os dois tokens foram achados.
+ * Página fechada (Chrome caiu) rejeita na hora, sem esperar o prazo.
  */
 export async function captureTokens(
   page: Page,
   locationId: string,
-  opcoes: { timeoutMs?: number; aoVerLogin?: (url: string) => void } = {},
+  opcoes: {
+    timeoutMs?: number;
+    aoVerLogin?: (url: string) => void;
+    pararNoLogin?: boolean;
+    cabecalhos?: (h: Record<string, string>) => void;
+  } = {},
 ): Promise<Tokens> {
   const { timeoutMs = 300_000, aoVerLogin } = opcoes;
   let resolved: Tokens | null = null;
@@ -66,6 +90,8 @@ export async function captureTokens(
       viuLogin = true;
       aoVerLogin(page.url());
     }
+    if (page.isClosed()) throw new Error("Target page, context or browser has been closed");
+    if (opcoes.pararNoLogin && ehTelaDeLogin(page.url())) throw new PedidoDeLogin(page.url());
   };
 
   const onRequest = async (req: Request) => {
@@ -76,8 +102,9 @@ export async function captureTokens(
       const h = await req.allHeaders();
       const auth = h["authorization"];
       const tokenId = h["token-id"];
-      if (auth?.startsWith("Bearer ") && tokenId) {
+      if (!resolved && auth?.startsWith("Bearer ") && tokenId) {
         resolved = { bearer: auth.slice("Bearer ".length), tokenId };
+        opcoes.cabecalhos?.(h);
       }
     } catch {
       // request pode ter sido descartado; ignora
@@ -105,9 +132,7 @@ export async function captureTokens(
   }
 
   if (!resolved) {
-    throw new Error(
-      "Não capturei os tokens. Faça login na janela do Chrome e abra a subconta, depois rode de novo.",
-    );
+    throw new SemTokens();
   }
   return resolved;
 }
