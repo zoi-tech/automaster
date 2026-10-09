@@ -433,3 +433,78 @@ test("fechar() só resolve depois que o close() do contexto resolveu", PRAZO, as
   assert.equal(ctx.fechouDeVerdade, true, "fechar() resolveu antes de o contexto fechar");
   assert.ok(Date.now() - t0 >= 250, `fechar() resolveu em ${Date.now() - t0} ms`);
 });
+
+/** Página que registra o próprio `close()` na ordem compartilhada; `rejeitar` simula a página que não fecha. */
+class PaginaQueFecha extends PaginaFalsa {
+  constructor(
+    readonly nome: string,
+    readonly ordem: string[],
+    private readonly opcoes: { rejeitar?: boolean; modo?: PaginaFalsa["modo"] } = {},
+  ) {
+    super(opcoes.modo);
+  }
+  close() {
+    this.ordem.push(this.nome);
+    this.fechada = true;
+    return this.opcoes.rejeitar ? Promise.reject(new Error("page.close: Target page has been closed")) : Promise.resolve();
+  }
+}
+
+/** Contexto com várias páginas que registra o próprio `close()` na mesma ordem das páginas. */
+class ContextoQueRegistra extends ContextoFalso {
+  constructor(
+    readonly paginas: PaginaFalsa[],
+    readonly ordem: string[],
+    readonly nome = "contexto",
+  ) {
+    super(paginas[0]);
+  }
+  override pages() {
+    return this.paginas;
+  }
+  override close() {
+    this.ordem.push(this.nome);
+    return super.close();
+  }
+}
+
+// Medido ao vivo: contexto.close() direto perpetua `exit_type: "Crashed"`; fechar as páginas antes sai "Normal".
+test("fechar() fecha todas as páginas do contexto antes do close() do contexto", PRAZO, async () => {
+  const ordem: string[] = [];
+  const m = montar(
+    () => new ContextoQueRegistra([new PaginaQueFecha("pagina-1", ordem), new PaginaQueFecha("pagina-2", ordem)], ordem),
+  );
+  await m.chrome.capturar("X");
+  await m.chrome.fechar();
+  assert.deepEqual(ordem, ["pagina-1", "pagina-2", "contexto"]);
+  assert.equal(m.contextos[0].fechado, 1);
+});
+
+test("página cujo close() rejeita não impede o close() do contexto, e fechar() resolve", PRAZO, async () => {
+  const ordem: string[] = [];
+  const m = montar(
+    () =>
+      new ContextoQueRegistra(
+        [new PaginaQueFecha("pagina-1", ordem, { rejeitar: true }), new PaginaQueFecha("pagina-2", ordem)],
+        ordem,
+      ),
+  );
+  await m.chrome.capturar("X");
+  await m.chrome.fechar();
+  assert.deepEqual(ordem, ["pagina-1", "pagina-2", "contexto"]);
+  assert.equal(m.contextos[0].fechado, 1);
+});
+
+test("reabertura depois de o Chrome cair fecha as páginas do contexto antigo antes do contexto", PRAZO, async () => {
+  const ordem: string[] = [];
+  let gotos = 0;
+  const m = montar((n) => {
+    if (n > 1) ordem.push(`lancar-${n}`);
+    const pagina = new PaginaQueFecha(`pagina-${n}`, ordem, { modo: { falhar: () => ++gotos === 1 } });
+    return new ContextoQueRegistra([pagina], ordem, `contexto-${n}`);
+  });
+  const t = await m.chrome.capturar("X");
+  assert.equal(t.bearer, BEARER);
+  assert.equal(m.lancamentos.length, 2);
+  assert.deepEqual(ordem, ["pagina-1", "contexto-1", "lancar-2"]);
+});
