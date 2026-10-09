@@ -117,7 +117,15 @@ export class ChromeDeFundo implements Navegador {
     const contexto = this.contexto;
     this.contexto = null;
     this.pagina = null;
-    await contexto?.close().catch(() => {});
+    if (!contexto) return;
+    const inicio = Date.now();
+    // medido ao vivo: contexto.close() direto perpetua exit_type "Crashed" no perfil; fechar as páginas antes deixa "Normal"
+    await Promise.allSettled(contexto.pages().map(async (p) => p.close()));
+    // fechamento sujo deixa o perfil "Crashed" e pode perder cookies (A8): o motivo vai para o log
+    await contexto.close().then(
+      () => this.log(`Chrome fechado em ${Date.now() - inicio} ms`),
+      (e: unknown) => this.log(`falha ao fechar o Chrome em ${Date.now() - inicio} ms: ${e instanceof Error ? e.message : String(e)}`),
+    );
   }
 
   private async navegarECapturar(
