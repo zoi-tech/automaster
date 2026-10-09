@@ -43,6 +43,7 @@
     "tag-acao": "tsx src/cli.ts tag-acao",
     "agenda-acao": "tsx src/cli.ts agenda-acao",
     "smoke": "tsx src/cli.ts smoke",
+    "sessao": "tsx src/cli.ts sessao",
     "test": "tsx --test test/*.test.ts",
     "lint": "eslint src test"
   },
