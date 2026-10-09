@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright";
 import { entrarNaFila } from "../auth/lock.js";
-import { defaultUserDataDir, openSession } from "../auth/session.js";
+import { cabecalhosCookie, defaultUserDataDir, openSession } from "../auth/session.js";
 import { captureTokens, type Tokens } from "../auth/token.js";
 import { GhlClient } from "../api/client.js";
 import { stampNow } from "../dump/writer.js";
@@ -70,14 +70,15 @@ export async function withClient(
   const { context, page, soltar } = await openSession(); // se falhar, o `exit` solta a fila
   try {
     log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
-    let tokens = await captureTokens(page, locationId, { aoVerLogin });
+    let tokens: Tokens = { ...(await captureTokens(page, locationId, { aoVerLogin })), cookies: await cabecalhosCookie(context) };
     const refresh = async (): Promise<Tokens> => {
       log("401 — recapturando tokens...");
       await page.reload({ waitUntil: "domcontentloaded" });
-      tokens = await captureTokens(page, locationId, { aoVerLogin });
+      tokens = { ...(await captureTokens(page, locationId, { aoVerLogin })), cookies: await cabecalhosCookie(context) };
       return tokens;
     };
-    await fn(new GhlClient(context, tokens, refresh), page, tokens);
+    const opcoesCliente = process.env.AUTOMASTER_CLIENTE_FETCH === "1" ? {} : { contexto: context };
+    await fn(new GhlClient(tokens, refresh, opcoesCliente), page, tokens);
   } finally {
     await context.close();
     soltar();

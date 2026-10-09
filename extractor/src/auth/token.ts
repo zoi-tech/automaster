@@ -5,6 +5,9 @@ import { ehTelaDeLogin } from "../fundo/comum.js";
 export interface Tokens {
   bearer: string;
   tokenId: string;
+  /** Cabeçalho `cookie` pronto, por host (`backend.leadconnectorhq.com` → `"a=1; b=2"`). */
+  cookies?: Record<string, string>;
+  userAgent?: string;
 }
 
 /** Payload de um JWT, sem verificar assinatura. `{}` quando o texto não é um JWT. */
