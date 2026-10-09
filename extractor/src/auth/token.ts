@@ -11,7 +11,7 @@ export interface Tokens {
 }
 
 /** Payload de um JWT, sem verificar assinatura. `{}` quando o texto não é um JWT. */
-function payloadDeJwt(token: string): Record<string, unknown> {
+export function payloadDeJwt(token: string): Record<string, unknown> {
   try {
     const parte = token.split(".")[1];
     if (!parte) return {};
