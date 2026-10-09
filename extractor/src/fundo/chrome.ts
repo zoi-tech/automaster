@@ -48,7 +48,14 @@ export function donoDoPerfil(
 
 type Lancar = (
   perfil: string,
-  opcoes: { headless: boolean; channel: "chrome"; userAgent: string },
+  opcoes: {
+    headless: boolean;
+    channel: "chrome";
+    userAgent: string;
+    handleSIGTERM: boolean;
+    handleSIGINT: boolean;
+    handleSIGHUP: boolean;
+  },
 ) => Promise<BrowserContext>;
 
 export class ChromeDeFundo implements Navegador {
@@ -91,6 +98,10 @@ export class ChromeDeFundo implements Navegador {
       headless: !comJanela,
       channel: "chrome",
       userAgent: uaDoPerfil(this.perfil),
+      // os tratadores do Playwright matam o Chrome em paralelo ao nosso fechar(): perfil "Crashed" e SingletonLock órfão
+      handleSIGTERM: false,
+      handleSIGINT: false,
+      handleSIGHUP: false,
     });
     this.contexto = contexto;
     this.comJanela = comJanela;
