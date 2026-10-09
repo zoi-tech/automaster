@@ -127,7 +127,7 @@ async function runOportunidadeAcao(opts: {
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 /** Estágios que sumiriam com a nova lista, e quantos cards vivem em cada um. */
@@ -206,7 +206,7 @@ async function runPipeline(opts: {
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarOportunidades(program: Command): void {

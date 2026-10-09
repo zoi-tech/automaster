@@ -213,7 +213,7 @@ async function runWorkflowAcao(opts: {
     const out = saidaWorkflowAcao({ acao: opts.acao, workflowId: wid, resposta: r, registro, aviso });
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarWorkflows(program: Command): void {

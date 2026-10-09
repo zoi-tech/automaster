@@ -71,7 +71,7 @@ async function runWhatsappEnviar(opts: {
     const out = { enviado: true, contactId: opts.id, conversationId: r.conversationId ?? null, messageId: r.messageId ?? null, registro };
     if (opts.json) emitir(true, out);
     else log(`ok — messageId ${out.messageId}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 async function runConfig(opts: {
@@ -107,7 +107,7 @@ async function runConfig(opts: {
       default: throw new Error(`-o inválido: ${opts.o}`);
     }
     emitir(opts.json, out);
-  });
+  }, { escrita: escritas.includes(opts.o) });
 }
 
 async function runGrupo(opts: {
@@ -147,7 +147,7 @@ async function runGrupo(opts: {
       default: throw new Error(`-o inválido: ${opts.o}`);
     }
     emitir(opts.json, out);
-  });
+  }, { escrita: opts.o !== "interno-checar" });
 }
 
 export function registrarMensageria(program: Command): void {

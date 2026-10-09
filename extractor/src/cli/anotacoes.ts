@@ -124,7 +124,7 @@ async function runAnotacaoAcao(o: OptsAnotacaoAcao): Promise<void> {
       resposta, apagou: o.acao === "apagar" ? deuCerto(resposta) : undefined, registro,
     };
     emitir(o.json, r);
-  });
+  }, { escrita: true });
 }
 
 const TAG_ACOES = ["criar", "renomear", "apagar"] as const;
@@ -205,7 +205,7 @@ async function runTagAcao(o: OptsTagAcao): Promise<void> {
     });
     const feito = { aplicado: true, acao: o.acao, resposta, registro };
     emitir(o.json, feito);
-  });
+  }, { escrita: !!o.confirmo });
 }
 
 export function registrarAnotacoes(program: Command): void {

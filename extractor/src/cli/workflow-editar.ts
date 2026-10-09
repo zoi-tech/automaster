@@ -178,7 +178,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
       log(saida.motivo as string);
     }
     imprimir(saida, o, log);
-  });
+  }, { escrita: !!o.confirmo });
 }
 
 /**

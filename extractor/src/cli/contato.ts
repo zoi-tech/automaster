@@ -269,7 +269,7 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
       mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
     if (opts.json) emitir(true, out);
     else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarContato(program: Command): void {

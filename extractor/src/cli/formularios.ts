@@ -277,7 +277,7 @@ async function runFormularioAcao(opts: {
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: !!opts.confirmo });
 }
 
 const ESTILO_ACOES = ["aplicar", "paleta-ver", "paleta-gravar", "temas", "previa-visual"];
@@ -429,7 +429,7 @@ async function runFormularioEstilo(opts: {
     const out = saidaPaletaGravar({ resposta: r, registro, aviso });
     if (opts.json) emitir(true, out);
     else log(`ok — paleta gravada; registro em ${registro}`);
-  });
+  }, { escrita: !!opts.confirmo });
 }
 
 export function registrarFormularios(program: Command): void {

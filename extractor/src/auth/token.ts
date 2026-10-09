@@ -1,4 +1,6 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import type { Page, Request } from "playwright";
+import { ehTelaDeLogin } from "../fundo/comum.js";
 
 export interface Tokens {
   bearer: string;
@@ -40,17 +42,28 @@ export function decodeUserId(bearer: string, tokenId: string): string {
 const WORKFLOWS_URL = (loc: string) =>
   `https://app.gohighlevel.com/v2/location/${loc}/automation/workflows`;
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
 /**
  * Captura os dois tokens (`authorization: Bearer` + `token-id`) que o app envia
  * aos serviços do GHL. Observa via `page.on('request')` (não bloqueia). Aceita
  * qualquer request autenticado a `leadconnectorhq.com` — após o login o dashboard
  * já dispara requests com ambos os tokens, então não dependemos de chegar à aba
  * de workflows. Espera até `timeoutMs` para dar tempo de login manual (inclui 2FA).
+ * `aoVerLogin` é chamado uma vez, com a URL, se o GHL redirecionar para a tela de login.
  */
-export async function captureTokens(page: Page, locationId: string, timeoutMs = 300_000): Promise<Tokens> {
+export async function captureTokens(
+  page: Page,
+  locationId: string,
+  opcoes: { timeoutMs?: number; aoVerLogin?: (url: string) => void } = {},
+): Promise<Tokens> {
+  const { timeoutMs = 300_000, aoVerLogin } = opcoes;
   let resolved: Tokens | null = null;
+  let viuLogin = false;
+  const conferirLogin = (): void => {
+    if (aoVerLogin && !viuLogin && ehTelaDeLogin(page.url())) {
+      viuLogin = true;
+      aoVerLogin(page.url());
+    }
+  };
 
   const onRequest = async (req: Request) => {
     if (resolved) return;
@@ -71,11 +84,13 @@ export async function captureTokens(page: Page, locationId: string, timeoutMs = 
   page.on("request", onRequest);
   try {
     await page.goto(WORKFLOWS_URL(locationId), { waitUntil: "domcontentloaded" }).catch(() => {});
+    conferirLogin();
 
     const deadline = Date.now() + timeoutMs;
     let reNavigated = false;
     while (!resolved && Date.now() < deadline) {
       await sleep(500);
+      conferirLogin();
       // se o login já aconteceu mas paramos noutra tela, força a aba de workflows 1x
       if (!reNavigated && page.url().includes(`/location/${locationId}`) && !page.url().includes("/automation/")) {
         reNavigated = true;

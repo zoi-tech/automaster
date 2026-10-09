@@ -134,7 +134,7 @@ async function runConversasAnexar(opts: {
     const out = { subido: true, conversationId, contactId: opts.id, urls: r.urls, uploadedFiles: r.uploadedFiles, mediaSids: r.mediaSids, registro };
     if (opts.json) emitir(true, out);
     else { log(`ok — ${r.urls.length} URL(s); registro em ${registro}`); r.urls.forEach((u) => log(u)); }
-  });
+  }, { escrita: true });
 }
 
 async function runConversasEnviar(opts: {
@@ -179,7 +179,7 @@ async function runConversasEnviar(opts: {
     };
     if (opts.json) emitir(true, out);
     else log(`ok — messageId ${out.messageId}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 async function runConversasMarcar(opts: {
@@ -202,7 +202,7 @@ async function runConversasMarcar(opts: {
     else r = await updateConversation(client, opts.location, conv.id, { starred: opts.acao === "estrela" });
     const out = { acao: opts.acao, conversationId: conv.id, ok: true, resposta: r };
     console.log(opts.json ? JSON.stringify(out) : `ok — ${opts.acao} em ${conv.id}`);
-  });
+  }, { escrita: true });
 }
 
 async function runConversasRascunho(opts: {
@@ -222,7 +222,7 @@ async function runConversasRascunho(opts: {
       out = { apagado: await deleteDraft(client, opts.rascunho) };
     } else throw new Error(`--acao inválida: ${opts.acao}. Aceitas: criar, listar, apagar`);
     emitir(opts.json, out);
-  });
+  }, { escrita: opts.acao !== "listar" });
 }
 
 async function runConversasMensagem(opts: {
@@ -236,7 +236,7 @@ async function runConversasMensagem(opts: {
         ? await resend(client, opts.location, opts.id, opts.email)
         : (() => { throw new Error(`--acao inválida: ${opts.acao}. Aceitas: cancelar, reenviar`); })();
     emitir(true, { acao: opts.acao, id: opts.id, resposta: r });
-  });
+  }, { escrita: true });
 }
 
 async function runConversasBuscar(opts: {

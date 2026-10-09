@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright";
-import { openSession } from "../auth/session.js";
+import { entrarNaFila } from "../auth/lock.js";
+import { defaultUserDataDir, openSession } from "../auth/session.js";
 import { captureTokens, type Tokens } from "../auth/token.js";
 import { GhlClient } from "../api/client.js";
 import { stampNow } from "../dump/writer.js";
+import { caminhosDaSessao, linhaDeLogin, registrarLogin } from "../fundo/comum.js";
 import { marcarRastro } from "../saida.js";
 
 export const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
@@ -34,27 +36,52 @@ export function latestDumpEntity(locationId: string, name: string): unknown {
   }
 }
 
-/** Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. */
+/** Registra no `logins.jsonl` cada vez que o GHL pede login no caminho antigo (linha de base da medição). */
+export function registroDeLoginAntigo(arquivo: string, perfil: string, subconta: string): (url: string) => void {
+  return (url) =>
+    registrarLogin(
+      arquivo,
+      linhaDeLogin({
+        via: "withClient",
+        motivo: "redirecionamento",
+        perfil,
+        subconta,
+        url,
+        navegacoes: 0,
+        ultima: null,
+        desde: new Date().toISOString(),
+      }),
+    );
+}
+
+/**
+ * Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. Com `escrita`, o
+ * comando inteiro roda dentro da fila de escrita: espera a vez de outra escrita em andamento.
+ */
 export async function withClient(
   locationId: string,
   log: (msg: string) => void,
   // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
   fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
+  opcoes: { escrita?: boolean } = {},
 ): Promise<void> {
-  const { context, page, soltar } = await openSession();
+  const sairDaFila = opcoes.escrita ? await entrarNaFila(caminhosDaSessao().escrita, log) : () => {};
+  const aoVerLogin = registroDeLoginAntigo(caminhosDaSessao().logins, defaultUserDataDir(), locationId);
+  const { context, page, soltar } = await openSession(); // se falhar, o `exit` solta a fila
   try {
     log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
-    let tokens = await captureTokens(page, locationId);
+    let tokens = await captureTokens(page, locationId, { aoVerLogin });
     const refresh = async (): Promise<Tokens> => {
       log("401 — recapturando tokens...");
       await page.reload({ waitUntil: "domcontentloaded" });
-      tokens = await captureTokens(page, locationId);
+      tokens = await captureTokens(page, locationId, { aoVerLogin });
       return tokens;
     };
     await fn(new GhlClient(context, tokens, refresh), page, tokens);
   } finally {
     await context.close();
     soltar();
+    sairDaFila();
   }
 }
 

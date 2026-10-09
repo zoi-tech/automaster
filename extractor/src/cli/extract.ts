@@ -72,7 +72,7 @@ async function runExtract(opts: { location: string }): Promise<void> {
       for (const f of fora.slice(0, 10)) console.warn(`  ${f}`);
       if (fora.length > 10) console.warn(`  (+${fora.length - 10} outro(s))`);
     }
-  });
+  }, { escrita: true });
 }
 
 async function runDiscover(opts: { location: string; area: string; rota?: string; filtro?: string }): Promise<void> {
