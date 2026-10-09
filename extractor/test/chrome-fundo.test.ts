@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { BrowserContext } from "playwright";
+import { setTimeout as sleep } from "node:timers/promises";
 import { UA_PADRAO } from "../src/api/client.js";
 import { ErroSessao } from "../src/fundo/comum.js";
 import { ChromeDeFundo, donoDoPerfil, uaDoPerfil, uaHeadless } from "../src/fundo/chrome.js";
@@ -121,7 +122,22 @@ class ContextoFalso {
   }
 }
 
-type Opcoes = { headless: boolean; channel: "chrome"; userAgent: string };
+type Opcoes = {
+  headless: boolean;
+  channel: "chrome";
+  userAgent: string;
+  handleSIGTERM?: boolean;
+  handleSIGINT?: boolean;
+  handleSIGHUP?: boolean;
+};
+
+/** A8: o Playwright não pode instalar tratador de sinal; quem encerra o Chrome é o nosso `fechar()`. */
+function semTratadoresDeSinal(opcoes: Opcoes): void {
+  assert.deepEqual(
+    { handleSIGTERM: opcoes.handleSIGTERM, handleSIGINT: opcoes.handleSIGINT, handleSIGHUP: opcoes.handleSIGHUP },
+    { handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false },
+  );
+}
 
 /** Lançador falso: registra cada chamada e devolve o contexto que `fabrica(n)` montar (n a partir de 1). */
 function montar(fabrica: (n: number, chrome: () => ChromeDeFundo) => ContextoFalso, perfil = perfilTemp()) {
@@ -377,4 +393,43 @@ test("perfil aberto por outro Chrome com janela: capturar recusa com sessao_indi
   assert.equal(erro.codigo, "sessao_indisponivel");
   assert.match(erro.message, /\(pid 1\)/);
   assert.equal(lancamentos.length, 0);
+});
+
+// ---------------------------------------------------------------- fechamento limpo (A8)
+
+test("lançamento invisível desliga os tratadores de SIGTERM, SIGINT e SIGHUP do Playwright", PRAZO, async () => {
+  const m = montar(() => new ContextoFalso(new PaginaFalsa()));
+  await m.chrome.capturar("X");
+  assert.equal(m.lancamentos[0].opcoes.headless, true);
+  semTratadoresDeSinal(m.lancamentos[0].opcoes);
+});
+
+test("lançamento com janela (login) desliga os tratadores de SIGTERM, SIGINT e SIGHUP do Playwright", PRAZO, async () => {
+  const m = montar((n) => new ContextoFalso(new PaginaFalsa({ login: n === 1 })));
+  await m.chrome.capturar("X");
+  assert.equal(m.lancamentos[1].opcoes.headless, false);
+  semTratadoresDeSinal(m.lancamentos[1].opcoes);
+});
+
+/** Contexto cujo `close()` demora, como o Chrome gravando cookies e Preferences antes de sair. */
+class ContextoLento extends ContextoFalso {
+  fechouDeVerdade = false;
+  override close() {
+    this.fechado++;
+    return sleep(300).then(() => {
+      this.fechouDeVerdade = true;
+      this.emitirClose();
+    });
+  }
+}
+
+test("fechar() só resolve depois que o close() do contexto resolveu", PRAZO, async () => {
+  const m = montar(() => new ContextoLento(new PaginaFalsa()));
+  await m.chrome.capturar("X");
+  const ctx = m.contextos[0] as ContextoLento;
+  const t0 = Date.now();
+  await m.chrome.fechar();
+  assert.equal(ctx.fechado, 1);
+  assert.equal(ctx.fechouDeVerdade, true, "fechar() resolveu antes de o contexto fechar");
+  assert.ok(Date.now() - t0 >= 250, `fechar() resolveu em ${Date.now() - t0} ms`);
 });
