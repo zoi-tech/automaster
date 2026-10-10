@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,4 +36,13 @@ function registrados(): string[] {
 
 test("todos os comandos continuam registrados, nem um a menos nem um a mais", () => {
   assert.deepEqual(registrados(), [...COMANDOS].sort());
+});
+
+test("a CLI roda por `node --import tsx`, o comando que o servidor MCP monta", () => {
+  // carregador no mesmo processo: o SIGKILL do timeout do MCP acerta quem escreve, sem neto órfão
+  const r = spawnSync(process.execPath, ["--import", "tsx", "src/cli.ts", "--help"], {
+    cwd: RAIZ, encoding: "utf-8",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Commands:/);
 });

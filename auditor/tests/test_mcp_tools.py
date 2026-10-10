@@ -26,7 +26,8 @@ def test_run_extractor_builds_cmd_and_parses_last_line(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mcp_base.subprocess, "run", fake_run)
     assert srv._run_extractor("contato-editar", "-l", "L", "--json") == {"ok": 1}
-    assert seen["cmd"][1:] == ["src/cli.ts", "contato-editar", "-l", "L", "--json"]
+    # `node --import tsx` roda o carregador no mesmo processo: o SIGKILL do timeout acerta quem escreve
+    assert seen["cmd"] == ["node", "--import", "tsx", "src/cli.ts", "contato-editar", "-l", "L", "--json"]
     assert seen["env"]["AUTOMASTER_DUMPS"]
 
 
@@ -76,6 +77,38 @@ def test_run_extractor_timeout_becomes_tool_error(monkeypatch, tmp_path):
     with pytest.raises(srv.ToolError, match="snapshot: /x/y.json") as e:
         srv._run_extractor("contato-editar")
     assert "tool `contato`" in str(e.value)
+
+
+def test_run_extractor_timeout_cita_as_duas_causas_provaveis(monkeypatch, tmp_path):
+    """Com o processo de fundo, 600 s parados é login esperando na janela OU fila de escrita ocupada."""
+    tsx = tmp_path / "node_modules" / ".bin" / "tsx"
+    tsx.parent.mkdir(parents=True)
+    tsx.write_text("")
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
+
+    def boom(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd, 600, stderr="snapshot: /x/y.json\n")
+
+    monkeypatch.setattr(mcp_base.subprocess, "run", boom)
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("contato-editar", "--confirmo")
+    msg = str(e.value)
+    assert "contato-editar estourou 600 s" in msg
+    assert "login pendente" in msg and "janela do Chrome" in msg
+    assert "fila de escrita ocupada" in msg
+    assert "PODE ter sido aplicada" in msg and "tool `contato`" in msg
+    assert "snapshot: /x/y.json" in msg
+
+
+def test_run_extractor_sem_tsx_continua_dizendo_nao_provisionado(monkeypatch, tmp_path):
+    """O comando passa a ser `node --import tsx`, mas o `.bin/tsx` segue sendo a prova do `npm ci`."""
+    monkeypatch.setattr(mcp_base, "EXTRACTOR_DIR", tmp_path)
+    chamado = []
+    monkeypatch.setattr(mcp_base.subprocess, "run", lambda cmd, **kw: chamado.append(cmd))
+    with pytest.raises(srv.ToolError, match="extractor não provisionado") as e:
+        srv._run_extractor("tags", "-l", "L")
+    assert "/automaster-extract" in str(e.value) and str(tmp_path) in str(e.value)
+    assert chamado == []
 
 
 def _steps_tag(tag):
@@ -991,6 +1024,73 @@ def test_previa_recusada_nao_acusa_escrita_parcial(monkeypatch, tmp_path):
     with pytest.raises(srv.ToolError) as e:
         srv._run_extractor("workflow-editar", "--confirmo")
     assert "parcialmente aplicada" not in str(e.value)
+
+
+_DICA_LOGIN = "janela do Chrome"
+_DICA_SESSAO = "npm run sessao -- --acao status"
+
+
+def test_login_pendente_pede_login_na_janela_e_nova_chamada(monkeypatch, tmp_path):
+    _extractor(
+        monkeypatch,
+        tmp_path,
+        '{"ok": false, "error": {"code": "login_pendente", "message": "o GHL pediu login"}}',
+        returncode=1,
+    )
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("tags", "-l", "L1")
+    msg = str(e.value)
+    assert "login_pendente" in msg and "o GHL pediu login" in msg
+    assert "entre na janela do Chrome que abriu" in msg
+    assert "chame a tool de novo" in msg
+    assert _DICA_SESSAO not in msg
+
+
+def test_sessao_indisponivel_aponta_status_e_log_do_fundo(monkeypatch, tmp_path):
+    _extractor(
+        monkeypatch,
+        tmp_path,
+        '{"ok": false, "error": {"code": "sessao_indisponivel", "message": "socket recusou"}}',
+        returncode=1,
+    )
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("tags", "-l", "L1")
+    msg = str(e.value)
+    assert "sessao_indisponivel" in msg and "socket recusou" in msg
+    assert _DICA_SESSAO in msg and str(tmp_path) in msg
+    assert "~/.automaster/sessao/fundo.log" in msg
+    assert _DICA_LOGIN not in msg
+
+
+@pytest.mark.parametrize("code", ["http_422", "erro"])
+def test_outros_codigos_nao_ganham_dica_de_sessao(monkeypatch, tmp_path, code):
+    _extractor(
+        monkeypatch,
+        tmp_path,
+        f'{{"ok": false, "error": {{"code": "{code}", "message": "falhou feio"}}}}',
+        returncode=1,
+    )
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("tags", "-l", "L1")
+    msg = str(e.value)
+    assert code in msg and "falhou feio" in msg
+    assert _DICA_LOGIN not in msg and _DICA_SESSAO not in msg and "fundo.log" not in msg
+
+
+def test_login_pendente_com_escrita_tentada_mantem_aviso_de_escrita_parcial(monkeypatch, tmp_path):
+    """A dica de sessão entra entre a mensagem e o aviso de escrita, sem tomar o lugar dele."""
+    _extractor(
+        monkeypatch,
+        tmp_path,
+        '{"ok": false, "error": {"code": "login_pendente", "message": "o GHL pediu login"},'
+        ' "escrita": {"tentada": true, "rastros": ["/r/antes.json"]}}',
+        returncode=1,
+    )
+    with pytest.raises(srv.ToolError) as e:
+        srv._run_extractor("contato-editar", "--confirmo")
+    msg = str(e.value)
+    assert "parcialmente aplicada" in msg and "/r/antes.json" in msg
+    assert msg.index("o GHL pediu login") < msg.index(_DICA_LOGIN) < msg.index("parcialmente aplicada")
 
 
 def test_conversas_sem_contato_vira_busca_na_subconta(root, monkeypatch):
