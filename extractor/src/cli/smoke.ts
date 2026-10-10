@@ -242,7 +242,7 @@ async function runSmoke(o: { location: string; contato?: string; json?: boolean;
   const log = o.json ? (): void => {} : console.log;
   let rs: Resultado[] = [];
   const cassete: Cassete = { gravadoEm: new Date().toISOString(), respostas: {} };
-  await withClient(o.location, log, async (client, _page, tokens) => {
+  await withClient(o.location, log, async (client, tokens) => {
     const ctx: Contexto = {
       loc: o.location,
       companyId: decodeCompanyId(tokens.tokenId) ?? "",

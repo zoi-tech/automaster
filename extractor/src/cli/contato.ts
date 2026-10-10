@@ -55,7 +55,7 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
   const days = Number(opts.days) || 60;
   // em --json o stdout é só o payload; progresso vai para stderr
   const log = opts.json ? console.error : console.log;
-  await withClient(locationId, log, async (client, _page) => {
+  await withClient(locationId, log, async (client) => {
     log(`Buscando audit logs de ${opts.id} (últimos ${days} dias)...`);
     const logs = await fetchAuditLogs(client, locationId, opts.id, days);
     log(`${logs.length} eventos do contato.`);
@@ -269,7 +269,7 @@ async function runContatoEditar(opts: { location: string; id: string; set: strin
       mudancas: { set: Object.fromEntries(sets.map(([n, v]) => [fieldIds.get(n), v])), tagsAdicionadas: tagsAdd, tagsRemovidas: tagsDel } };
     if (opts.json) emitir(true, out);
     else log(`ok: ${sets.length} campo(s), +${tagsAdd.length}/-${tagsDel.length} tag(s). snapshot em ${snapPath}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarContato(program: Command): void {

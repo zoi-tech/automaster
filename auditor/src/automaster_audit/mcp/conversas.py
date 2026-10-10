@@ -341,7 +341,7 @@ TOOLS = {
     "conversas": (
         conversas,
         (
-            "AO VIVO: abre Chrome e lê as mensagens trocadas com um contato (SMS, e-mail, "
+            "AO VIVO, pelo processo de fundo do extractor: lê as mensagens trocadas com um contato (SMS, e-mail, "
             "WhatsApp...). Cada mensagem traz tipo, direcao, autor e `origem` (app/workflow/campaign/api) — "
             "é `origem` que diz se veio de automação. Corpo cortado em 400 chars; eventos de timeline "
             "(ACTIVITY_*) ficam de fora salvo atividades=true. SEM `id`, com `busca`, procura o texto nas "
@@ -419,7 +419,7 @@ TOOLS = {
     "whatsapp": (
         whatsapp,
         (
-            "Leitura do WhatsApp da subconta (abre Chrome): `templates` (os componentes "
+            "Leitura ao vivo do WhatsApp da subconta (pelo processo de fundo do extractor): `templates` (os componentes "
             "inteiros), `aprovados` (só os liberados, formato de opção), `flows` (formulários "
             "interativos), `numeros` (o id alimenta `de` no envio), `configurado`."
         ),

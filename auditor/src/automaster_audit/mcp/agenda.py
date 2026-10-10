@@ -173,7 +173,7 @@ TOOLS = {
     "agenda": (
         agenda,
         (
-            "Leitura ao vivo da agenda (abre Chrome, não usa o dump): "
+            "Leitura ao vivo da agenda (pelo processo de fundo do extractor, não usa o dump): "
             "`calendarios` (os calendários da subconta), `calendario` (um pelo id), "
             "`livres` (horários livres de um calendário num período, teto de 31 dias), "
             "`eventos` (só compromissos do período — bloqueio NUNCA aparece aqui, use "

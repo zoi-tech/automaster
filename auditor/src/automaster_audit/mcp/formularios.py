@@ -150,7 +150,7 @@ TOOLS = {
     "formularios": (
         formularios,
         (
-            "Leitura ao vivo de formulários e surveys (abre Chrome, não usa o dump): "
+            "Leitura ao vivo de formulários e surveys (pelo processo de fundo do extractor, não usa o dump): "
             "`lista` (todos, já paginados), `detalhe` (um, com os campos), `submissoes` (respostas, "
             "com filtro de formulário, contato e período), `buscar` (por nome). O parâmetro `tipo` "
             "escolhe entre formulário e survey. O id `fb-<locationId>` nas submissões é o formulário "

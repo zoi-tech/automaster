@@ -1,5 +1,7 @@
 import { Command } from "commander";
-import { openSession } from "../auth/session.js";
+import { openSession, type Session } from "../auth/session.js";
+import { TravaOcupada } from "../auth/lock.js";
+import { encerrarFundo, opcoesPadrao } from "../fundo/cliente.js";
 import { decodeCompanyId } from "../auth/token.js";
 import { fetchTemplates as waTemplates } from "../api/whatsapp.js";
 import { listWorkflows, fetchWorkflow } from "../api/workflows.js";
@@ -15,7 +17,7 @@ import { conferirDump } from "../dump/schema.js";
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
-  await withClient(locationId, console.log, async (client, _page, tokens) => {
+  await withClient(locationId, console.log, async (client, tokens) => {
     console.log(`tokens ok (bearer ${tokens.bearer.slice(0, 12)}…, token-id ${tokens.tokenId.slice(0, 12)}…)`);
     const writer = new DumpWriter(DUMPS_DIR, locationId, stampNow());
 
@@ -72,11 +74,25 @@ async function runExtract(opts: { location: string }): Promise<void> {
       for (const f of fora.slice(0, 10)) console.warn(`  ${f}`);
       if (fora.length > 10) console.warn(`  (+${fora.length - 10} outro(s))`);
     }
-  });
+  }, { escrita: true });
 }
 
 async function runDiscover(opts: { location: string; area: string; rota?: string; filtro?: string }): Promise<void> {
-  const { context, page, soltar } = await openSession();
+  // O discover abre o perfil com janela: encerra o processo de fundo antes. Outro comando
+  // pode subir um fundo novo entre o encerrar e a trava; o laço o encerra de novo.
+  const fundo = opcoesPadrao(console.log);
+  let sessao: Session;
+  for (let i = 1; ; i++) {
+    if (await encerrarFundo(fundo)) console.log("Processo de fundo encerrado: o discover usa o perfil com janela.");
+    try {
+      sessao = await openSession(undefined, "discover");
+      break;
+    } catch (e) {
+      if (!(e instanceof TravaOcupada && e.rotulo === "fundo")) throw e;
+      if (i === 3) throw new Error("outro comando automaster está subindo o processo de fundo ao mesmo tempo; espere ele terminar e repita o discover.", { cause: e });
+    }
+  }
+  const { context, page, soltar } = sessao;
   const rota = opts.rota ?? (opts.area === "contatos" ? "contacts/smart_list/All" : "automation/workflows");
   console.log(
     `Modo discover: navegue manualmente pela aba ${opts.area} da subconta ${opts.location}.\n` +

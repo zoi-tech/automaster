@@ -37,10 +37,15 @@ function codigo(msg: string): string {
   return m ? `http_${m[1]}` : "erro";
 }
 
-/** Handler único dos `.catch(...)` da CLI: envelope de erro no stdout, texto no stderr, código 1. */
+/**
+ * Handler único dos `.catch(...)` da CLI: envelope de erro no stdout, texto no stderr, código 1.
+ * Erro com `codigo` em texto (`login_pendente`, `sessao_indisponivel`) leva esse código ao envelope.
+ */
 export function falhar(e: unknown): never {
   const message = e instanceof Error ? e.message : String(e);
   console.error(message);
-  console.log(JSON.stringify({ ok: false, error: { code: codigo(message), message }, ...escritaInfo() }));
+  const c = (e as { codigo?: unknown } | null)?.codigo;
+  const code = typeof c === "string" ? c : codigo(message);
+  console.log(JSON.stringify({ ok: false, error: { code, message }, ...escritaInfo() }));
   process.exit(1);
 }

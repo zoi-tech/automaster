@@ -121,7 +121,7 @@ async function runWorkflowAcao(opts: {
     throw new Error("retomar exige --inscricao <id> ou --contato <id>");
   }
 
-  await withClient(opts.location, log, async (client, _page, tokens) => {
+  await withClient(opts.location, log, async (client, tokens) => {
     const userId = opts.usuario || decodeUserId(tokens.bearer, tokens.tokenId);
     if (!userId) {
       throw new Error(
@@ -213,7 +213,7 @@ async function runWorkflowAcao(opts: {
     const out = saidaWorkflowAcao({ acao: opts.acao, workflowId: wid, resposta: r, registro, aviso });
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarWorkflows(program: Command): void {

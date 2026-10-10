@@ -317,7 +317,7 @@ async function runAgendaAcao(opts: {
     const out = { aplicado: true, acao: opts.acao, resposta: r, registro };
     if (opts.json) emitir(true, out);
     else log(`ok — ${opts.acao}; registro em ${registro}`);
-  });
+  }, { escrita: true });
 }
 
 export function registrarAgenda(program: Command): void {

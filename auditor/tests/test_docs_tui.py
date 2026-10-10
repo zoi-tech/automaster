@@ -1,6 +1,5 @@
 """A 0.27.0 (TUI) sobe a versão e documenta a TUI no changelog e no CLAUDE.md."""
 
-import json
 import re
 from pathlib import Path
 
@@ -14,9 +13,9 @@ def _secao_changelog(versao: str) -> str:
     return m.group(0)
 
 
-def test_plugin_esta_em_0_27_0():
-    plugin = json.loads((RAIZ / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    assert plugin["version"] == "0.27.0"
+def test_changelog_mantem_a_secao_0_27_0():
+    # a versão atual é conferida por test_versoes.py; aqui só não se perde o registro da TUI
+    assert _secao_changelog("0.27.0")
 
 
 def test_changelog_0_27_0_cita_a_tui():

@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Page } from "playwright";
-import { openSession } from "../auth/session.js";
-import { captureTokens, type Tokens } from "../auth/token.js";
+import { entrarNaFila } from "../auth/lock.js";
+import type { Tokens } from "../auth/token.js";
 import { GhlClient } from "../api/client.js";
 import { stampNow } from "../dump/writer.js";
+import { opcoesPadrao, renovarNoFundo, tokensDoFundo } from "../fundo/cliente.js";
+import { caminhosDaSessao } from "../fundo/comum.js";
 import { marcarRastro } from "../saida.js";
 
 export const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
@@ -34,27 +35,31 @@ export function latestDumpEntity(locationId: string, name: string): unknown {
   }
 }
 
-/** Sessão + tokens + client, com refresh em 401; fecha o Chrome ao sair. */
+/**
+ * Tokens do processo de fundo + client, com tokens novos em 401. Nenhum Chrome abre aqui.
+ * Com `escrita`, o comando inteiro roda dentro da fila de escrita: espera a vez de outra
+ * escrita em andamento.
+ */
 export async function withClient(
   locationId: string,
   log: (msg: string) => void,
   // `tokens` no callback é para o `runExtract`, que tira o companyId do token-id
-  fn: (client: GhlClient, page: Page, tokens: Tokens) => Promise<void>,
+  fn: (client: GhlClient, tokens: Tokens) => Promise<void>,
+  opcoes: { escrita?: boolean } = {},
 ): Promise<void> {
-  const { context, page, soltar } = await openSession();
+  const sairDaFila = opcoes.escrita ? await entrarNaFila(caminhosDaSessao().escrita, log) : () => {};
   try {
-    log("Capturando tokens (faça login na janela do Chrome, se pedido)...");
-    let tokens = await captureTokens(page, locationId);
+    const fundo = opcoesPadrao(log);
+    log("Pedindo tokens ao processo de fundo...");
+    let atual = await tokensDoFundo(locationId, fundo);
     const refresh = async (): Promise<Tokens> => {
-      log("401 — recapturando tokens...");
-      await page.reload({ waitUntil: "domcontentloaded" });
-      tokens = await captureTokens(page, locationId);
-      return tokens;
+      log("401 — pedindo tokens novos ao processo de fundo...");
+      atual = await renovarNoFundo(locationId, atual, fundo);
+      return atual;
     };
-    await fn(new GhlClient(context, tokens, refresh), page, tokens);
+    await fn(new GhlClient(atual, refresh), atual);
   } finally {
-    await context.close();
-    soltar();
+    sairDaFila();
   }
 }
 

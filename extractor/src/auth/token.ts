@@ -1,12 +1,17 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import type { Page, Request } from "playwright";
+import { ehTelaDeLogin } from "../fundo/comum.js";
 
 export interface Tokens {
   bearer: string;
   tokenId: string;
+  /** Cabeçalho `cookie` pronto, por host (`backend.leadconnectorhq.com` → `"a=1; b=2"`). */
+  cookies?: Record<string, string>;
+  userAgent?: string;
 }
 
 /** Payload de um JWT, sem verificar assinatura. `{}` quando o texto não é um JWT. */
-function payloadDeJwt(token: string): Record<string, unknown> {
+export function payloadDeJwt(token: string): Record<string, unknown> {
   try {
     const parte = token.split(".")[1];
     if (!parte) return {};
@@ -37,10 +42,24 @@ export function decodeUserId(bearer: string, tokenId: string): string {
   return "";
 }
 
+/** O GHL mandou a página para a tela de login (só com `pararNoLogin`). */
+export class PedidoDeLogin extends Error {
+  constructor(readonly url: string) {
+    super(`o GHL pediu login (${url})`);
+    this.name = "PedidoDeLogin";
+  }
+}
+
+/** O prazo acabou sem nenhum request autenticado. */
+export class SemTokens extends Error {
+  constructor() {
+    super("Não capturei os tokens. Faça login na janela do Chrome e abra a subconta, depois rode de novo.");
+    this.name = "SemTokens";
+  }
+}
+
 const WORKFLOWS_URL = (loc: string) =>
   `https://app.gohighlevel.com/v2/location/${loc}/automation/workflows`;
-
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
  * Captura os dois tokens (`authorization: Bearer` + `token-id`) que o app envia
@@ -48,9 +67,25 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * qualquer request autenticado a `leadconnectorhq.com` — após o login o dashboard
  * já dispara requests com ambos os tokens, então não dependemos de chegar à aba
  * de workflows. Espera até `timeoutMs` para dar tempo de login manual (inclui 2FA).
+ * `pararNoLogin` troca a espera por `PedidoDeLogin` assim que a tela de login aparece;
+ * `cabecalhos` recebe os cabeçalhos do request em que os dois tokens foram achados.
+ * Página fechada (Chrome caiu) rejeita na hora, sem esperar o prazo.
  */
-export async function captureTokens(page: Page, locationId: string, timeoutMs = 300_000): Promise<Tokens> {
+export async function captureTokens(
+  page: Page,
+  locationId: string,
+  opcoes: {
+    timeoutMs?: number;
+    pararNoLogin?: boolean;
+    cabecalhos?: (h: Record<string, string>) => void;
+  } = {},
+): Promise<Tokens> {
+  const { timeoutMs = 300_000 } = opcoes;
   let resolved: Tokens | null = null;
+  const conferirLogin = (): void => {
+    if (page.isClosed()) throw new Error("Target page, context or browser has been closed");
+    if (opcoes.pararNoLogin && ehTelaDeLogin(page.url())) throw new PedidoDeLogin(page.url());
+  };
 
   const onRequest = async (req: Request) => {
     if (resolved) return;
@@ -60,8 +95,9 @@ export async function captureTokens(page: Page, locationId: string, timeoutMs = 
       const h = await req.allHeaders();
       const auth = h["authorization"];
       const tokenId = h["token-id"];
-      if (auth?.startsWith("Bearer ") && tokenId) {
+      if (!resolved && auth?.startsWith("Bearer ") && tokenId) {
         resolved = { bearer: auth.slice("Bearer ".length), tokenId };
+        opcoes.cabecalhos?.(h);
       }
     } catch {
       // request pode ter sido descartado; ignora
@@ -71,11 +107,13 @@ export async function captureTokens(page: Page, locationId: string, timeoutMs = 
   page.on("request", onRequest);
   try {
     await page.goto(WORKFLOWS_URL(locationId), { waitUntil: "domcontentloaded" }).catch(() => {});
+    conferirLogin();
 
     const deadline = Date.now() + timeoutMs;
     let reNavigated = false;
     while (!resolved && Date.now() < deadline) {
       await sleep(500);
+      conferirLogin();
       // se o login já aconteceu mas paramos noutra tela, força a aba de workflows 1x
       if (!reNavigated && page.url().includes(`/location/${locationId}`) && !page.url().includes("/automation/")) {
         reNavigated = true;
@@ -87,9 +125,7 @@ export async function captureTokens(page: Page, locationId: string, timeoutMs = 
   }
 
   if (!resolved) {
-    throw new Error(
-      "Não capturei os tokens. Faça login na janela do Chrome e abra a subconta, depois rode de novo.",
-    );
+    throw new SemTokens();
   }
   return resolved;
 }

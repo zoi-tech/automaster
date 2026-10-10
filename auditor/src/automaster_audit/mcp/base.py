@@ -120,8 +120,19 @@ def _head_tail(err: str | None, head: int = 2, tail: int = 600) -> str:
     return inicio if not resto else f"{inicio}\n[...]\n{resto[-tail:]}"
 
 
+# `{EXTRACTOR_DIR}` é preenchido na hora do erro: o diretório pode ser trocado (testes)
+_DICAS_SESSAO = {
+    "login_pendente": " O GHL pediu login: entre na janela do Chrome que abriu (e-mail e senha ou Google) "
+    "e chame a tool de novo.",
+    "sessao_indisponivel": " O processo de fundo do automaster não está disponível. Diagnóstico: "
+    "`npm run sessao -- --acao status` em {EXTRACTOR_DIR}; log em ~/.automaster/sessao/fundo.log.",
+}
+
+
 def _run_extractor(*args: str) -> dict:
-    """Roda `tsx src/cli.ts <args>` no extractor (abre Chrome; espera segundos). Só a última linha do stdout é JSON."""
+    """Roda `node --import tsx src/cli.ts <args>` no extractor. Pede os tokens ao processo de fundo; a primeira
+    chamada depois de horas paradas sobe o processo, as seguintes saem em menos de um segundo. Só a última linha
+    do stdout é JSON."""
     if not args:
         raise ToolError("uso interno: _run_extractor exige ao menos o nome do subcomando")
     tsx = EXTRACTOR_DIR / "node_modules" / ".bin" / "tsx"
@@ -137,7 +148,7 @@ def _run_extractor(*args: str) -> dict:
         "AUTOMASTER_DUMPS": str(_root()),
         "PATH": os.pathsep.join([os.environ.get("PATH", ""), *extra]),
     }
-    cmd = [str(tsx), "src/cli.ts", *args]
+    cmd = ["node", "--import", "tsx", "src/cli.ts", *args]
     try:
         r = subprocess.run(
             cmd, cwd=EXTRACTOR_DIR, capture_output=True, text=True, timeout=600, env=env, check=False
@@ -152,7 +163,8 @@ def _run_extractor(*args: str) -> dict:
             else "confira o estado atual com a tool `contato`."
         )
         raise ToolError(
-            f"{args[0]} estourou 600 s e foi morto — provável login manual pendente na janela do Chrome. "
+            f"{args[0]} estourou 600 s e foi morto. Causas prováveis: login pendente (o GHL pediu login e a "
+            "janela do Chrome ficou esperando) ou fila de escrita ocupada por outro comando automaster. "
             "A escrita PODE ter sido aplicada (o processo pode ter morrido entre o PUT e a marcação do "
             f"snapshot): {dica_estado} "
             + _head_tail(e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace"))
@@ -162,7 +174,9 @@ def _run_extractor(*args: str) -> dict:
         erro = (saida or {}).get("error", {})
         raise ToolError(
             f"{args[0]} falhou ({erro.get('code') or f'código {r.returncode}'}): "
-            f"{erro.get('message') or _head_tail(r.stderr)}{_dica_escrita(args, saida)}"
+            f"{erro.get('message') or _head_tail(r.stderr)}"
+            f"{_DICAS_SESSAO.get(erro.get('code'), '').format(EXTRACTOR_DIR=EXTRACTOR_DIR)}"
+            f"{_dica_escrita(args, saida)}"
         )
     return saida.get("data", saida)
 
