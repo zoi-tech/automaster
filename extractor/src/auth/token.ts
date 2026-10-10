@@ -67,7 +67,6 @@ const WORKFLOWS_URL = (loc: string) =>
  * qualquer request autenticado a `leadconnectorhq.com` — após o login o dashboard
  * já dispara requests com ambos os tokens, então não dependemos de chegar à aba
  * de workflows. Espera até `timeoutMs` para dar tempo de login manual (inclui 2FA).
- * `aoVerLogin` é chamado uma vez, com a URL, se o GHL redirecionar para a tela de login.
  * `pararNoLogin` troca a espera por `PedidoDeLogin` assim que a tela de login aparece;
  * `cabecalhos` recebe os cabeçalhos do request em que os dois tokens foram achados.
  * Página fechada (Chrome caiu) rejeita na hora, sem esperar o prazo.
@@ -77,19 +76,13 @@ export async function captureTokens(
   locationId: string,
   opcoes: {
     timeoutMs?: number;
-    aoVerLogin?: (url: string) => void;
     pararNoLogin?: boolean;
     cabecalhos?: (h: Record<string, string>) => void;
   } = {},
 ): Promise<Tokens> {
-  const { timeoutMs = 300_000, aoVerLogin } = opcoes;
+  const { timeoutMs = 300_000 } = opcoes;
   let resolved: Tokens | null = null;
-  let viuLogin = false;
   const conferirLogin = (): void => {
-    if (aoVerLogin && !viuLogin && ehTelaDeLogin(page.url())) {
-      viuLogin = true;
-      aoVerLogin(page.url());
-    }
     if (page.isClosed()) throw new Error("Target page, context or browser has been closed");
     if (opcoes.pararNoLogin && ehTelaDeLogin(page.url())) throw new PedidoDeLogin(page.url());
   };

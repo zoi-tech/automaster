@@ -47,7 +47,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
 
   conferirCamadaCrua(o);
 
-  await withClient(o.location, log, async (client, _page, tokens: Tokens) => {
+  await withClient(o.location, log, async (client, tokens: Tokens) => {
     const usuarioId = o.usuario ?? decodeUserId(tokens.bearer, tokens.tokenId);
     const saida: Record<string, unknown> = {
       aplicado: false, acao: o.acao, id: o.id,

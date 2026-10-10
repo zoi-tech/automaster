@@ -1,5 +1,4 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import type { BrowserContext } from "playwright";
 import type { Tokens } from "../auth/token.js";
 import { marcarEscrita } from "../saida.js";
 
@@ -8,7 +7,7 @@ export const UA_PADRAO =
 
 type Metodo = "get" | "put" | "post" | "delete";
 
-/** O mínimo de uma resposta que o cliente usa, igual para `fetch` e `context.request`. */
+/** O mínimo de uma resposta do `fetch` que o cliente usa. */
 interface Resposta {
   status: number;
   ok: boolean;
@@ -28,18 +27,15 @@ export class GhlClient {
   private throttleMs: number;
   private backoffMs: number;
   private timeoutMs: number;
-  // caminho padrão até a prova A19; sai quando os comandos passarem a pedir tokens ao processo de fundo
-  private contexto: BrowserContext | undefined;
   constructor(
     tokens: Tokens,
     private onRefresh: () => Promise<Tokens>,
-    opcoes: { throttleMs?: number; backoffMs?: number; timeoutMs?: number; contexto?: BrowserContext } = {},
+    opcoes: { throttleMs?: number; backoffMs?: number; timeoutMs?: number } = {},
   ) {
     this.tokens = tokens;
     this.throttleMs = opcoes.throttleMs ?? 200;
     this.backoffMs = opcoes.backoffMs ?? 1000;
     this.timeoutMs = opcoes.timeoutMs ?? 30_000;
-    this.contexto = opcoes.contexto;
   }
 
   /** Liga a espia: daqui em diante toda resposta ok é acumulada para `coletar()`. */
@@ -69,22 +65,15 @@ export class GhlClient {
       "user-agent": this.tokens.userAgent ?? UA_PADRAO,
       accept: "application/json",
     };
-    // com o contexto do Playwright os cookies do perfil já vão sozinhos
-    const cookie = this.contexto ? undefined : this.tokens.cookies?.[new URL(url).host];
+    const cookie = this.tokens.cookies?.[new URL(url).host];
     if (cookie) h.cookie = cookie;
     return h;
   }
 
-  /** Um pedido HTTP, pelo `context.request` quando há contexto, senão pelo `fetch` do Node. */
+  /** Um pedido HTTP pelo `fetch` do Node. */
   private async enviar(
     metodo: Metodo, url: string, headers: Record<string, string>, corpo: { json?: unknown; form?: FormData } = {},
   ): Promise<Resposta> {
-    if (this.contexto) {
-      const r = corpo.form
-        ? await this.contexto.request.post(url, { headers, multipart: corpo.form })
-        : await this.contexto.request.fetch(url, { method: metodo.toUpperCase(), headers, data: corpo.json });
-      return { status: r.status(), ok: r.ok(), json: () => r.json() as Promise<unknown>, text: () => r.text() };
-    }
     try {
       const r = await fetch(url, {
         method: metodo.toUpperCase(),
@@ -132,7 +121,7 @@ export class GhlClient {
 
   /**
    * POST multipart. Mesmo tratamento de 401/429 do JSON; o `content-type` (com
-   * boundary) é montado pelo Playwright ou pelo `fetch` a partir do FormData — nunca defina à mão.
+   * boundary) é montado pelo `fetch` a partir do FormData — nunca defina à mão.
    */
   async postMultipart<T = unknown>(
     url: string, form: FormData, extraHeaders: Record<string, string> = {},

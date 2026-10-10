@@ -7,7 +7,7 @@ import { lockPath, travarChrome } from "./lock.js";
 export interface Session {
   context: BrowserContext;
   page: Page;
-  /** Solta a trava do perfil. `withClient` chama junto com o `context.close()`. */
+  /** Solta a trava do perfil. Quem abre chama junto com o `context.close()`. */
   soltar: () => void;
 }
 
@@ -31,8 +31,9 @@ export function defaultUserDataDir(): string {
 }
 
 /**
- * Abre Chrome com perfil persistente. Login manual na 1ª vez; depois a sessão
- * é reaproveitada. `launchPersistentContext` retorna o context (não a page).
+ * Abre Chrome visível com perfil persistente, só para o `discover` (observar requests).
+ * Os outros comandos pedem os tokens ao processo de fundo e nunca abrem Chrome.
+ * `launchPersistentContext` retorna o context (não a page).
  */
 export async function openSession(userDataDir = defaultUserDataDir(), rotulo = ""): Promise<Session> {
   const dono = donoDoPerfil(userDataDir);
