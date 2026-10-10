@@ -231,7 +231,7 @@ test("PRAZOS tem os valores combinados e as somas cabem nos cortes", () => {
     pedidoTokensMs: 330_000,
     filaEscritaMs: 120_000,
     subidaMs: 15_000,
-    encerrarMs: 20_000,
+    encerrarMs: 45_000,
   });
   const p = PRAZOS;
   assert.ok(p.tentativaInvisivelMs + 2 * p.aberturaChromeMs + p.esperaLoginMs <= p.pedidoTokensMs);
