@@ -60,3 +60,31 @@ Notas da prova:
   segunda); o processo saiu sozinho e limpo, mas o comando respondeu `sessao_indisponivel`.
 - No passo 9 o `wc -l` do plano deu 7 porque `MacOS/Google Chrome ` também casa com os helpers;
   processo principal do Chrome no perfil, só um.
+
+## Prova ao vivo dos comandos pelo processo de fundo
+
+- Data: 2026-10-10
+- Primeira chamada (sobe o processo de fundo): 7,36 s
+- Chamadas seguintes (mediana de 3): 1,73 s
+- Chrome invisível registrado como app no macOS durante os comandos (System Events): 0
+- Duas leituras ao mesmo tempo: ok
+- Escrita descartável pelo processo de fundo (tag criada e apagada, tag do contato removida e reposta, nota): ok, desfeita
+- Smoke depois: 23 ok, 0 falhou, 0 pulado
+- Checagens que falharam só depois da troca: nenhuma
+- Discover encerra o processo de fundo e os comandos falham na hora: ok
+- Renovação pelo exp depois de 61 min parado: ok
+- Resíduo: nenhum
+
+Contato usado: `ZlkU3kiMDr0xiIGLiMC5`, o mesmo da prova A19 (o antigo não existe mais). Antes da
+troca, cada `tags` levava 4,60 s com o Chrome visível; agora leva 1,73 s com o processo de fundo
+de pé.
+
+Com o discover aberto, `tags` respondeu `sessao_indisponivel` em 0,61 s citando o pid do
+discover. A janela foi fechada com SIGTERM no processo principal do Chrome (o usuário não a
+encontrou na tela); o perfil saiu `SessionEnded`, não `Crashed`, e o comando seguinte voltou a
+dar `ok`. O discover termina com a mensagem `browserContext.close: Target page, context or
+browser has been closed` quando o Chrome sai inteiro: inofensivo, e anterior a esta mudança.
+
+Renovação: `tags` às 11:18:33 UTC, espera até 12:20:13, `tags` de novo com `ok` e
+`motivo=vencido` no `fundo.log` às 12:20:14. Durante a espera, sessões de outros projetos
+pediram tokens de outras subcontas e foram servidas do cache, sem navegação.
