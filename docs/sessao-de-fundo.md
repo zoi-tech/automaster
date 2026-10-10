@@ -121,3 +121,24 @@ browser has been closed` quando o Chrome sai inteiro: inofensivo, e anterior a e
 Renovação: `tags` às 11:18:33 UTC, espera até 12:20:13, `tags` de novo com `ok` e
 `motivo=vencido` no `fundo.log` às 12:20:14. Durante a espera, sessões de outros projetos
 pediram tokens de outras subcontas e foram servidas do cache, sem navegação.
+
+## Prova final pelo MCP
+
+- Data: 2026-10-10
+- Plugin em uso (CLAUDE_PLUGIN_ROOT dos servidores MCP): /Users/luccassilveira/Desktop/ZOI/Projetos_ZOI/automaster_v2 (6 servidores, todos desta pasta)
+- Primeira chamada pelo caminho do MCP (_run_extractor), subindo o processo de fundo: 6,67 s
+- Processo de fundo vivo depois do fim do Python: sim
+- Tool chamada numa sessão do Claude Code: ok
+- Duas tools ao mesmo tempo, em dois processos pelo caminho do MCP (sobreposição medida): ok
+- Chrome invisível registrado como app no macOS: 0
+- Tempo de `tags` depois (mediana de 3): 1,77 s
+
+As duas tools em paralelo (`tags` e `oportunidades -o pipelines`) terminaram em 1,54 s e 1,49 s,
+com os intervalos sobrepostos. A tool `tags` foi chamada nesta sessão depois de reconectar o
+servidor `automaster` pelo `/mcp`.
+
+## Semana de medição de logins
+
+- Início: 2026-10-10
+- Como conferir: ao fim de sete dias de uso normal, rode `grep -F '"via":"fundo"' ~/.automaster/sessao/logins.jsonl | grep -F '"motivo":"redirecionamento"'` e fique com as linhas cujo `perfil` é o `~/.automaster/chrome-profile` expandido (as de `/tmp/...` são dos testes). Cada uma é uma queda: veja `origem`, `navegouAntes` e `ultimaNavegacao`. Linhas com `"motivo":"sem_tokens"` vão à parte e não contam como queda; as com `"via":"withClient"` são a linha de base do caminho antigo. Para cruzar com telas de login abertas fora do processo de fundo: `cp ~/.automaster/chrome-profile/Default/History /tmp/h.db && sqlite3 /tmp/h.db "select datetime(last_visit_time/1000000-11644473600,'unixepoch'), url from urls where url like 'https://app.gohighlevel.com/?url=%' order by last_visit_time desc limit 30" && rm /tmp/h.db`. `grep -c "motivo=" ~/.automaster/sessao/fundo.log` dá quantas capturas o processo fez e `grep "encerrando" ~/.automaster/sessao/fundo.log` mostra cada encerramento e o motivo. Aprovado se nenhuma queda tiver sido causada por ação do automaster; queda do lado do GHL é anotada e não reprova.
+- Resultado: em andamento
