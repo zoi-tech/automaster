@@ -149,9 +149,9 @@ def test_gravacao_passa_pela_validacao_e_grava(monkeypatch):
     assert any("--confirmo" in v for v in vistos)
 
 
-def test_workflow_fora_do_dump_nao_estoura_e_avisa_antes_do_chrome(monkeypatch):
+def test_workflow_fora_do_dump_nao_estoura_e_avisa_antes_do_extractor(monkeypatch):
     """Workflow recém-criado ou duplicado não está no dump: antes isso era ValueError crua,
-    e a prévia (que abre o Chrome) já tinha rodado. Agora a checagem vem primeiro."""
+    e a prévia (que chama o extractor ao vivo) já tinha rodado. Agora a checagem vem primeiro."""
     ordem = []
 
     def falso(*args):
@@ -169,7 +169,7 @@ def test_workflow_fora_do_dump_nao_estoura_e_avisa_antes_do_chrome(monkeypatch):
     monkeypatch.setattr(mcp_workflows, "validar_edicao", lambda *a, **k: pytest.fail("não devia validar"))
 
     r = mcp_server.workflow_editar(loc="L1", acao="trocar-tag", id="W1", de="a", para="b", confirmo=True)
-    assert ordem[0] == "dump"  # o dump é lido antes de abrir o Chrome
+    assert ordem[0] == "dump"  # o dump é lido antes de chamar o extractor
     assert r["aplicado"] is True
     assert r["validacao"]["rodou"] is False
     assert "não está no dump" in r["validacao"]["motivo"]
@@ -216,13 +216,13 @@ def test_schema_oferece_as_tres_acoes_de_trigger():
 
 def test_criar_e_duplicar_exigem_pasta(monkeypatch):
     """Workflow fora de pasta não aparece na lista do app e o editor abre em branco. A
-    recusa vem antes de abrir o Chrome."""
+    recusa vem antes de chamar o extractor."""
     chamou = []
     monkeypatch.setattr(mcp_base, "_run_extractor", lambda *a: chamou.append(a) or {})
     for acao in ("criar", "duplicar"):
         with pytest.raises(mcp_server.ToolError, match="pasta"):
             mcp_server.workflow_editar(loc="L1", acao=acao, id="W1", nome="x")
-    assert chamou == [], "não pode abrir o Chrome para uma chamada que já se sabe errada"
+    assert chamou == [], "não pode chamar o extractor para uma chamada que já se sabe errada"
 
 
 def test_trigger_corpo_vira_json_na_linha_de_comando(monkeypatch):
