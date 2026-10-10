@@ -2,6 +2,39 @@
 
 Este arquivo reúne o contrato do processo de fundo e as provas ao vivo que o sustentam.
 
+## Contrato do socket
+
+Para outros projetos da máquina (decisão A45). O perfil `~/.automaster/chrome-profile` é só do
+processo de fundo: projeto que precisa de token pede pelo socket; projeto que precisa de tela
+usa perfil e login próprios.
+
+- **Onde:** socket Unix `~/.automaster/sessao/sock` (pasta `0700`, socket `0600`), HTTP com JSON.
+- **Se não responder, suba:** `npm --prefix <repo>/extractor run sessao -- --acao subir --json`.
+- **`POST /tokens {"subconta": "<locationId>"}`** → `200 {"bearer", "tokenId", "cookies":
+  {"<host>": "<cabeçalho cookie>"}, "userAgent"}`. Mande `authorization: Bearer <bearer>`,
+  `token-id: <tokenId>`, `channel: APP`, `source: WEB_USER`, `version: 2021-07-28`, o cookie do
+  host e o `userAgent` (UA que não é de browser leva 403).
+- **`POST /renovar {"subconta", "bearer", "tokenId"}`**, com o par que levou `401` → par novo
+  (ou o atual, se outro pedido já renovou).
+- **`GET /versao`** → `{"versao", "pid", "perfil", "esperandoLogin"}`.
+- **`POST /encerrar`** → fecha o Chrome e sai.
+- **Erros:** `503 {"code": "login_pendente" | "sessao_indisponivel", "message"}`; `400` para
+  pedido sem `subconta`. `login_pendente`: alguém precisa entrar na janela do Chrome que abriu.
+- **Prazo:** o pedido de tokens pode levar até uns 5 min quando o GHL pede login (janela
+  aberta). Use timeout de pelo menos 330 s e não repita o pedido por tempo esgotado: cada
+  repetição abriria outra espera de login.
+- **Regras:** nunca gravar os tokens em disco; nunca abrir `~/.automaster/chrome-profile` em
+  outro Chrome; o processo morre após 4 h sem pedido e sobe de novo no próximo.
+- **Exemplo:**
+  `curl -s --unix-socket ~/.automaster/sessao/sock -X POST -H 'content-type: application/json' -d '{"subconta":"<locationId>"}' http://fundo/tokens`
+
+## Arquivos
+
+- `~/.automaster/sessao/fundo.log`: log do processo de fundo, sem tokens.
+- `~/.automaster/sessao/logins.jsonl`: cada pedido de login, com `via` e `motivo`.
+- `~/.automaster/sessao/escrita.lock`: fila de escrita da máquina (espera até 2 min).
+- `~/.automaster/chrome.lock`: trava do perfil, com o pid e o rótulo `fundo` ou `discover`.
+
 ## Prova A19 — cliente sobre fetch
 
 Subconta de teste Instaltech (`Xb9gDxwxYhdqtprGcb5E`). O contato de teste antigo

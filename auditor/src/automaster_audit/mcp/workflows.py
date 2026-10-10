@@ -157,7 +157,7 @@ def workflow_editar(
     if acao != "criar" and not id:
         raise ToolError(f"acao {acao!r} exige `id` (id do workflow)")
     # Workflow fora de pasta some da lista da interface (a raiz mostra PASTA, não workflow)
-    # e o editor abre em branco. O erro sai aqui, antes de abrir o Chrome à toa.
+    # e o editor abre em branco. O erro sai aqui, antes de chamar o extractor à toa.
     if acao in ("criar", "duplicar") and not pasta:
         raise ToolError(
             f"acao {acao!r} exige `pasta`: workflow fora de pasta não aparece na lista do app e o "
@@ -180,7 +180,7 @@ def workflow_editar(
         # trigger é a lista de ids que a prévia viu, não a versão.
         if triggers:
             a += ["--triggers-esperados", ",".join(str(t) for t in triggers)]
-        # I1: a prévia e a gravação são dois processos, com um Chrome subindo no meio. Sem
+        # I1: a prévia e a gravação são dois processos, com o tempo entre as duas invocações. Sem
         # carregar a `version` que a prévia viu, a guarda de concorrência só enxerga o que
         # acontece DENTRO da segunda invocação, e a janela entre as duas fica descoberta.
         if versao is not None:
@@ -217,7 +217,7 @@ def workflow_editar(
         resultado = base._run_extractor(*_args(confirmo))
         return _sem_documento(resultado)
 
-    # O dump é checado ANTES da prévia: a prévia abre o Chrome inteiro, e workflow
+    # O dump é checado ANTES da prévia: a prévia chama o extractor ao vivo, e workflow
     # recém-criado ou duplicado não está em dump nenhum — não pode virar exceção crua
     # depois de todo esse trabalho. A ausência aqui não zera mais o ctx: se a prévia
     # trouxer o documento de antes, o workflow entra no contexto montado ao vivo.
@@ -329,7 +329,7 @@ TOOLS = {
     "workflows_ao_vivo": (
         workflows_ao_vivo,
         (
-            "Leitura AO VIVO de workflows (abre Chrome, não usa o "
+            "Leitura AO VIVO de workflows (pelo processo de fundo do extractor, não usa o "
             "dump e não exige extração prévia): `lista` (todos os workflows com o status "
             "corrente), `dentro` (quem está dentro de um workflow agora, com o passo em "
             "que cada um parou, desde quando e por que entrou), `contato` (em que "

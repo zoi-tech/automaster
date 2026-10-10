@@ -4,8 +4,8 @@ import type { GhlClient } from "../api/client.js";
  * Cassete do smoke: a FORMA das respostas da API interna, gravada uma vez ao vivo e
  * reproduzida no CI.
  *
- * O smoke ao vivo é o que avisa que a API do GHL mudou, mas não roda em CI (abre Chrome
- * com login manual). Sem ele, nada defende o parsing de `src/api/*` de uma regressão nossa.
+ * O smoke ao vivo é o que avisa que a API do GHL mudou, mas não roda em CI (precisa do
+ * processo de fundo logado). Sem ele, nada defende o parsing de `src/api/*` de uma regressão nossa.
  * O cassete fecha essa metade: as mesmas checagens rodam contra respostas gravadas.
  *
  * Só a forma é gravada, porque o cassete é commitado e a resposta de uma subconta real traz

@@ -1371,23 +1371,18 @@ inteira mesclada); são apenas swatches adicionais no seletor de cores do builde
 na subconta usa esses nomes de papel hoje, então nenhuma página ou automação muda de
 aparência por causa disso.
 
-**Chrome persistente com perfil compartilhado — a escrita ao vivo é serial por
-construção.** Abrir uma segunda sessão do Chrome apontando para o mesmo
-`~/.automaster/chrome-profile` (por exemplo, uma segunda invocação do CLI, ou uma
-ferramenta de automação de navegador separada) enquanto o extractor tenta abrir a sua
-própria sessão trava o lock (`SingletonLock`) e faz o `npm run formulario-*` falhar com
-`Target page, context or browser has been closed` — ou, pior, deixa duas requisições
-disputando a mesma aba e produz efeitos cruzados (visto na 1ª rodada desta tarefa: uma
-cópia extra e uma exclusão inesperada do formulário original, quando a sessão principal e
-um subagente escreveram perto no tempo — ver episódio registrado acima). Matar os
-processos Chrome do perfil e apagar
-`SingletonLock`/`SingletonCookie`/`SingletonSocket` resolve o lock em si, mas não evita o
-segundo efeito. Não é um bug do extractor: é a arquitetura de "perfil persistente único"
-descrita no CLAUDE.md — **a consequência prática é que nenhuma escrita ao vivo de
-formulário/survey (nem a captura de token que a antecede) pode rodar em paralelo com
-outra**, nem em dois terminais, nem em dois agentes/processos, nem numa mistura dos dois.
-Quem for operar este comando deve sempre rodá-lo em série, um de cada vez, até o fim — é a
-regra que as rodadas 2, 3 e 4 desta tarefa seguiram, e a 1ª rodada não seguiu.
+**Até a 0.27.0, o perfil compartilhado obrigava a escrita em série.** Cada comando
+abria a própria sessão do Chrome no mesmo `~/.automaster/chrome-profile`. Uma segunda
+sessão no mesmo perfil (outra invocação do CLI ou outra ferramenta de automação de
+navegador) travava no `SingletonLock` e fazia o `npm run formulario-*` falhar com
+`Target page, context or browser has been closed` — ou, pior, deixava duas requisições
+disputando a mesma aba, com efeitos cruzados (visto na 1ª rodada desta tarefa: uma cópia
+extra e uma exclusão inesperada do formulário original, quando a sessão principal e um
+subagente escreveram perto no tempo — ver episódio registrado acima). Por isso as rodadas 2,
+3 e 4 rodaram um comando de cada vez, até o fim. Desde a 0.28.0 o perfil é só do processo
+de fundo (`docs/sessao-de-fundo.md`), as chamadas saem por `fetch`, sem aba compartilhada,
+e a escrita entra numa fila da máquina (`~/.automaster/sessao/escrita.lock`, até 2 min):
+duas escritas ao mesmo tempo não falham, a segunda espera a vez.
 
 **Residual de teste (conferido nas cinco rodadas)**: nenhum, em formulário ou survey. A
 conferência de cada rodada foi: rodar `formulario-acao -o lista` (formulário) e `-o lista

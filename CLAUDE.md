@@ -15,7 +15,7 @@ Docs-chave (leia antes de mudança estrutural):
 
 Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** em `~/.automaster/dumps/` (raiz configurável por `AUTOMASTER_DUMPS`; o extractor cai em `../dumps` sem a env):
 
-- **`extractor/`** — TypeScript + Playwright. Abre Chrome com perfil persistente (`~/.automaster/chrome-profile`, login manual 1x), está dividido em `src/api/` (uma função por rota) e `src/cli/` (um módulo por domínio, cada um exportando `registrarX(program)`; `cli.ts` só junta e `cli/shared.ts` guarda sessão, raiz dos dumps e rastro de escrita — importar o `cli.ts` executa o programa, então módulo de comando nunca importa de lá). Intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app, e então chama a API interna diretamente via HTTP. Em `401`, recarrega a página para recapturar (página fica aberta durante a extração). Tokens nunca vão para disco. Extrai workflows + 11 entidades: pipelines, tags, custom_fields, users, calendars, custom_values, **message_templates, whatsapp_templates, email_templates, forms, surveys** (as cinco últimas opcionais: canal desligado ou busca que falha vira warning no manifest).
+- **`extractor/`** — TypeScript + Playwright. Um processo de fundo (`src/fundo/`: `comum.ts`, `servidor.ts`, `chrome.ts`, `cliente.ts`, `processo.ts`, `main.ts`) é o único dono do perfil `~/.automaster/chrome-profile`, mantém um Chrome invisível logado e entrega os tokens por um socket Unix em `~/.automaster/sessao/sock` (contrato em `docs/sessao-de-fundo.md`); a janela só aparece quando o GHL pede login. Está dividido em `src/api/` (uma função por rota) e `src/cli/` (um módulo por domínio, cada um exportando `registrarX(program)`; `cli.ts` só junta e `cli/shared.ts` guarda sessão, raiz dos dumps e rastro de escrita — importar o `cli.ts` executa o programa, então módulo de comando nunca importa de lá). O processo de fundo intercepta **dois tokens** de auth (`authorization: Bearer` + `token-id` Firebase) dos requests reais do app; cada comando os pede pelo socket e chama a API interna direto por `fetch`. Em `401`, pede `/renovar`. Comando ao vivo: 1,7 s com o processo de pé (era 4,6 s com o Chrome visível a cada comando); a primeira chamada depois de 4 h paradas sobe o processo (7,4 s). Tokens nunca vão para disco. Extrai workflows + 11 entidades: pipelines, tags, custom_fields, users, calendars, custom_values, **message_templates, whatsapp_templates, email_templates, forms, surveys** (as cinco últimas opcionais: canal desligado ou busca que falha vira warning no manifest).
 - **`auditor/`** — Python (src/ layout, `src/automaster_audit/`). Lê um dump e produz 6 saídas na pasta do dump:
   - `report.md`/`report.json` — auditoria (`automaster-audit audit`)
   - `graph.html` — grafo interativo de conexões (`automaster-audit graph`)
@@ -29,7 +29,7 @@ Duas partes independentes que se comunicam **exclusivamente por arquivos JSON** 
 
 Plugin do Claude Code (raiz do repo): `.claude-plugin/plugin.json`, `.claude-plugin/mcp.json` (servidor `automaster` via `bin/automaster-python.sh`, shim que exige Python ≥ 3.12), `hooks/` (SessionStart de diagnóstico), `commands/automaster-{extract,audit}.md`, `skills/automaster-leitura/`, `skills/automaster-formulario-visual/` (identidade visual de formulário/survey — tokens que a tool `formulario_estilo` aplica). A config MCP fica **fora da raiz de propósito**, apontada pelo campo `mcpServers` do plugin.json: um `.mcp.json` na raiz o Claude Code também carrega como servidor de projeto, e nesse contexto `${CLAUDE_PLUGIN_ROOT}` não expande — o servidor falha com ENOENT em toda sessão aberta no repo. O servidor `mcp_server.py` tem só o protocolo: as tools moram em `auditor/src/automaster_audit/mcp/`, um módulo por domínio (`base` com o que todos usam, mais `dump`, `contato`, `conversas`, `tags`, `oportunidades`, `agenda`, `formularios`, `workflows`, `emails`), cada um com a própria fatia do dict `TOOLS`; o `mcp_server` junta as fatias e re-exporta as funções. Tool nova entra no módulo do domínio, não no `mcp_server`. São trinta e duas tools (`dumps`, `comparar`, `inventario`, `workflow`, `achados`, `buscar`, `jornada`, `contato`, `conversas`, `conversa_acao`, `enviar`, `whatsapp`, `whatsapp_enviar`, `config`, `grupo`, `editar`, `oportunidades`, `oportunidade_acao`, `pipeline`, `agenda`, `agenda_acao`, `formularios`, `formulario_acao`, `formulario_estilo`, `workflows_ao_vivo`, `workflow_acao`, `workflow_editar`, `modelos_email`, `anotacoes`, `anotacao_acao`, `tags`, `tag_acao`) e **importa o auditor como biblioteca**, nunca lê o dump direto. Spec: `docs/superpowers/specs/2026-09-18-automaster-plugin-design.md`. **Versões do plugin em `CHANGELOG.md`** — mudança que altere o comportamento do plugin instalado sobe a versão no plugin.json e entra lá. As TRÊS versões andam juntas (`plugin.json`, `extractor/package.json`, `auditor/pyproject.toml`) e a seção correspondente precisa existir no `CHANGELOG.md`: `auditor/tests/test_versoes.py` falha se divergirem.
 
-**Escrita ao vivo é serial por construção.** O perfil persistente do Chrome (`~/.automaster/chrome-profile`) é único: dois comandos de escrita ao vivo rodando em paralelo (`formulario-acao`/`formulario-estilo`, mas também qualquer outro comando que abra Chrome) disputam o mesmo `SingletonLock` e um deles trava ou falha. Desde a 0.22.0 isso é erro na hora, e não corrida silenciosa: `openSession` trava `~/.automaster/chrome.lock` com o próprio PID (`src/auth/lock.ts`). Mesmo assim, nunca despachar dois agentes escrevendo ao vivo ao mesmo tempo — descoberto ao vivo durante a validação de formulários (`docs/endpoints.md`).
+**Um processo de fundo, uma fila de escrita.** O processo de fundo trava `~/.automaster/chrome.lock` (`src/auth/lock.ts`) e é o único que abre o perfil: nenhum outro Chrome nem outro projeto o abre (quem precisa de token pede pelo socket; quem precisa de tela usa perfil próprio, decisão A45). Leitura roda em paralelo entre sessões e processos; escrita espera a vez numa fila da máquina (`~/.automaster/sessao/escrita.lock`, até 2 min) que cobre o comando inteiro — até a 0.27.0 duas escritas disputavam o perfil, e na validação de formulários isso gerou uma cópia e uma exclusão que ninguém pediu (`docs/endpoints.md`). Dentro de uma sessão do Claude Code o servidor MCP é serial: as tools esperam a vez. Erros do envelope: `login_pendente` (alguém precisa entrar na janela do Chrome) e `sessao_indisponivel` (`npm run sessao -- --acao status`).
 
 **A saída `--json` da CLI é um envelope** (`extractor/src/saida.ts`): `{ok, data}` ou `{ok:false, error:{code, message}}`, mais `escrita:{tentada, rastros}` quando um PUT/POST/DELETE saiu de verdade. É o contrato que o servidor MCP lê (`mcp/base.py:_run_extractor`, que desembrulha `data`); comando novo emite por `emitir(opts.json, dado)` e erra por `.catch(falhar)`, nunca por `console.log(JSON.stringify(...))`. Sem `--json` a saída segue pretty, para gente.
 
@@ -46,7 +46,8 @@ O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-D
 ```bash
 # Extractor (em extractor/)
 npm install && npx playwright install chromium
-npm run extract -- --location <locationId>    # extração completa (abre Chrome p/ login 1x)
+npm run extract -- --location <locationId>    # extração completa
+npm run sessao -- --acao status --json        # processo de fundo: status | subir | encerrar | tokens | renovar
 npm run timeline -- -l <loc> -i <contactId> --json  # eventos do contato em JSON (stdout)
 npm run contato-editar -- -l <loc> -i <contactId> --set campo=valor --tag +x --json  # edita campos/tags do contato
 npm run conversas -- -l <loc> -i <contactId> --json  # mensagens trocadas com o contato (leitura)
@@ -82,7 +83,7 @@ npm run smoke -- -l <loc> --contato <id> --gravar test/fixtures/api-forma.json  
 npm run discover -- --location <locationId>   # observar requests ao backend
 npm run typecheck                              # tsc sobre src E test (tsconfig.check.json)
 npm run lint                                   # eslint + typescript-eslint
-npm test                                       # suíte (235 testes)
+npm test                                       # suíte (480 testes)
 
 # Auditor (em auditor/) — usa venv: .venv/bin/...
 python -m venv .venv && .venv/bin/pip install -e .
@@ -96,7 +97,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
 .venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
 .venv/bin/pip install -e '.[tui]' && .venv/bin/automaster-audit tui   # TUI de navegação do dump (só leitura)
-.venv/bin/python -m pytest -q                             # suíte (454 testes)
+.venv/bin/python -m pytest -q                             # suíte (686 testes)
 .venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests  # lint + formatação
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
 
@@ -106,7 +107,7 @@ claude plugin install automaster@zoi
 .venv/bin/python -m pytest tests/test_broken_tag_ref.py   # uma regra só
 ```
 
-Subconta de validação: `idTeste0000000000004` (subconta de teste, 72 workflows). A sessão Chrome persistente costuma já estar logada → `extract` reusa sem novo login.
+Subconta de validação: `idTeste0000000000004` (subconta de teste, 72 workflows). O perfil do processo de fundo costuma já estar logado → `extract` reusa sem novo login.
 
 ## Pontos críticos
 
@@ -126,7 +127,7 @@ Subconta de validação: `idTeste0000000000004` (subconta de teste, 72 workflows
   A data é texto ISO, o inverso da agenda, onde ISO devolve lista vazia em silêncio. Tarefa
   criada sem dono fica mesmo sem responsável, e a busca por subconta ainda mostra por um tempo
   a tarefa já apagada — a leitura por contato é a fonte confiável.
-- **CI em `.github/workflows/ci.yml`**: typecheck, lint (`eslint` no extractor, `ruff check` + `ruff format --check` no auditor) e as duas suítes em todo push e PR. O smoke das rotas ao vivo NÃO roda lá — o extractor abre Chrome com perfil persistente e login manual —, é `npm run smoke -- -l <loc>` na máquina de quem já está logado, e é o que avisa que a API interna mudou antes de o cliente avisar.
+- **CI em `.github/workflows/ci.yml`**: typecheck, lint (`eslint` no extractor, `ruff check` + `ruff format --check` no auditor) e as duas suítes em todo push e PR. O smoke das rotas ao vivo NÃO roda lá — o extractor precisa do processo de fundo logado —, é `npm run smoke -- -l <loc>` na máquina de quem já está logado, e é o que avisa que a API interna mudou antes de o cliente avisar.
 - **Rate limit conservador** (~0,2s entre chamadas, backoff em 429). Falha em workflow individual → warning no manifest, segue.
 - **Os steps do canvas se montam por `step-criar`/`step-remover`/`step-mover`**, e nenhuma
   estreia rota: as três mandam o corpo pelo mesmo save. O step novo vai em JSON cru (`--corpo`)

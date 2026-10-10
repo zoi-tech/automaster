@@ -4,6 +4,32 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.28.0 — sessão de fundo: um Chrome invisível para todos os comandos ao vivo
+
+- **Processo de fundo dono do perfil** `~/.automaster/chrome-profile`: mantém um Chrome
+  invisível logado; a janela só aparece quando o GHL pede login.
+- **Tokens por socket Unix** em `~/.automaster/sessao/`; cada comando chama o GHL direto por
+  `fetch`, com corte de 30 s, e a renovação sai pelo `exp` a cada pedido.
+- **Tempo de um comando ao vivo**: 4,60 s antes (Chrome visível a cada comando); 1,73 s com o
+  processo de fundo de pé; 7,36 s na primeira chamada, que sobe o processo.
+- **Leitura em paralelo** entre sessões e processos. Dentro de uma sessão do Claude Code o
+  servidor MCP segue serial: as tools esperam a vez.
+- **Reverte a 0.12.0** (escrita ao vivo em série por convenção) **e a recusa da trava da
+  0.22.0**: a trava do perfil passa a ser do processo de fundo, e a escrita espera a vez numa
+  fila da máquina (`escrita.lock`, até 2 min) em vez de falhar.
+- **Códigos `login_pendente` e `sessao_indisponivel`** no envelope `--json`.
+- **Comando `sessao`** (`status`, `subir`, `encerrar`, `tokens`, `renovar`).
+- **Fechamento limpo**: o Chrome de fundo fecha as páginas antes do contexto e desliga os
+  tratadores de sinal do Playwright; fechar o contexto direto perpetuava `exit_type: Crashed`
+  no perfil, e o caminho antigo fechava sujo — candidata a causa de parte dos logins perdidos.
+  O Chrome invisível parado leva 20 a 26 s para fechar; o prazo de encerramento é 45 s.
+- Prévia visual no Chrome do sistema sem perfil; o discover encerra o processo de fundo; erro
+  claro de perfil aberto por outro Chrome (C5); registro de pedidos de login
+  (`logins.jsonl`); o MCP roda a CLI com `node --import tsx`, sem processo intermediário.
+- **Contrato do socket para outros projetos** em `docs/sessao-de-fundo.md`: quem precisa de
+  token pede ao processo de fundo; quem precisa de tela usa perfil próprio (A45).
+- Atualizar o plugin: `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
+
 ## 0.27.0 — TUI de navegação do dump
 
 - **TUI `automaster-audit tui`** (Textual + textualeffects, extra opcional `tui`:

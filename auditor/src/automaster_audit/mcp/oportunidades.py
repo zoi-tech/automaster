@@ -144,7 +144,7 @@ TOOLS = {
     "oportunidades": (
         oportunidades,
         (
-            "Leitura ao vivo de pipelines e oportunidades (abre Chrome, não usa "
+            "Leitura ao vivo de pipelines e oportunidades (pelo processo de fundo do extractor, não usa "
             "o dump): `pipelines` (funis e seus estágios), `listar` (cards, com filtro de pipeline, "
             "estágio, status e contato), `buscar` (termo livre), `ver` (um card pelo id)."
         ),

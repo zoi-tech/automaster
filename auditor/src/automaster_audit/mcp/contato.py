@@ -147,7 +147,7 @@ TOOLS = {
     "contato": (
         contato,
         (
-            "AO VIVO: abre Chrome e pagina o audit log do contato (~10 s logado, exige setup do "
+            "AO VIVO, pelo processo de fundo do extractor: pagina o audit log do contato (~10 s logado, exige setup do "
             "extractor). Eventos mais recentes primeiro (~155 tokens cada), sourceWorkflowName resolvido; teto ~10k tokens, "
             "pagine com ate=proximo_ate."
         ),
@@ -163,7 +163,7 @@ TOOLS = {
     "anotacoes": (
         anotacoes,
         (
-            "Leitura ao vivo de notas e tarefas do contato (abre Chrome, não usa o "
+            "Leitura ao vivo de notas e tarefas do contato (pelo processo de fundo, não usa o "
             "dump): `lista` e `detalhe` precisam de contato; `buscar` varre as tarefas de TODA "
             "a subconta e só existe para tarefa — é a forma de responder o que está atrasado. "
             "Nota de compromisso é outra coisa, e sai pela tool `agenda`."
@@ -206,7 +206,7 @@ TOOLS = {
     "editar": (
         editar,
         (
-            "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna (abre Chrome). "
+            "ESCREVE EM PRODUÇÃO: altera campos e/ou tags de um contato pela API interna, ao vivo. "
             "Grava snapshot do contato antes; devolve antes/depois, caminho do snapshot e `dispara` = workflows "
             "cujo trigger reage à mudança. Nomes de campo/tag resolvidos pelo dump; não cria tags."
         ),

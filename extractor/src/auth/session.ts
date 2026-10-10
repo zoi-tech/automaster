@@ -31,8 +31,8 @@ export function defaultUserDataDir(): string {
 }
 
 /**
- * Abre Chrome visível com perfil persistente, só para o `discover` (observar requests).
- * Os outros comandos pedem os tokens ao processo de fundo e nunca abrem Chrome.
+ * Chrome visível com perfil persistente: só o `discover` (observar requests) usa o perfil
+ * com janela. Os outros comandos pedem os tokens ao processo de fundo.
  * `launchPersistentContext` retorna o context (não a page).
  */
 export async function openSession(userDataDir = defaultUserDataDir(), rotulo = ""): Promise<Session> {

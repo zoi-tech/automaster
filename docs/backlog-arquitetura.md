@@ -4,8 +4,9 @@ Levantado em 2026-09-21 a partir da revisão de estrutura do repo. Ordem = risco
 não esforço. Marque `[x]` ao fechar e registre o commit.
 
 - [x] **A1 — Lock do Chrome.** `~/.automaster/chrome.lock` no arranque de `openSession`.
-  Hoje a serialização da escrita ao vivo é convenção documentada e já falhou ao vivo
-  (0.12.0: dois agentes no mesmo formulário, uma exclusão que ninguém pediu).
+  Até a 0.27.0 a ordem da escrita ao vivo era convenção documentada e já falhou ao vivo
+  (0.12.0: dois agentes no mesmo formulário, uma exclusão que ninguém pediu); desde a 0.28.0
+  a escrita entra numa fila da máquina.
 - [x] **A2 — Envelope JSON da CLI.** Toda saída `--json` vira `{ok, data}` / `{ok:false,
   error:{code, message, gravou, snapshot}}`. Tira do Python a classificação de erro por
   prefixo do comando (`args[0].startswith("formulario-")`) e o palpite de escrita
@@ -74,10 +75,11 @@ zero pelas tools. Cada item abaixo custou tempo ou um desvio para fora do automa
   nunca traz o `before.assignedTo`, e integração aparece como id de app OAuth
   (`source: INTEGRATION`, `channel: OAUTH`), sem nome — o `sourceWorkflowName` já resolve
   workflow, integração não. Foi justamente o que deixou a causa sem nome.
-- [ ] **C5 — Erro de perfil ocupado é ilegível.** Um Chrome fora do automaster (com
+- [x] **C5 — Erro de perfil ocupado é ilegível.** Um Chrome fora do automaster (com
   `--remote-debugging-port=9223`) segurava o perfil; o `chrome.lock` só conhece processos do
   próprio automaster, e o erro que chegou foi `Target page, context or browser has been
-  closed`. Deveria dizer "perfil em uso pelo pid X" lendo o `SingletonLock`.
+  closed`. Deveria dizer "perfil em uso pelo pid X" lendo o `SingletonLock`. Fechado na
+  0.28.0: o processo de fundo lê o `SingletonLock` e diz qual pid segura o perfil.
 - [ ] **C6 — Ramificar por gatilho: padrão promissor, sem prova.** Um workflow com N
   triggers e um `if_else` com `conditionType: "trigger"` e `conditionValue: <triggerId>` em
   cada ramo (formato copiado do "Entrada - Novos Leads", que já roda assim). Montado na
@@ -85,4 +87,5 @@ zero pelas tools. Cada item abaixo custou tempo ou um desvio para fora do automa
   ele até esta anotação. Só vira doc de skill depois do primeiro uso real.
 
 Nota de disciplina, não de código: duas `tag_acao` saíram em paralelo por engano. As duas
-gravaram; não se sabe se foi o `chrome.lock` esperando ou sorte.
+gravaram, e foi sorte: a trava `chrome.lock` não esperava, recusava o segundo comando.
+Desde a 0.28.0 a escrita espera a vez numa fila da máquina (`~/.automaster/sessao/escrita.lock`).

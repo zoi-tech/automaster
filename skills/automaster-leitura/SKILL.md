@@ -21,7 +21,7 @@ As tools devolvem fatos do dump. Esta skill diz o que cada fato costuma signific
 
 **Jornada de criação vazia é informação.** Na subconta de teste não há trigger `contact_created`: o contato entra por tag, resposta ou ligação, e isso aparece em `anytime`. `jornada` devolve um nível por chamada; desça com `caminho=[i, j, ...]` (índices sobre `criacao + anytime`) e nunca peça `profundidade` alta num nó com muitos filhos.
 
-**`contato` é ao vivo.** Abre Chrome, leva segundos e exige o extractor provisionado. Eventos vêm com `sourceWorkflowName`; para explicar o porquê, chame `workflow(loc, sourceId)`. Com `truncado`, pagine com `ate=proximo_ate`.
+**`contato` é ao vivo.** Passa pelo processo de fundo do extractor e exige o extractor provisionado; a primeira chamada depois de horas paradas leva uns 7 s, as outras perto de 2 s. Eventos vêm com `sourceWorkflowName`; para explicar o porquê, chame `workflow(loc, sourceId)`. Com `truncado`, pagine com `ate=proximo_ate`.
 
 **`editar` escreve em produção.** Só depois de diagnosticar com `contato` e com o pedido explícito do usuário. Ela grava snapshot antes e devolve `dispara`: cite esses workflows na resposta, porque a mudança pode acendê-los. Não cria tag nem campo; se o nome não existe no dump, extraia de novo ou passe o id.
 
@@ -64,10 +64,11 @@ restaurar é você regravando à mão.
 o formato do payload veio de leitura parcial do app. Trate um erro ali como contrato
 errado, não como bug do CRM.
 
-**As tools de oportunidade não leem o dump — elas abrem o Chrome.** `oportunidades`,
+**As tools de oportunidade não leem o dump — são ao vivo.** `oportunidades`,
 `oportunidade_acao` e `pipeline` falam sempre com a subconta ao vivo. O funil muda a toda
 hora, então um número de card vindo do snapshot enganaria. Custo: cada chamada precisa da
-sessão logada, e é mais lenta que as tools de dump.
+sessão logada no processo de fundo, e é mais lenta que as tools de dump (a primeira depois
+de horas paradas leva uns segundos).
 
 **O contato de uma oportunidade é de nascença.** Ele só se define na criação; o servidor
 não aceita trocá-lo depois, e a tool recusa a tentativa. Quem pediu "mudar o card para
@@ -83,7 +84,7 @@ com `apagar_com_cards=true`. Ao montar a lista, sempre parta da leitura atual do
 apagado devolve 404 na leitura até ser restaurado. Pipeline apagado leva os cards junto e
 só volta reconstruído à mão, a partir do estado gravado em `<dumps>/_oportunidades/`.
 
-**As tools de agenda não leem o dump — elas abrem o Chrome.** O dump só guarda nome e id de
+**As tools de agenda não leem o dump — são ao vivo**, e a primeira depois de horas paradas leva uns segundos. O dump só guarda nome e id de
 calendário, para resolver referência de workflow. Compromisso não está lá.
 
 **Marcar ou cancelar fala com o cliente.** A escrita dispara o e-mail ou SMS que o
@@ -137,7 +138,7 @@ devolve `aplicado` — cada uma tem sua própria forma de resposta:
 ## Workflows ao vivo (`workflows_ao_vivo`, `workflow_acao`, `workflow_editar`)
 
 `workflow` lê o dump — o estado pode estar velho, com a idade que `_snapshot.idade_dias`
-declara. `workflows_ao_vivo` abre o Chrome e pergunta ao servidor agora. Não é redundância:
+declara. `workflows_ao_vivo` pergunta ao servidor agora, ao vivo. Não é redundância:
 use `workflow` para entender o desenho do workflow (steps, triggers, caminhos) e
 `workflows_ao_vivo` para saber quem está dentro dele neste minuto. Este par não tem
 precedente na skill — é a primeira vez que duas tools tratam do mesmo assunto com frescores
@@ -226,11 +227,12 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
   do texto de SMS, e-mail e WhatsApp: `de="Olá"` reescreveria o que o cliente fala com a base
   dele, e nenhuma das 18 regras acharia isso estranho. Texto que não tem cara de id é recusado.
   Para tag pelo nome use `trocar-tag`; para um campo de um step, `atributo`.
-- **Escrita ao vivo é serial, e navegar no app pelo Playwright derruba a sessão.** O perfil
-  persistente do Chrome é único: dois comandos de escrita ao mesmo tempo travam no
-  `SingletonLock`. E abrir o app do GHL com Playwright para inspecionar tela já deslogou o
-  perfil — o comando seguinte pediu login manual. Para conferir o efeito de uma escrita, releia
-  pela API (é o que as tools já fazem), não pela interface.
+- **Escrita ao vivo entra numa fila.** Duas escritas ao mesmo tempo não falham, a segunda espera
+  a vez (até 2 min); leitura roda em paralelo entre sessões. Navegar no app do GHL com Playwright
+  no perfil do automaster já deslogou o perfil: o perfil é só do processo de fundo; para conferir
+  o efeito de uma escrita, releia pela API.
+- **`login_pendente`** = peça ao usuário para entrar na janela do Chrome que abriu;
+  **`sessao_indisponivel`** = rode `npm run sessao -- --acao status` no extractor.
 - **`apagar` não tem desfazer** e é a única escrita daqui sem volta: guarda cópia do documento e
   dos triggers no registro antes do DELETE, e é só isso que sobra. Não prometa restauração.
 
