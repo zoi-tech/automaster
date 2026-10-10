@@ -28,8 +28,10 @@ export const PRAZOS = {
   filaEscritaMs: 120_000,
   // espera pela subida do processo de fundo
   subidaMs: 15_000,
-  // espera pelo encerramento de um processo velho
-  encerrarMs: 20_000,
+  // espera pelo encerramento de um processo velho. Medido ao vivo: o Chrome invisível parado há
+  // uns 20 s leva 20 a 26 s para fechar (perfil novo ou real, com ou sem o GHL aberto); logo
+  // depois de abrir fecha em 0,1 s. Matar antes deixaria o perfil "Crashed" (A8).
+  encerrarMs: 45_000,
 } as const;
 
 export function caminhosDaSessao(dir = path.join(os.homedir(), ".automaster", "sessao")): Caminhos {
