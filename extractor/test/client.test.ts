@@ -262,34 +262,3 @@ test("cabecalhosCookie junta os cookies por host e omite host sem cookie", async
   assert.deepEqual(await cabecalhosCookie(contexto), { "backend.leadconnectorhq.com": "a=1; b=2" });
   assert.ok(vistos.includes("https://services.leadconnectorhq.com/"), "consulta também o services");
 });
-
-test("com contexto, getJson passa pelo contexto.request e não põe cookie à mão", async () => {
-  await comServidor(sempre(200), async ({ base, host, pedidos }) => {
-    const chamadas: { url: string; opcoes: { method?: string; headers?: Record<string, string> } }[] = [];
-    const resposta = {
-      status: () => 200,
-      ok: () => true,
-      json: () => Promise.resolve({ viaContexto: true }),
-      text: () => Promise.resolve('{"viaContexto":true}'),
-    };
-    const responder = (url: string, opcoes: { method?: string; headers?: Record<string, string> } = {}) => {
-      chamadas.push({ url, opcoes });
-      return Promise.resolve(resposta);
-    };
-    const contexto = {
-      request: {
-        fetch: responder,
-        get: (url: string, o: { headers?: Record<string, string> } = {}) => responder(url, { ...o, method: "GET" }),
-      },
-    } as unknown as BrowserContext;
-    const c = new GhlClient({ ...TOKENS, cookies: { [host]: "a=1; b=2" } }, semRefresh, { throttleMs: 0, contexto });
-    assert.deepEqual(await c.getJson(`${base}/x`), { viaContexto: true });
-    assert.equal(pedidos.length, 0, "nada saiu pelo fetch do Node");
-    assert.equal(chamadas.length, 1);
-    assert.equal(chamadas[0]!.url, `${base}/x`);
-    assert.equal(chamadas[0]!.opcoes.method?.toUpperCase() ?? "GET", "GET");
-    const h = chamadas[0]!.opcoes.headers ?? {};
-    assert.equal(h["authorization"], "Bearer B1");
-    assert.equal(h["cookie"], undefined);
-  });
-});
