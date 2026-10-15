@@ -404,6 +404,9 @@ test("criarStep com ramos fora do if_else usa transition, sem branches nem sibli
   assert.deepEqual(ramos.map((x: any) => x.type), ["transition", "transition"]);
   assert.equal(ramos[0].sibling, undefined);
   assert.deepEqual(ramos.map((x: any) => x.name), ["A", "B"]);
+  // sem a lista em attributes.transitions o servidor recusa o save ("Multi-path node is missing transitions")
+  assert.deepEqual(cont.attributes.transitions.map((t: any) => t.id), cont.next);
+  assert.deepEqual(cont.attributes.transitions.map((t: any) => t.name), ["A", "B"]);
 });
 
 test("criarStep com ramos manda a cauda da âncora para o primeiro ramo, e avisa", () => {

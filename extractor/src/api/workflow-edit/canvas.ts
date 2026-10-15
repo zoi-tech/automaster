@@ -177,6 +177,14 @@ function montarRamos(no: Step, ramos: Ramo[], ordemBase: number): Step[] {
       branches: ramos.flatMap((r, i) =>
         r.else ? [] : [{ ...(r.branch ?? {}), id: nos[i].id, name: nos[i].name }]),
     };
+  } else {
+    // O servidor recusa o save se cada nó `transition` não tiver entrada com o mesmo id em
+    // `attributes.transitions` do container ("Multi-path node is missing transitions").
+    for (const n of nos) n.parent = no.id;
+    no.attributes = {
+      ...(no.attributes ?? {}),
+      transitions: nos.map((n) => ({ id: n.id, name: n.name, fields: [], meta: {}, conditionType: "default" })),
+    };
   }
   return nos;
 }
