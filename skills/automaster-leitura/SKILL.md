@@ -236,6 +236,67 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
 - **`apagar` não tem desfazer** e é a única escrita daqui sem volta: guarda cópia do documento e
   dos triggers no registro antes do DELETE, e é só isso que sobra. Não prometa restauração.
 
+## Armadilhas medidas em produção (2026-10-15)
+
+Cada item custou uma gravação errada ou quase errada numa subconta real.
+
+**Step interno precisa de `workflowsActionType: "INTERNAL"` no topo do `corpo`**, fora de
+`attributes`. Vale para `internal-add-contact-followers`, `internal-remove-contact-followers`,
+`internal-add-opportunities-followers` e afins. Sem ele o servidor devolve
+`400 "<nome> action has a corrupted type"` e nada é gravado. O molde lido pelo `workflow` mostra
+o campo; copie o step inteiro, não só os `attributes`.
+
+**Espera do tipo `reply` aponta para um step de mensagem** (`attributes.reply: [stepId]`). Remover
+a mensagem antes da espera dá `400 "Referenced reply step no longer exists"`. Remova a espera
+primeiro (`step-remover` com `com_subarvore`, se os ramos estiverem vazios) e depois a mensagem.
+
+**Antes de remover step ou container, veja quem está parado nele.** `workflows_ao_vivo(o=dentro)`
+traz só o NOME do passo, e nomes como "Espera" e "Wait" se repetem. O id exato vem do campo cru
+`currentStepId` das inscrições (`todosOsInscritos` em `api/workflows-live.ts`). Contato parado num
+step que você apaga fica sem caminho. Na Nick, uma cauda "solta" segurava 539 contatos numa espera
+de 15 dias: ela só pode sair depois que eles terminarem.
+
+**Timeout ou 503 numa escrita não quer dizer que ela falhou.** `PUT … tempo esgotado (30 s)`,
+`fetch failed` e `503 upstream connect error` apareceram com a mudança já gravada. Releia o
+workflow (extração nova ou `workflow`) antes de repetir: repetir um `step-criar` duplica o step.
+
+**Linha de WhatsApp migrada para provedor próprio (Conversation Provider custom, ex.: ZOI Hub):**
+- O WhatsApp nativo do GHL perde o número. `whatsapp_v2` passa a falhar com
+  `Object with ID '<phone id>' does not exist, cannot be loaded due to missing permissions`, e
+  nenhuma mensagem nova chega com `message.type == 19`. Gatilho `customer_reply` filtrado por
+  canal WhatsApp e `message.meta.to` para de disparar, em silêncio.
+- A mensagem do cliente chega como `TYPE_CUSTOM_PROVIDER_SMS`. `customer_reply` sem filtro e com
+  "contém frase" (`string-contains-any-of` em `message.body`) dispara normalmente; foi testado. No ZOI Hub, a
+  linha que recebeu está no fim do corpo, `[[zoi:<4 dígitos do cliente> → <4 dígitos da linha>]]`:
+  filtre por `→ 4024]]`, por exemplo.
+- Envio de workflow vira step `sms`, que sai pelo **provedor padrão de SMS** da subconta. Se o
+  padrão não for o provedor certo, o SMS falha com `404` e nem chega ao provedor. O padrão se
+  troca em Configurações → Sistema telefônico → Configurações adicionais → Provedor de telefonia
+  (a tela faz `PUT backend…/locations/{loc}/conversationChannels`). Leitura:
+  `GET backend…/locations/{loc}/conversationChannels/SMS`, campo `defaults.SMS`.
+- Clique em botão de template chega como texto comum com o título do botão. Os ramos de botão do
+  `whatsapp_v2` (`toggle_branch`) não servem mais: a rota vira gatilho "contém <texto do botão>" com
+  uma tag de guarda.
+- `update_appointment_status` só funciona dentro do workflow disparado pelo agendamento. Um
+  workflow disparado pela resposta do cliente não tem o compromisso no contexto.
+- `internal_notification` do tipo `whatsapp` também usa o número nativo e falha junto. O tipo
+  `notification` (aviso no app) continua funcionando.
+
+**Pasta de workflow:** criar é `POST backend…/workflow/{loc}/directory` com
+`{type:"directory", name, parentId:null}`. Mover é `PUT …/move-directory/{wid}`. Apagar pasta
+VAZIA é o mesmo `DELETE` do workflow. Antes de apagar, confira que ela não tem filhos: a lista
+`…/list` traz `parentId` de cada item.
+
+**A extração pela linha de comando e as tools leem lugares diferentes.** `npx tsx src/cli.ts
+extract` grava em `automaster_v2/dumps/` (padrão de `cli/shared.ts`). As tools e a validação das 18
+regras leem `~/.automaster/dumps/` (padrão de `mcp/base.py`). Extração rodada pela CLI sem
+`AUTOMASTER_DUMPS=~/.automaster/dumps` não atualiza o que a validação vê, e a resposta continua
+citando o snapshot antigo em `validacao.snapshot`.
+
+**A CLI crua do extractor recusa escrita sem `--sem-regras`.** Para escrever em lote com a guarda
+das 18 regras, use `bin/automaster-python.sh -m automaster_audit.cli workflow-editar -l <loc> …`,
+com as mesmas flags da tool.
+
 
 ## Templates de e-mail (modelos_email, stale_email_template, unused_email_template)
 
