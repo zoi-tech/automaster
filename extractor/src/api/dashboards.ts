@@ -91,6 +91,10 @@ export async function versoesPainel(client: GhlClient, loc: string, id: string):
 export async function dadosWidget(
   client: GhlClient, loc: string, widget: { chartType: string; options: unknown; apiConfig: { path: string } },
 ): Promise<unknown> {
+  // O path vem da resposta do servidor; o token segue junto, então só aceita rota simples.
+  if (!/^\/[A-Za-z0-9/_-]+$/.test(widget.apiConfig.path) || widget.apiConfig.path.includes("//")) {
+    throw new Error(`apiConfig.path suspeito, recusado: ${widget.apiConfig.path}`);
+  }
   const r = await client.postJson<Cru>(`${BASE}${widget.apiConfig.path}?locationId=${enc(loc)}`, {
     chartType: widget.chartType, options: widget.options,
   });

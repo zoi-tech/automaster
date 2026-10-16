@@ -160,6 +160,14 @@ test("dadosWidget faz POST no path do apiConfig com corpo {chartType, options} e
   assert.deepEqual(r, dados);
 });
 
+test("dadosWidget recusa path com query, traversal ou fragmento", async () => {
+  for (const path of ["/a?x=1", "/a/../b", "/a#f", "/a%2e%2e/b", "//evil", "a/b"]) {
+    const a = clienteFalso({ data: 1 });
+    await assert.rejects(dadosWidget(a.client, "L1", { chartType: "pie", options: {}, apiConfig: { path } } as never), /suspeito/);
+    assert.equal(a.chamadas.length, 0);
+  }
+});
+
 test("fusoDaSubconta faz GET da subconta e devolve o timezone IANA", async () => {
   const a = clienteFalso({ location: { id: "L1", timezone: "America/Sao_Paulo" } });
   const r = await fusoDaSubconta(a.client, "L1");
