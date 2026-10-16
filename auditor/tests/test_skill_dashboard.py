@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+from test_sessao_de_fundo_docs import PROIBIDO
 
 RAIZ = Path(__file__).resolve().parents[2]
 SKILL = RAIZ / "skills" / "automaster-dashboard" / "SKILL.md"
@@ -18,10 +19,6 @@ SECOES = [
     "Publicação",
     "Escada",
 ]
-PROIBIDO = re.compile(
-    r"abr(e|em|ir) (o |um )?(chrome|browser|navegador)|serial por constru|escrita ao vivo é serial|serialização da escrita",
-    re.IGNORECASE,
-)
 
 
 @pytest.fixture(scope="module")
