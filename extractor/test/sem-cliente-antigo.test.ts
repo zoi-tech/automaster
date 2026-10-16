@@ -46,6 +46,15 @@ test("openSession( só aparece na definição (auth/session.ts) e no discover (c
   assert.deepEqual(onde, ["auth/session.ts", "cli/extract.ts"]);
 });
 
+test("launchPersistentContext só em auth/, fundo/ e tela/perfil.ts", () => {
+  const onde = arquivosDe(SRC)
+    .filter((f) => fs.readFileSync(f, "utf-8").includes("launchPersistentContext"))
+    .map(rel)
+    .filter((r) => !r.startsWith("auth/") && !r.startsWith("fundo/"))
+    .sort();
+  assert.deepEqual(onde, ["tela/perfil.ts"]);
+});
+
 for (const proibido of ["context.request", "AUTOMASTER_CLIENTE_FETCH", "registroDeLoginAntigo", "aoVerLogin"]) {
   test(`${proibido} não aparece em lugar nenhum de src/`, () => {
     const onde = arquivosDe(SRC)
