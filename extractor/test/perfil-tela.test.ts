@@ -281,7 +281,7 @@ test("passa pela fila de escrita: com a fila ocupada não abre o perfil até ela
   corrida.catch(() => {});
   try {
     await sleep(1200);
-    assert.deepEqual(a.eventos, [], "abriu o perfil com a fila ocupada");
+    assert.equal(a.eventos.length, 0, "abriu o perfil com a fila ocupada");
   } finally {
     matar();
   }
