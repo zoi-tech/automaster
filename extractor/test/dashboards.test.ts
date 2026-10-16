@@ -6,10 +6,12 @@
  *
  * src/api/dashboards.ts, BASE = "https://backend.leadconnectorhq.com/reporting"
  *   listarPaineis(client, loc): GET `${BASE}/dashboards?locationId=<loc>`
- *     resposta crua assumida: { data: [{ _id, title, isDefault, isPrivate, __v, ... }] }
- *     devolve [{ id, titulo, isDefault, isPrivate, __v }]
+ *     resposta crua (medida ao vivo): { data: { defaultDashboardId, dashboard: [{_id,title,isDefault|null,isFavorite}],
+ *       sharedDashboards: [mesmo formato] } } (sem isPrivate nem __v)
+ *     devolve [{ id, titulo, isDefault (null vira false), isFavorite, compartilhado }]:
+ *       primeiro os de `dashboard` (compartilhado=false), depois os de `sharedDashboards` (true)
  *   detalhePainel(client, loc, id): GET `${BASE}/dashboards/<id>?locationId=<loc>`
- *     resposta crua: { data: { _id, title, isDefault, isPrivate, __v, themeConfig,
+ *     resposta crua: { data: { dashboard: { _id, title, isDefault, isPrivate, __v, themeConfig },
  *       dashboardWidgets: [{ widgetId, layout: {x,y,w,h,minW,minH} }],
  *       widgets: [{ widgetId, title, chartType, module, options, apiConfig }] } }
  *     devolve { id, titulo, isDefault, isPrivate, __v, themeConfig,
@@ -17,9 +19,9 @@
  *     na ordem de dashboardWidgets; `definicao` = o objeto cru de data.widgets com o mesmo
  *     widgetId, ou null se não houver par (então titulo/chartType/module/options/apiConfig = null).
  *   catalogoWidgets(client, loc): GET `${BASE}/dashboards/widgets-definitions?locationId=<loc>`
- *     devolve o `data` da resposta, sem tocar.
+ *     data é um objeto ({filters, groups, definitions, ...}); devolve-o sem tocar.
  *   versoesPainel(client, loc, id): GET `${BASE}/dashboards/<id>/versions?locationId=<loc>`
- *     devolve o `data` da resposta, sem tocar.
+ *     data = { versions: [], drift, nextCursor }; devolve-o sem tocar.
  *   dadosWidget(client, loc, widget: {chartType, options, apiConfig:{path}}):
  *     POST `${BASE}${apiConfig.path}?locationId=<loc>` com corpo EXATO { chartType, options };
  *     devolve o `data` da resposta, sem tocar.
@@ -54,21 +56,26 @@ function clienteFalso(resposta: unknown) {
 const R = "https://backend.leadconnectorhq.com/reporting";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("listarPaineis faz GET na lista e devolve só id, título, isDefault, isPrivate e __v", async () => {
-  const a = clienteFalso({ data: [
-    { _id: "D1", title: "Vendas", isDefault: true, isPrivate: false, __v: 3, themeConfig: {}, extra: 1 },
-    { _id: "D2", title: "Meu", isDefault: false, isPrivate: true, __v: 0 },
-  ] });
+test("listarPaineis junta próprios e compartilhados, normaliza isDefault null e não inventa isPrivate/__v", async () => {
+  const a = clienteFalso({ data: {
+    defaultDashboardId: "D1",
+    dashboard: [
+      { _id: "D1", title: "Vendas", isDefault: true, isFavorite: true },
+      { _id: "D2", title: "Meu", isDefault: null, isFavorite: false },
+    ],
+    sharedDashboards: [{ _id: "D3", title: "Do time", isDefault: null, isFavorite: false }],
+  } });
   const r = await listarPaineis(a.client, "L1");
   assert.deepEqual(a.chamadas, [{ metodo: "get", url: `${R}/dashboards?locationId=L1`, corpo: undefined }]);
   assert.deepEqual(r, [
-    { id: "D1", titulo: "Vendas", isDefault: true, isPrivate: false, __v: 3 },
-    { id: "D2", titulo: "Meu", isDefault: false, isPrivate: true, __v: 0 },
+    { id: "D1", titulo: "Vendas", isDefault: true, isFavorite: true, compartilhado: false },
+    { id: "D2", titulo: "Meu", isDefault: false, isFavorite: false, compartilhado: false },
+    { id: "D3", titulo: "Do time", isDefault: false, isFavorite: false, compartilhado: true },
   ]);
 });
 
 const DETALHE = { data: {
-  _id: "D1", title: "Vendas", isDefault: false, isPrivate: true, __v: 7, themeConfig: { cor: "x" },
+  dashboard: { _id: "D1", title: "Vendas", isDefault: false, isPrivate: true, __v: 7, themeConfig: { cor: "x" } },
   dashboardWidgets: [
     { widgetId: "W2", layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 } },
     { widgetId: "W1", layout: { x: 6, y: 0, w: 6, h: 4, minW: 3, minH: 3 } },
@@ -109,7 +116,7 @@ test("detalhePainel devolve id, título, themeConfig, isPrivate, isDefault e a v
 
 test("detalhePainel mantém widget sem definição, com definicao: null", async () => {
   const a = clienteFalso({ data: {
-    _id: "D1", title: "T", isDefault: false, isPrivate: false, __v: 1, themeConfig: {},
+    dashboard: { _id: "D1", title: "T", isDefault: false, isPrivate: false, __v: 1, themeConfig: {} },
     dashboardWidgets: [
       { widgetId: "W1", layout: { x: 0, y: 0, w: 4, h: 4, minW: 1, minH: 1 } },
       { widgetId: "ORFAO", layout: { x: 4, y: 0, w: 4, h: 4, minW: 1, minH: 1 } },
@@ -126,17 +133,17 @@ test("detalhePainel mantém widget sem definição, com definicao: null", async 
 });
 
 test("catalogoWidgets faz GET em widgets-definitions e devolve o data", async () => {
-  const a = clienteFalso({ data: [{ chartType: "pie" }] });
+  const a = clienteFalso({ data: { filters: [{ k: 1 }], groups: [], definitions: [{ chartType: "pie" }] } });
   const r = await catalogoWidgets(a.client, "L1");
   assert.deepEqual(a.chamadas, [{ metodo: "get", url: `${R}/dashboards/widgets-definitions?locationId=L1`, corpo: undefined }]);
-  assert.deepEqual(r, [{ chartType: "pie" }]);
+  assert.deepEqual(r, { filters: [{ k: 1 }], groups: [], definitions: [{ chartType: "pie" }] });
 });
 
 test("versoesPainel faz GET em versions do painel e devolve o data", async () => {
-  const a = clienteFalso({ data: [{ v: 1 }, { v: 2 }] });
+  const a = clienteFalso({ data: { versions: [{ v: 1 }, { v: 2 }], drift: null, nextCursor: null } });
   const r = await versoesPainel(a.client, "L1", "D1");
   assert.deepEqual(a.chamadas, [{ metodo: "get", url: `${R}/dashboards/D1/versions?locationId=L1`, corpo: undefined }]);
-  assert.deepEqual(r, [{ v: 1 }, { v: 2 }]);
+  assert.deepEqual(r, { versions: [{ v: 1 }, { v: 2 }], drift: null, nextCursor: null });
 });
 
 test("dadosWidget faz POST no path do apiConfig com corpo {chartType, options} e devolve o data intacto", async () => {
