@@ -279,7 +279,7 @@ test("editar com widget novo: 2 PUTs. 1º cria (ObjectId gerado, corpo do molde)
   assert.deepEqual(p2.layout, [
     { id: "w1", x: 0, y: 0, w: 3, h: 4, minW: 3, minH: 4 },
     { id: "w2", x: 3, y: 0, w: 3, h: 4, minW: 3, minH: 4 },
-    { id: G1, x: 6, y: 0, w: 3, h: 4, minW: 3, minH: 4 }, // minW/minH do tipo numeric (molde sem layout)
+    { id: G1, x: 6, y: 0, w: 3, h: 4, minW: 3, minH: 3 }, // minW/minH do tipo numeric, 3x3 (molde sem layout)
   ]);
   assert.equal(s.aplicado, true);
 });
