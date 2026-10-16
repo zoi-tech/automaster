@@ -1629,6 +1629,18 @@ Conversas: GHL 459, recontagem 97, `diverge`.
 - Sem recontagem (`sem_conferencia` com o motivo, sem consultar a busca): agrupamento, condição fora de `assigned_to`,
   mais de uma alternativa OR ou mais de um valor, `last_status_change_at` em contatos e atualização em conversas.
 
+### Conferência: período próprio do widget (`dateRangeOverride`, 2026-10-16)
+
+- **A janela não é sempre a do painel.** `options.dateRangeOverride.operator` diz qual período a tela aplica ao widget:
+  `dashboard_date_range` (o do painel) ou um fixo — `till_date`, `today`, `last_month`, `custom`... (lista completa em
+  `widgets-definitions`, campo `dateRangeOverride`). O widget salvo não traz `time_series` em nenhum dos casos.
+- **`till_date` = tudo até hoje, sem início.** Provado na Xb9g, painel `6ad2421cd7803e179ee56ca2`, "Pipeline aberto em R$ (hoje)"
+  (soma de `monetary_value`, status `open`): POST de dados sem `time_series` e com `time_series [0, agora]` dão 392.325, o que a tela
+  mostra; com a janela de 30 dias dá 0. "Cards abertos por funil": 4.612 contra 429 em 30 dias.
+- Até aqui a conferência materializava sempre a janela do painel e comparava 0 com 0 (`bate` falso). Agora `filtroDoWidget` usa
+  `[0, fim do painel]` para `till_date`, a busca de cards vai sem `date`, e qualquer outro período fixo sem `time_series` explícito
+  sai `sem_conferencia` com o motivo `dateRangeOverride <op>`. Os dois widgets passaram a bater de verdade (392.325 e 4.612).
+
 ### Conferência: e-mail, ligações e anúncios do Meta (etapa 7)
 
 Provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 7` privado (apagado no fim). Bundles lidos: `reportingApp` build 306
@@ -1639,6 +1651,8 @@ Provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 7` privado (apagad
   `{callStatusStats:{<status>:{count,change}}, callDurationSummary}`. **As chaves de `callStatusStats` são rótulos de exibição**
   (`Answered`, `Missed`, `Voicemail`, `Ringing`, `Failed`); o widget agrupa pelo valor cru (`completed`, `no-answer`, `voicemail`,
   `ringing`, `failed`). `recontarLigacoes` traduz esses cinco. Total bate: 69 (365 dias) e 170 (1500 dias) na Xb9g, direction `inbound`.
+  Em 2026-10-16 apareceram também `No answer` (→ `no-answer`) e `Busy` (→ `busy`); rótulo fora da tabela é normalizado
+  (minúsculas, espaço→hífen) e chaves que caem no mesmo valor cru somam.
 - É o GHL contra o GHL: o item sai com `fonte:"ghl"`, `independente:false` e `resumo` dizendo isso.
 - **E-mail: rota NÃO encontrada.** O prefixo `reporting/emails` (`EmailReportingService`) existe no serviço-base, mas nenhum chunk do
   `reportingApp` o usa; `lcEmailApp` e `emailMarketingApp` não têm rota de relatório de conta (só `/__live/report/<campanha>`,

@@ -24,7 +24,7 @@ import { conferirPainel } from "../api/dashboards-conferir.js";
 function materializar(options: unknown, timezone: string): unknown {
   const o = structuredClone(options) as Record<string, any>;
   const fim = Date.now();
-  const janela = [fim - 30 * 86_400_000, fim];
+  const janela = [o.dateRangeOverride?.operator === "till_date" ? 0 : fim - 30 * 86_400_000, fim];
   if (o.groupBy?.fields) {
     o.groupBy.fields = o.groupBy.fields.map((f: unknown) => (typeof f === "string" ? { field: f, type: "field" } : f));
   }
@@ -170,7 +170,7 @@ const ACOES_ESCRITA = ["criar", "editar", "tema", "renomear", "apagar", "restaur
 const PAPEIS = ["account_admin", "account_user"];
 const ACESSOS = ["read", "write"];
 // Lista fixa do que o app manda ao criar um widget (copiada do molde); o resto o servidor preenche.
-const CAMPOS_WIDGET_NOVO = ["hasTrimmedFilters", "identifier", "className", "module", "moduleName", "eventSource", "group", "title", "chartType", "options", "savedOptionPairs", "locationId", "extras", "apiConfig", "externalDataConfig"];
+const CAMPOS_WIDGET_NOVO = ["hasTrimmedFilters", "identifier", "className", "module", "moduleName", "eventSource", "group", "title", "chartType", "options", "savedOptionPairs", "locationId", "extras", "apiConfig", "externalDataConfig", "objectWidgetOptions"];
 const objectId = () => randomBytes(12).toString("hex");
 /** O GET devolve o tema plano; o PUT só aplica `{dashboardTheme, widgetTheme}`. */
 // Painel recém-criado vem sem tema, e o PUT recusa tema vazio (422): o app manda este.

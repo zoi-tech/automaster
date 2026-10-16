@@ -1,0 +1,2505 @@
+[
+  {
+    "selector": "#app",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "clipped-overflow-container",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "div clips a positioned child",
+        "ignoreValue": "",
+        "name": "Positioned child clipped by overflow container",
+        "description": "A clipping container (overflow hidden or clip) wrapping an absolutely-positioned child cuts off tooltips, menus, and popovers that need to escape. Let the overflow be visible, or move the positioned layer out of the clip."
+      }
+    ]
+  },
+  {
+    "selector": "div.pmd-app--panel-flat",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "clipped-overflow-container",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "div.pmd-app--panel-flat clips a positioned child",
+        "ignoreValue": "",
+        "name": "Positioned child clipped by overflow container",
+        "description": "A clipping container (overflow hidden or clip) wrapping an absolutely-positioned child cuts off tooltips, menus, and popovers that need to escape. Let the overflow be visible, or move the positioned layer out of the clip."
+      }
+    ]
+  },
+  {
+    "selector": "div.pmd-app__side-dock-main-surface",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: width, margin",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "div.flex.v2-open",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "clipped-overflow-container",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "div.flex.v2-open.sidebar-v2-location.Xb9gDxwxYhdqtprGcb5E.flex.v2-open.sidebar-v2-location clips a positioned child",
+        "ignoreValue": "",
+        "name": "Positioned child clipped by overflow container",
+        "description": "A clipping container (overflow hidden or clip) wrapping an absolutely-positioned child cuts off tooltips, menus, and popovers that need to escape. Let the overflow be visible, or move the positioned layer out of the clip."
+      }
+    ]
+  },
+  {
+    "selector": "#sidebar-v2",
+    "tagName": "aside",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 224,
+      "height": 900,
+      "top": 0,
+      "right": 224,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#sb_vibe > span.lg\\:block.xl\\:block:nth-of-type(2)",
+    "tagName": "span",
+    "rect": {
+      "x": 177.359375,
+      "y": 608.5,
+      "width": 30.640625,
+      "height": 17,
+      "top": 608.5,
+      "right": 208,
+      "bottom": 625.5,
+      "left": 177.359375
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "9.6px functional text \"Beta\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "div.grid-stack.-m-2",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 173,
+      "width": 1168,
+      "height": 14472,
+      "top": 173,
+      "right": 1416,
+      "bottom": 14645,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f728e",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 173,
+      "width": 1168,
+      "height": 54,
+      "top": 173,
+      "right": 1416,
+      "bottom": 227,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f728f",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 227,
+      "width": 1168,
+      "height": 54,
+      "top": 227,
+      "right": 1416,
+      "bottom": 281,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7290",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 281,
+      "width": 292,
+      "height": 324,
+      "top": 281,
+      "right": 540,
+      "bottom": 605,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7291",
+    "tagName": "div",
+    "rect": {
+      "x": 540,
+      "y": 281,
+      "width": 292,
+      "height": 324,
+      "top": 281,
+      "right": 832,
+      "bottom": 605,
+      "left": 540
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7292",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 281,
+      "width": 292,
+      "height": 324,
+      "top": 281,
+      "right": 1124,
+      "bottom": 605,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7293",
+    "tagName": "div",
+    "rect": {
+      "x": 1124,
+      "y": 281,
+      "width": 292,
+      "height": 324,
+      "top": 281,
+      "right": 1416,
+      "bottom": 605,
+      "left": 1124
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7294",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 605,
+      "width": 1168,
+      "height": 54,
+      "top": 605,
+      "right": 1416,
+      "bottom": 659,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7295",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 659,
+      "width": 389.328125,
+      "height": 324,
+      "top": 659,
+      "right": 637.328125,
+      "bottom": 983,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7296",
+    "tagName": "div",
+    "rect": {
+      "x": 637.328125,
+      "y": 659,
+      "width": 389.328125,
+      "height": 324,
+      "top": 659,
+      "right": 1026.65625,
+      "bottom": 983,
+      "left": 637.328125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7297",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 659,
+      "width": 389.328125,
+      "height": 324,
+      "top": 659,
+      "right": 1415.984375,
+      "bottom": 983,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7298",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 983,
+      "width": 778.65625,
+      "height": 648,
+      "top": 983,
+      "right": 1026.65625,
+      "bottom": 1631,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe67",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 983,
+      "width": 389.328125,
+      "height": 648,
+      "top": 983,
+      "right": 1415.984375,
+      "bottom": 1631,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f7299",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 1631,
+      "width": 1168,
+      "height": 54,
+      "top": 1631,
+      "right": 1416,
+      "bottom": 1685,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729a",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 1685,
+      "width": 389.328125,
+      "height": 324,
+      "top": 1685,
+      "right": 637.328125,
+      "bottom": 2009,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729b",
+    "tagName": "div",
+    "rect": {
+      "x": 637.328125,
+      "y": 1685,
+      "width": 389.328125,
+      "height": 324,
+      "top": 1685,
+      "right": 1026.65625,
+      "bottom": 2009,
+      "left": 637.328125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729c",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 1685,
+      "width": 389.328125,
+      "height": 324,
+      "top": 1685,
+      "right": 1415.984375,
+      "bottom": 2009,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729d",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 2009,
+      "width": 778.65625,
+      "height": 756,
+      "top": 2009,
+      "right": 1026.65625,
+      "bottom": 2765,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729e",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 2009,
+      "width": 389.328125,
+      "height": 756,
+      "top": 2009,
+      "right": 1415.984375,
+      "bottom": 2765,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f729f",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 2765,
+      "width": 1168,
+      "height": 54,
+      "top": 2765,
+      "right": 1416,
+      "bottom": 2819,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f72a0",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 2819,
+      "width": 584,
+      "height": 756,
+      "top": 2819,
+      "right": 832,
+      "bottom": 3575,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24eef424b0855b60f72a1",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 2819,
+      "width": 584,
+      "height": 756,
+      "top": 2819,
+      "right": 1416,
+      "bottom": 3575,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a1",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 3575,
+      "width": 1168,
+      "height": 54,
+      "top": 3575,
+      "right": 1416,
+      "bottom": 3629,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a2",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 3629,
+      "width": 584,
+      "height": 756,
+      "top": 3629,
+      "right": 832,
+      "bottom": 4385,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a3",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 3629,
+      "width": 584,
+      "height": 756,
+      "top": 3629,
+      "right": 1416,
+      "bottom": 4385,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a4",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 4385,
+      "width": 1168,
+      "height": 54,
+      "top": 4385,
+      "right": 1416,
+      "bottom": 4439,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a5",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 4439,
+      "width": 584,
+      "height": 756,
+      "top": 4439,
+      "right": 832,
+      "bottom": 5195,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a6",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 4439,
+      "width": 584,
+      "height": 756,
+      "top": 4439,
+      "right": 1416,
+      "bottom": 5195,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a7",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 5195,
+      "width": 1168,
+      "height": 54,
+      "top": 5195,
+      "right": 1416,
+      "bottom": 5249,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a8",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 5249,
+      "width": 584,
+      "height": 756,
+      "top": 5249,
+      "right": 832,
+      "bottom": 6005,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8a9",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 5249,
+      "width": 584,
+      "height": 756,
+      "top": 5249,
+      "right": 1416,
+      "bottom": 6005,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8aa",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 6005,
+      "width": 1168,
+      "height": 54,
+      "top": 6005,
+      "right": 1416,
+      "bottom": 6059,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8ab",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 6059,
+      "width": 292,
+      "height": 324,
+      "top": 6059,
+      "right": 540,
+      "bottom": 6383,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8ac",
+    "tagName": "div",
+    "rect": {
+      "x": 540,
+      "y": 6059,
+      "width": 292,
+      "height": 324,
+      "top": 6059,
+      "right": 832,
+      "bottom": 6383,
+      "left": 540
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8ad",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 6059,
+      "width": 292,
+      "height": 324,
+      "top": 6059,
+      "right": 1124,
+      "bottom": 6383,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8ae",
+    "tagName": "div",
+    "rect": {
+      "x": 1124,
+      "y": 6059,
+      "width": 292,
+      "height": 324,
+      "top": 6059,
+      "right": 1416,
+      "bottom": 6383,
+      "left": 1124
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8af",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 6383,
+      "width": 389.328125,
+      "height": 756,
+      "top": 6383,
+      "right": 637.328125,
+      "bottom": 7139,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8b0",
+    "tagName": "div",
+    "rect": {
+      "x": 637.328125,
+      "y": 6383,
+      "width": 389.328125,
+      "height": 756,
+      "top": 6383,
+      "right": 1026.65625,
+      "bottom": 7139,
+      "left": 637.328125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8b1",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 6383,
+      "width": 389.328125,
+      "height": 756,
+      "top": 6383,
+      "right": 1415.984375,
+      "bottom": 7139,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f08bc51cd727771f8b2",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 7139,
+      "width": 1168,
+      "height": 54,
+      "top": 7139,
+      "right": 1416,
+      "bottom": 7193,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe59",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 7193,
+      "width": 292,
+      "height": 324,
+      "top": 7193,
+      "right": 540,
+      "bottom": 7517,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5a",
+    "tagName": "div",
+    "rect": {
+      "x": 540,
+      "y": 7193,
+      "width": 292,
+      "height": 324,
+      "top": 7193,
+      "right": 832,
+      "bottom": 7517,
+      "left": 540
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5b",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 7193,
+      "width": 292,
+      "height": 324,
+      "top": 7193,
+      "right": 1124,
+      "bottom": 7517,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5c",
+    "tagName": "div",
+    "rect": {
+      "x": 1124,
+      "y": 7193,
+      "width": 292,
+      "height": 324,
+      "top": 7193,
+      "right": 1416,
+      "bottom": 7517,
+      "left": 1124
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5d",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 7517,
+      "width": 778.65625,
+      "height": 756,
+      "top": 7517,
+      "right": 1026.65625,
+      "bottom": 8273,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5e",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 7517,
+      "width": 389.328125,
+      "height": 756,
+      "top": 7517,
+      "right": 1415.984375,
+      "bottom": 8273,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe5f",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 8273,
+      "width": 584,
+      "height": 756,
+      "top": 8273,
+      "right": 832,
+      "bottom": 9029,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe60",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 8273,
+      "width": 584,
+      "height": 756,
+      "top": 8273,
+      "right": 1416,
+      "bottom": 9029,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe61",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 9029,
+      "width": 1168,
+      "height": 54,
+      "top": 9029,
+      "right": 1416,
+      "bottom": 9083,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe62",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 9083,
+      "width": 292,
+      "height": 324,
+      "top": 9083,
+      "right": 540,
+      "bottom": 9407,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe63",
+    "tagName": "div",
+    "rect": {
+      "x": 540,
+      "y": 9083,
+      "width": 292,
+      "height": 324,
+      "top": 9083,
+      "right": 832,
+      "bottom": 9407,
+      "left": 540
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe64",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 9083,
+      "width": 292,
+      "height": 324,
+      "top": 9083,
+      "right": 1124,
+      "bottom": 9407,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe65",
+    "tagName": "div",
+    "rect": {
+      "x": 1124,
+      "y": 9083,
+      "width": 292,
+      "height": 324,
+      "top": 9083,
+      "right": 1416,
+      "bottom": 9407,
+      "left": 1124
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe66",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 9407,
+      "width": 1168,
+      "height": 864,
+      "top": 9407,
+      "right": 1416,
+      "bottom": 10271,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe68",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 10271,
+      "width": 1168,
+      "height": 756,
+      "top": 10271,
+      "right": 1416,
+      "bottom": 11027,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#hr-prev-button-v-27-2-label",
+    "tagName": "p",
+    "rect": {
+      "x": 1213.078125,
+      "y": 10985,
+      "width": 51.734375,
+      "height": 18,
+      "top": 10985,
+      "right": 1264.8125,
+      "bottom": 11003,
+      "left": 1213.078125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "low-contrast",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "1.5:1 (need 4.5:1) — text #d0d5dd on #ffffff",
+        "ignoreValue": "",
+        "name": "Low contrast text",
+        "description": "Text does not meet WCAG AA contrast requirements (4.5:1 for body, 3:1 for large text). Increase the contrast between text and background."
+      }
+    ]
+  },
+  {
+    "selector": "#next-button-v-27-2-label",
+    "tagName": "p",
+    "rect": {
+      "x": 1332.8125,
+      "y": 10985,
+      "width": 56.1875,
+      "height": 18,
+      "top": 10985,
+      "right": 1389,
+      "bottom": 11003,
+      "left": 1332.8125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "low-contrast",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "1.5:1 (need 4.5:1) — text #d0d5dd on #ffffff",
+        "ignoreValue": "",
+        "name": "Low contrast text",
+        "description": "Text does not meet WCAG AA contrast requirements (4.5:1 for body, 3:1 for large text). Increase the contrast between text and background."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe69",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 11027,
+      "width": 1168,
+      "height": 54,
+      "top": 11027,
+      "right": 1416,
+      "bottom": 11081,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f0ebcf9971195a4fe6a",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 11081,
+      "width": 584,
+      "height": 756,
+      "top": 11081,
+      "right": 832,
+      "bottom": 11837,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d130",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 11081,
+      "width": 584,
+      "height": 756,
+      "top": 11081,
+      "right": 1416,
+      "bottom": 11837,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d131",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 11837,
+      "width": 389.328125,
+      "height": 648,
+      "top": 11837,
+      "right": 637.328125,
+      "bottom": 12485,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d132",
+    "tagName": "div",
+    "rect": {
+      "x": 637.328125,
+      "y": 11837,
+      "width": 389.328125,
+      "height": 648,
+      "top": 11837,
+      "right": 1026.65625,
+      "bottom": 12485,
+      "left": 637.328125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d133",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 11837,
+      "width": 389.328125,
+      "height": 648,
+      "top": 11837,
+      "right": 1415.984375,
+      "bottom": 12485,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d134",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 12485,
+      "width": 1168,
+      "height": 54,
+      "top": 12485,
+      "right": 1416,
+      "bottom": 12539,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d135",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 12539,
+      "width": 292,
+      "height": 324,
+      "top": 12539,
+      "right": 540,
+      "bottom": 12863,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d136",
+    "tagName": "div",
+    "rect": {
+      "x": 540,
+      "y": 12539,
+      "width": 292,
+      "height": 324,
+      "top": 12539,
+      "right": 832,
+      "bottom": 12863,
+      "left": 540
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d137",
+    "tagName": "div",
+    "rect": {
+      "x": 832,
+      "y": 12539,
+      "width": 292,
+      "height": 324,
+      "top": 12539,
+      "right": 1124,
+      "bottom": 12863,
+      "left": 832
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d138",
+    "tagName": "div",
+    "rect": {
+      "x": 1124,
+      "y": 12539,
+      "width": 292,
+      "height": 324,
+      "top": 12539,
+      "right": 1416,
+      "bottom": 12863,
+      "left": 1124
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24fa50d173aedb604f632",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 12863,
+      "width": 778.65625,
+      "height": 756,
+      "top": 12863,
+      "right": 1026.65625,
+      "bottom": 13619,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13a",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 12863,
+      "width": 389.328125,
+      "height": 756,
+      "top": 12863,
+      "right": 1415.984375,
+      "bottom": 13619,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13b",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 13619,
+      "width": 1168,
+      "height": 54,
+      "top": 13619,
+      "right": 1416,
+      "bottom": 13673,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13c",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 13673,
+      "width": 389.328125,
+      "height": 324,
+      "top": 13673,
+      "right": 637.328125,
+      "bottom": 13997,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13d",
+    "tagName": "div",
+    "rect": {
+      "x": 637.328125,
+      "y": 13673,
+      "width": 389.328125,
+      "height": 324,
+      "top": 13673,
+      "right": 1026.65625,
+      "bottom": 13997,
+      "left": 637.328125
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13e",
+    "tagName": "div",
+    "rect": {
+      "x": 1026.65625,
+      "y": 13673,
+      "width": 389.328125,
+      "height": 324,
+      "top": 13673,
+      "right": 1415.984375,
+      "bottom": 13997,
+      "left": 1026.65625
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "#widget_6ad24f140d173aedb604d13f",
+    "tagName": "div",
+    "rect": {
+      "x": 248,
+      "y": 13997,
+      "width": 1168,
+      "height": 648,
+      "top": 13997,
+      "right": 1416,
+      "bottom": 14645,
+      "left": 248
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: height, width",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      }
+    ]
+  },
+  {
+    "selector": "div.pmd-app__side-dock-clip",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "clipped-overflow-container",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "div.pmd-app__side-dock-clip clips a positioned child",
+        "ignoreValue": "",
+        "name": "Positioned child clipped by overflow container",
+        "description": "A clipping container (overflow hidden or clip) wrapping an absolutely-positioned child cuts off tooltips, menus, and popovers that need to escape. Let the overflow be visible, or move the positioned layer out of the clip."
+      }
+    ]
+  },
+  {
+    "selector": "div.navigation-container:nth-of-type(1) > div.navigation-title.truncate",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": true,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "10px functional text \"Recentes\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "div.navigation-container:nth-of-type(2) > div.navigation-title.truncate",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": true,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "10px functional text \"Contatos\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "div.navigation-container.active-navigation > div.navigation-title.truncate",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": true,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "10px functional text \"Teclado\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "div.navigation-container:nth-of-type(4) > div.navigation-title.truncate",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": true,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "10px functional text \"Correio de voz\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "div.navigation-container:nth-of-type(5) > div.navigation-title.truncate",
+    "tagName": "div",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "isPageLevel": false,
+    "isHidden": true,
+    "findings": [
+      {
+        "type": "undersized-ui-text",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "10px functional text \"Fila\" (below 11px floor)",
+        "ignoreValue": "",
+        "name": "Undersized functional text",
+        "description": "Interactive and content-bearing UI text (links, buttons, nav items, labels, table cells, meta rows, timecodes) below 11px is a legibility failure, not a style choice. WCAG sets no absolute pixel floor, but functional text under 11px is a defensible quality bar: it fails on high-DPI and small viewports and it degrades tap and read targets. The 11px floor holds even inside a footer; only non-interactive legal smallprint gets the softer 10px floor. Being ON the DESIGN.md size ramp does not exempt a value here: adding 8px to the ramp launders the token but not the legibility problem, and that is exactly the escape hatch this rule closes. Exempts sup/sub, visually-hidden (sr-only) text, and code/terminal contexts. Decorative letterspaced micro-labels are still functional and stay in scope."
+      }
+    ]
+  },
+  {
+    "selector": "#sb_reputation > span.hl_text-overflow.sm\\:hidden",
+    "tagName": "span",
+    "rect": {
+      "x": 44,
+      "y": 859,
+      "width": 70.546875,
+      "height": 20,
+      "top": 859,
+      "right": 114.546875,
+      "bottom": 879,
+      "left": 44
+    },
+    "isPageLevel": false,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "text-occlusion",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "span.hl_text-overflow.sm:hidden.md:hidden.nav-title.lg:block.xl:block \"Reputação\" is 100% covered by overlapping text (span.hl_text-overflow.sm:hidden.md:hidden.nav-title.lg:block.xl:block)",
+        "ignoreValue": "",
+        "name": "Text occluded by an overlapping element",
+        "description": "Text is painted under an opaque element or a second text run, so part of it cannot be read. A decorative box, a stacked layer, or an inline element with leaked padding lands on the words instead of beside them. Give overlapping layers room, or move the text out from under the layer above it."
+      }
+    ]
+  },
+  {
+    "selector": "body",
+    "tagName": "body",
+    "rect": null,
+    "isPageLevel": true,
+    "isHidden": false,
+    "findings": [
+      {
+        "type": "bounce-easing",
+        "category": "slop",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "cubic-bezier(1, -.115, .975, .855)",
+        "ignoreValue": "",
+        "name": "Bounce or elastic easing",
+        "description": "Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing (ease-out-quart/quint/expo) instead."
+      },
+      {
+        "type": "layout-transition",
+        "category": "quality",
+        "severity": "warning",
+        "advisory": false,
+        "detail": "transition: max-width, margin-left, margin-right",
+        "ignoreValue": "",
+        "name": "Layout property animation",
+        "description": "Animating width, height, padding, or margin causes layout thrash and janky performance. Use transform and opacity instead, or grid-template-rows for height animations."
+      },
+      {
+        "type": "marquee",
+        "category": "slop",
+        "severity": "warning",
+        "advisory": false,
+        "detail": ".app-shell-bar::after — infinite horizontal loop animation \"app-shell-glow\"",
+        "ignoreValue": "",
+        "name": "Auto-scrolling marquee",
+        "description": "Continuously auto-scrolling content demands attention it has not earned and hides half its content at any moment. Reserve motion for content that changes; let readers move at their own pace."
+      }
+    ]
+  }
+]

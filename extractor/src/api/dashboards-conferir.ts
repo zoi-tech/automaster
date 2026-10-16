@@ -97,9 +97,12 @@ export function filtroDoWidget(
   widget: { options: unknown; module?: string | null }, fuso: string, dateRange: Periodo,
 ): { ok: true; filtro: Filtro } | { ok: false; motivo: string } {
   const o = (widget.options ?? {}) as {
-    aggregations?: { operator: string; field: string }[]; dateProperty?: string;
+    aggregations?: { operator: string; field: string }[]; dateProperty?: string; dateRangeOverride?: { operator?: string };
     filters?: No[]; groupBy?: { fields?: (string | { field: string })[]; groupFieldType?: string };
   };
+  // A tela aplica ao widget o período do painel (dashboard_date_range) ou, com till_date, tudo até hoje
+  // (provado ao vivo: sem time_series e com [0, agora] o GHL devolve o mesmo número). Os outros períodos fixos não são reproduzidos.
+  const override = o.dateRangeOverride?.operator ?? "dashboard_date_range";
   try {
     const campoData = DATAS[o.dateProperty ?? "date_added"];
     if (!campoData) throw new Error(`campo de data sem recontagem: ${o.dateProperty}`);
@@ -124,7 +127,11 @@ export function filtroDoWidget(
       if (o.groupBy?.groupFieldType === "time_series" || !AGRUPAR.includes(nome)) throw new Error(`agrupamento sem recontagem: ${nome}`);
       agrupar = nome;
     }
-    return { ok: true, filtro: { campoData, inicio: periodo?.[0] ?? dateRange.inicio, fim: periodo?.[1] ?? dateRange.fim, fuso, grupos, agrupar, soma } };
+    if (!periodo && override !== "dashboard_date_range" && override !== "till_date") {
+      throw new Error(`período próprio do widget sem recontagem: dateRangeOverride ${override}`);
+    }
+    const inicio = periodo?.[0] ?? (override === "till_date" ? 0 : dateRange.inicio);
+    return { ok: true, filtro: { campoData, inicio, fim: periodo?.[1] ?? dateRange.fim, fuso, grupos, agrupar, soma } };
   } catch (e) {
     return { ok: false, motivo: (e as Error).message };
   }
@@ -169,7 +176,7 @@ async function todosOsCards(client: GhlClient, loc: string, janela: { date?: num
 }
 
 export async function recontarOportunidades(client: GhlClient, loc: string, f: Filtro): Promise<Medida> {
-  const janela = f.campoData === "date_added" ? { date: f.inicio - 86_400_000, endDate: f.fim + 86_400_000 } : {};
+  const janela = f.campoData === "date_added" && f.inicio > 0 ? { date: f.inicio - 86_400_000, endDate: f.fim + 86_400_000 } : {};
   const porJanela = cartoes.get(client) ?? new Map<string, Promise<Card[]>>();
   cartoes.set(client, porJanela);
   const chave = JSON.stringify(janela);
@@ -232,7 +239,9 @@ export async function recontarConversas(client: GhlClient, loc: string, f: Filtr
  * (ms dá 422). O relatório é do próprio GHL, então esta conferência é o GHL contra o GHL.
  */
 // O relatório devolve o rótulo de exibição; o widget agrupa pelo valor cru (medido ao vivo na Xb9g).
-const ROTULO_STATUS: Record<string, string> = { Answered: "completed", Missed: "no-answer", Voicemail: "voicemail", Ringing: "ringing", Failed: "failed" };
+// Rótulo fora da tabela é normalizado (minúsculas, espaço→hífen) para não divergir à toa; o "N/A" do grupo vazio fica.
+const ROTULO_STATUS: Record<string, string> = { Answered: "completed", Missed: "no-answer", "No answer": "no-answer", Busy: "busy" };
+const statusCru = (r: string) => ROTULO_STATUS[r] ?? (r.startsWith("N/A") ? r : r.trim().toLowerCase().replace(/\s+/g, "-"));
 export async function recontarLigacoes(client: GhlClient, loc: string, f: Filtro): Promise<Medida> {
   if (f.grupos.length > 1) throw new Error("ligações com várias alternativas (OR) sem recontagem");
   const conds = f.grupos[0] ?? [];
@@ -247,9 +256,9 @@ export async function recontarLigacoes(client: GhlClient, loc: string, f: Filtro
     `https://backend.leadconnectorhq.com/reporting/calls/get-call-status-summary?locationId=${loc}`,
     { locationId: loc, startDate: new Date(f.inicio).toISOString(), endDate: new Date(f.fim).toISOString(), ...(direction ? { direction } : {}) },
   );
-  const grupos = Object.entries(r.callStatusStats ?? {})
-    .map(([id, v]) => ({ id: ROTULO_STATUS[id] ?? id, value: Number(v.count ?? 0) }))
-    .filter((g) => !status || status.includes(g.id));
+  const por = new Map<string, number>();
+  for (const [id, v] of Object.entries(r.callStatusStats ?? {})) por.set(statusCru(id), (por.get(statusCru(id)) ?? 0) + Number(v.count ?? 0));
+  const grupos = [...por].map(([id, value]) => ({ id, value })).filter((g) => !status || status.includes(g.id));
   const total = grupos.reduce((s, g) => s + g.value, 0);
   return f.agrupar === "callStatus" ? { total, grupos } : { total };
 }
