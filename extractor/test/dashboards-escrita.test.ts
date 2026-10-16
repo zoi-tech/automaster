@@ -29,10 +29,25 @@
  *   Prévia (retorno sem confirmo): { acao, aplicado:false, motivo, painel:{id,titulo,isDefault,isPrivate},
  *     versao:<__v lido>, mudancas:[...não vazio], problemas:[{codigo,mensagem}], avisos:[{codigo,mensagem}] }
  *   Gravação: { ..., aplicado:true, registro:<caminho do json do rastro>, resposta }
+ *   executarDashboardAcao(client, o, log?, novoId?): novoId() -> ObjectId de 24 hex, injetável; o padrão
+ *     gera ids aleatórios. A chave de activityBuffer.create e o _id do widget novo são esses ids.
  *   plano (editar) = { criar:[{id, titulo?, options?, molde:<widget cru de outro painel>}], atualizar:[{widgetId, ...}],
- *     remover:[widgetId], layout:[{id,x,y,w,h}] } — layout lista a posição final de cada widget.
- *     PUT.layout = o layout final, itens {id,x,y,w,h}; PUT.activityBuffer.create[0][<id>] herda chartType
- *     e module do molde.
+ *     remover:[widgetId], layout:[{id,x,y,w,h}] } — `id` do criar é temporário e só vale no plano
+ *     (layout o referencia); a ferramenta troca pelo ObjectId gerado.
+ *   Fatos medidos ao vivo (Xb9g) que os testes fixam:
+ *     - activityBuffer é {} quando não há mudança de widget (tema, renomear, 2º PUT do editar).
+ *     - cada item de layout no PUT: {id,x,y,w,h,minW,minH}. Widget existente: minW/minH do layout atual.
+ *       Item novo: minW/minH de molde.layout se existir, senão mínimos do tipo (numeric 3x4, table 6x6,
+ *       funnel 5x6, demais 4x6).
+ *     - themeConfig no PUT é aninhado { dashboardTheme:{...cores e chaves extras}, widgetTheme }. O GET
+ *       devolve plano; o `tema` aceita plano OU aninhado, mescla e envia aninhado, preservando widgetTheme
+ *       ({} se não houver) e chaves extras.
+ *     - widget novo: corpo = lista fixa copiada do molde (deleted:false, _id, hasTrimmedFilters, identifier,
+ *       className, module, moduleName, eventSource, group, title, chartType, options, savedOptionPairs,
+ *       locationId, extras, apiConfig, externalDataConfig, metricId), sem dashboardId/createdBy/__v.
+ *     - o layout enviado no create é IGNORADO: editar com widget novo faz 2 PUTs. 1º {activityBuffer:{create},
+ *       version:<__v>}; 2º {activityBuffer:{}, layout completo com os ids novos, version:<__v+1>}.
+ *       Sem widget novo, 1 PUT. Cada PUT sobe o __v em 1.
  *   Mensagens de recusa (regex): sem molde /molde.*-o detalhe/s; padrão /é o painel padrão da subconta/;
  *     sem versão /--versao-esperada/; divergência /o painel mudou desde a prévia/; layout /sobrepõem/
  *     (a mensagem lista cada problema); cor /#RRGGBB/; contraste /contraste/.
@@ -84,15 +99,16 @@ function detalheCru(extra: { isDefault?: boolean; v?: number; theme?: unknown } 
 
 /** Cliente falso que roteia as leituras e registra TODAS as chamadas, em ordem. */
 function falso(extra: Parameters<typeof detalheCru>[0] = {}) {
+  let v = extra.v ?? 7; // cada save sobe o __v em 1
   const chamadas: Chamada[] = [];
   const reg = (metodo: string, resposta: (url: string) => unknown) => (url: string, corpo?: unknown) => {
     chamadas.push({ metodo, url, corpo });
     return Promise.resolve(resposta(url));
   };
   const client = {
-    getJson: reg("get", (u) => (u.includes("/versions") ? { data: { versions: [], drift: false, nextCursor: null } } : detalheCru(extra))),
+    getJson: reg("get", (u) => (u.includes("/versions") ? { data: { versions: [], drift: false, nextCursor: null } } : detalheCru({ ...extra, v }))),
     postJson: reg("post", () => ({ data: { _id: "NOVO1" } })),
-    putJson: reg("put", () => ({ data: { ok: true } })),
+    putJson: reg("put", () => { v += 1; return { data: { ok: true } }; }),
     deleteJson: reg("delete", () => ({ data: { ok: true } })),
   } as never;
   const escritas = () => chamadas.filter((c) => c.metodo !== "get");
@@ -112,6 +128,25 @@ const planoValido = {
   layout: [...layoutBase, { id: "novo1", x: 6, y: 0, w: 3, h: 4 }],
 };
 const plano = (p: unknown) => JSON.stringify(p);
+/** Gerador determinístico de ObjectId (24 hex). */
+function geraIds() {
+  let n = 0;
+  return () => `aaaaaaaaaaaaaaaaaaaa${(++n).toString(16).padStart(4, "0")}`;
+}
+/** executarDashboardAcao com o 4º parâmetro (gerador de ids), sem exigir o tipo antes de existir. */
+const comIds = (client: unknown, o: object) =>
+  (executarDashboardAcao as unknown as (...a: unknown[]) => Promise<Record<string, any>>)(client, o, undefined, geraIds());
+const G1 = "aaaaaaaaaaaaaaaaaaaa0001";
+const CAMPOS_WIDGET_NOVO = [
+  "_id", "apiConfig", "chartType", "className", "deleted", "eventSource", "externalDataConfig", "extras",
+  "group", "hasTrimmedFilters", "identifier", "locationId", "metricId", "module", "moduleName", "options",
+  "savedOptionPairs", "title",
+];
+const moldeCompleto = {
+  ...molde, deleted: false, _id: "x", hasTrimmedFilters: false, identifier: "i", className: "c", moduleName: "m",
+  eventSource: "e", group: "g", savedOptionPairs: [], locationId: LOC, extras: {}, externalDataConfig: null, metricId: "mt",
+  dashboardId: ID, createdBy: "u", __v: 3,
+};
 
 // ---------- os 4 verbos da API ----------
 
@@ -155,7 +190,7 @@ test("restaurarVersao: POST em versions/<v>/restore com locationId na query", as
 // ---------- prévia: zero escritas ----------
 
 for (const [acao, extra] of [
-  ["criar", { id: undefined, titulo: "ZZ TESTE AUTOMASTER novo" }],
+  ["criar", { titulo: "ZZ TESTE AUTOMASTER novo" }],
   ["renomear", { titulo: "outro nome" }],
   ["tema", { tema: '{"metricColor":"#003366"}' }],
   ["editar", { plano: plano(planoValido) }],
@@ -203,34 +238,77 @@ test("prévia de editar lista os avisos de validarComposicao (donut sem limite d
 
 // ---------- editar ----------
 
-test("editar com confirmo: 1 PUT com activityBuffer.create herdando o molde, layout final e version", async () => {
+test("editar com widget novo: 2 PUTs. 1º cria (ObjectId gerado, corpo do molde); 2º posiciona com o layout completo", async () => {
   const { client, escritas } = falso();
-  const s = await executarDashboardAcao(client, { ...base, acao: "editar", plano: plano(planoValido) } as never);
+  const s = await comIds(client, { ...base, acao: "editar", plano: plano(planoValido) });
   const e = escritas();
-  assert.equal(e.length, 1);
-  assert.equal(e[0].metodo, "put");
-  assert.equal(e[0].url, `${R}/dashboards/${ID}?locationId=${LOC}`);
-  const c = e[0].corpo as Record<string, any>;
-  assert.deepEqual(Object.keys(c).sort(), ["activityBuffer", "layout", "themeConfig", "title", "version"]);
-  assert.equal(c.version, 7);
-  assert.equal(c.title, "ZZ TESTE AUTOMASTER etapa 3");
-  assert.equal(c.activityBuffer.create.length, 1);
-  const novo = c.activityBuffer.create[0].novo1;
+  assert.equal(e.length, 2);
+  for (const c of e) {
+    assert.equal(c.metodo, "put");
+    assert.equal(c.url, `${R}/dashboards/${ID}?locationId=${LOC}`);
+    assert.deepEqual(Object.keys(c.corpo as object).sort(), ["activityBuffer", "layout", "themeConfig", "title", "version"]);
+  }
+  const p1 = e[0].corpo as Record<string, any>;
+  assert.equal(p1.version, 7);
+  assert.equal(p1.activityBuffer.create.length, 1);
+  assert.deepEqual(Object.keys(p1.activityBuffer.create[0]), [G1]);
+  const novo = p1.activityBuffer.create[0][G1];
+  assert.deepEqual(Object.keys(novo).sort(), CAMPOS_WIDGET_NOVO);
+  assert.equal(novo._id, G1);
+  assert.equal(novo.deleted, false);
   assert.equal(novo.chartType, "numeric");
   assert.equal(novo.module, "crm-opportunities");
-  assert.deepEqual(c.activityBuffer.update, []);
-  assert.deepEqual(c.activityBuffer.delete, []);
-  assert.deepEqual(c.layout.map((i: { id: string }) => i.id).sort(), ["novo1", "w1", "w2"]);
-  assert.deepEqual(c.layout.find((i: { id: string }) => i.id === "novo1"), { id: "novo1", x: 6, y: 0, w: 3, h: 4 });
+  assert.equal(novo.title, "Perdidos (data de criação)");
+  assert.ok(!("dashboardId" in novo) && !("createdBy" in novo) && !("__v" in novo));
+  assert.ok(!(p1.activityBuffer.update?.length) && !(p1.activityBuffer.delete?.length));
+  const p2 = e[1].corpo as Record<string, any>;
+  assert.equal(p2.version, 8); // o 1º save subiu o __v
+  assert.deepEqual(p2.activityBuffer, {});
+  assert.equal(p2.title, "ZZ TESTE AUTOMASTER etapa 3");
+  assert.deepEqual(p2.layout, [
+    { id: "w1", x: 0, y: 0, w: 3, h: 4, minW: 3, minH: 4 },
+    { id: "w2", x: 3, y: 0, w: 3, h: 4, minW: 3, minH: 4 },
+    { id: G1, x: 6, y: 0, w: 3, h: 4, minW: 3, minH: 4 }, // minW/minH do tipo numeric (molde sem layout)
+  ]);
   assert.equal(s.aplicado, true);
 });
 
-test("editar remover: o id vai em activityBuffer.delete", async () => {
+test("item novo do layout herda minW/minH de molde.layout quando o molde tem", async () => {
+  const { client, escritas } = falso();
+  const p = {
+    criar: [{ id: "n", titulo: "t", molde: { ...moldeCompleto, layout: { x: 0, y: 0, w: 4, h: 5, minW: 4, minH: 5 } } }],
+    layout: [...layoutBase, { id: "n", x: 6, y: 0, w: 4, h: 5 }],
+  };
+  await comIds(client, { ...base, acao: "editar", plano: plano(p) });
+  const lay = (escritas()[1].corpo as { layout: Record<string, unknown>[] }).layout;
+  assert.deepEqual(lay.find((i) => i.id === G1), { id: G1, x: 6, y: 0, w: 4, h: 5, minW: 4, minH: 5 });
+});
+
+test("item novo sem layout no molde usa os mínimos do tipo (table 6x6)", async () => {
+  const { client, escritas } = falso();
+  const p = {
+    criar: [{ id: "n", titulo: "t", molde: { ...moldeCompleto, chartType: "table" } }],
+    layout: [...layoutBase, { id: "n", x: 0, y: 4, w: 6, h: 6 }],
+  };
+  await comIds(client, { ...base, acao: "editar", plano: plano(p) });
+  const lay = (escritas()[1].corpo as { layout: Record<string, unknown>[] }).layout;
+  assert.deepEqual(lay.find((i) => i.id === G1), { id: G1, x: 0, y: 4, w: 6, h: 6, minW: 6, minH: 6 });
+});
+
+test("o ObjectId do widget novo tem 24 hex também com o gerador padrão", async () => {
+  const { client, escritas } = falso();
+  await executarDashboardAcao(client, { ...base, acao: "editar", plano: plano(planoValido) } as never);
+  const [chave] = Object.keys((escritas()[0].corpo as any).activityBuffer.create[0]);
+  assert.match(chave, /^[0-9a-f]{24}$/);
+});
+
+test("editar remover: 1 PUT, o id vai em activityBuffer.delete e sai do layout", async () => {
   const { client, escritas } = falso();
   await executarDashboardAcao(client, { ...base, acao: "editar", plano: plano({ remover: ["w2"], layout: [layoutBase[0]] }) } as never);
+  assert.equal(escritas().length, 1);
   const c = escritas()[0].corpo as Record<string, any>;
   assert.deepEqual(c.activityBuffer.delete, ["w2"]);
-  assert.deepEqual(c.layout.map((i: { id: string }) => i.id), ["w1"]);
+  assert.deepEqual(c.layout, [{ id: "w1", x: 0, y: 0, w: 3, h: 4, minW: 3, minH: 4 }]);
 });
 
 test("editar atualizar: o widget vai em activityBuffer.update[{widgetId: widget}]", async () => {
@@ -239,6 +317,7 @@ test("editar atualizar: o widget vai em activityBuffer.update[{widgetId: widget}
     ...base, acao: "editar",
     plano: plano({ atualizar: [{ widgetId: "w1", title: "Leads do mês" }], layout: layoutBase }),
   } as never);
+  assert.equal(escritas().length, 1);
   const c = escritas()[0].corpo as Record<string, any>;
   assert.equal(c.activityBuffer.update.length, 1);
   assert.equal(c.activityBuffer.update[0].w1.title, "Leads do mês");
@@ -324,16 +403,36 @@ test("apagar e editar recusam painel isDefault, com ou sem --confirmo", async ()
 
 // ---------- tema ----------
 
-test("tema: PUT mescla no themeConfig atual (mantém chaves que não vieram) e não mexe no título", async () => {
+test("tema (GET plano): PUT aninhado { dashboardTheme, widgetTheme:{} }, mescla e mantém chaves extras", async () => {
   const { client, escritas } = falso();
   await executarDashboardAcao(client, { ...base, acao: "tema", tema: '{"metricColor":"#003366"}' } as never);
+  assert.equal(escritas().length, 1);
   const c = escritas()[0].corpo as Record<string, any>;
-  assert.equal(c.themeConfig.metricColor, "#003366");
-  assert.equal(c.themeConfig.extra, "keep");
-  assert.equal(c.themeConfig.titleColor, "#111111");
+  assert.deepEqual(c.themeConfig, {
+    dashboardTheme: {
+      titleColor: "#111111", backgroundColor: "#ffffff", baseColor: "#eeeeee", metricColor: "#003366",
+      linkColor: "#0000ee", extra: "keep",
+    },
+    widgetTheme: {},
+  });
   assert.equal(c.title, "ZZ TESTE AUTOMASTER etapa 3");
-  assert.deepEqual(c.activityBuffer, { create: [], update: [], delete: [] });
+  assert.equal(c.version, 7);
+  assert.deepEqual(c.activityBuffer, {});
   assert.equal(c.layout.length, 2);
+  assert.equal(c.layout[0].minW, 3);
+});
+
+test("tema (GET já aninhado): preserva widgetTheme e chaves extras, sem aninhar duas vezes", async () => {
+  const { client, escritas } = falso({ theme: {
+    dashboardTheme: { titleColor: "#111111", backgroundColor: "#ffffff", baseColor: "#eeeeee", metricColor: "#222222", linkColor: "#0000ee", extra: "keep" },
+    widgetTheme: { raio: 8 },
+  } });
+  await executarDashboardAcao(client, { ...base, acao: "tema", tema: '{"linkColor":"#003366"}' } as never);
+  const c = escritas()[0].corpo as Record<string, any>;
+  assert.equal(c.themeConfig.dashboardTheme.linkColor, "#003366");
+  assert.equal(c.themeConfig.dashboardTheme.extra, "keep");
+  assert.deepEqual(c.themeConfig.widgetTheme, { raio: 8 });
+  assert.ok(!("dashboardTheme" in c.themeConfig.dashboardTheme));
 });
 
 test("tema recusa cor fora de #RRGGBB", async () => {
@@ -377,13 +476,16 @@ test("tema confere contra o fundo MESCLADO: trocar só o fundo para preto reprov
 
 // ---------- renomear / apagar / restaurar / criar ----------
 
-test("renomear: PUT só troca o título, preserva layout, tema e version", async () => {
+test("renomear: 1 PUT só troca o título; preserva layout, tema aninhado, version e activityBuffer {}", async () => {
   const { client, escritas } = falso();
   await executarDashboardAcao(client, { ...base, acao: "renomear", titulo: "ZZ TESTE AUTOMASTER novo nome" } as never);
+  assert.equal(escritas().length, 1);
   const c = escritas()[0].corpo as Record<string, any>;
   assert.equal(c.title, "ZZ TESTE AUTOMASTER novo nome");
   assert.equal(c.version, 7);
-  assert.equal(c.themeConfig.extra, "keep");
+  assert.equal(c.themeConfig.dashboardTheme.extra, "keep");
+  assert.deepEqual(c.themeConfig.widgetTheme, {});
+  assert.deepEqual(c.activityBuffer, {});
   assert.equal(c.layout.length, 2);
 });
 
