@@ -510,3 +510,17 @@ um grill-me, com perguntas tiradas de uma leitura a fundo da subconta.
   `diverge` sem causa.
 - O usuário vê no GHL e aprova ou pede ajuste; a decisão fica no relatório.
 - Suítes completas, typecheck, lint e ruff passam.
+
+## Etapa 13 — Divisões na cor de destaque e o painel da ZOI como padrão
+
+**Tela:** não (o painel já foi verificado na etapa 12; muda só a cor das faixas de título).
+
+O usuário aprovou o painel da etapa 12 e pediu: todos os painéis nesse padrão, e as divisões
+(títulos de seção, `object-title`) na mesma cor do destaque.
+
+**O que prova a etapa:**
+- A skill diz que todo `object-title` usa `objectWidgetOptions.backgroundColor` igual à cor de
+  destaque (`baseColor` do tema) e `textColor` escuro com contraste ≥ 4.5 sobre ela, e aponta o
+  painel da etapa 12 (`docs/vesta/mockups/2026-10-16-dashboards/etapa-12/plano.md`) como o padrão
+  de referência para qualquer cliente.
+- O painel da ZOI fica com todas as faixas de título em `#b5ff81` e texto `#101828` (ao vivo).
