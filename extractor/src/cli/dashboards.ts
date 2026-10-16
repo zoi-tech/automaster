@@ -7,6 +7,7 @@ import { validarLayout, validarComposicao, contraste, minimosDoTipo } from "../a
 import type { CorpoSalvar } from "../api/dashboards.js";
 import type { ItemPlano, Problema } from "../api/dashboards-layout.js";
 import fs from "node:fs";
+import type { BrowserContext } from "playwright";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { withClient, DUMPS_DIR, registroEscrita } from "./shared.js";
@@ -64,6 +65,28 @@ async function runDashboards(opts: {
 
 // Candidatos a confirmar ao vivo: seletor de widget e contêiner que rola.
 const SELETOR_WIDGET = ".location-dashboard-numeric-card, .chart-container";
+/**
+ * Copia para o perfil de tela a sessão do GHL que o processo de fundo salva em disco (só cookies
+ * e localStorage dos domínios do GHL, a mesma que o Playwright MCP importa). Assim a captura não
+ * pede login próprio. O perfil do processo de fundo continua intocado: só o arquivo é lido.
+ * Sem o arquivo, segue sem sessão e o login próprio (--login) vale como reserva.
+ */
+async function importarSessaoSalva(context: Pick<BrowserContext, "addCookies" | "addInitScript">): Promise<void> {
+  let est: { cookies?: Parameters<BrowserContext["addCookies"]>[0]; origins?: { origin: string; localStorage: { name: string; value: string }[] }[] };
+  try {
+    est = JSON.parse(fs.readFileSync(caminhosDaSessao().estado, "utf-8"));
+  } catch {
+    return;
+  }
+  if (est.cookies?.length) await context.addCookies(est.cookies);
+  for (const o of est.origins ?? []) {
+    // ponytail: grava o localStorage a cada navegação da origem; o app reescreve o que precisar depois
+    await context.addInitScript(([origem, itens]) => {
+      if (location.origin === origem) for (const i of itens) localStorage.setItem(i.name, i.value);
+    }, [o.origin, o.localStorage] as const);
+  }
+}
+
 const URL_LOGIN = "https://app.gohighlevel.com/";
 
 interface Resultado { arquivo: string; largura: number; altura: number; widgets: number; vazios: string[] }
@@ -77,9 +100,11 @@ const MEDIR = `(async () => {
     for (let y = 0; y < rolavel.scrollHeight; y += 600) { rolavel.scrollTo(0, y); await new Promise((r) => setTimeout(r, 250)); }
     rolavel.scrollTo(0, 0);
   }
-  const vazios = [...w].filter((x) => /sem dados|no data/i.test(x.textContent || "")).map((x) => (x.querySelector("h1,h2,h3,h4,.title,[class*=title]")?.textContent || "").trim());
+  // conta depois de rolar e por item da grade: o seletor de espera não casa com todo tipo de widget
+  const itens = document.querySelectorAll(".grid-stack-item");
+  const vazios = [...itens].filter((x) => /sem dados|no data/i.test(x.textContent || "")).map((x) => (x.querySelector("h1,h2,h3,h4,.title,[class*=title]")?.textContent || "").trim());
   return {
-    widgets: w.length, vazios,
+    widgets: itens.length, vazios,
     largura: Math.max(document.documentElement.scrollWidth, window.innerWidth),
     altura: Math.max(rolavel ? rolavel.scrollHeight + rolavel.getBoundingClientRect().top : 0, document.documentElement.scrollHeight, window.innerHeight),
   };
@@ -96,6 +121,7 @@ export async function runDashboardVer(
   let perfil: Awaited<ReturnType<typeof abrirPerfilDeTela>> | undefined;
   try {
     perfil = await abrir({ visivel: !!opts.login });
+    if (!opts.login) await importarSessaoSalva(perfil.context);
     const page = perfil.context.pages()[0] ?? (await perfil.context.newPage());
     if (opts.login) {
       await page.goto(URL_LOGIN, { waitUntil: "domcontentloaded" });

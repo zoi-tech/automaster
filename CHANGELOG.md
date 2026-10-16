@@ -9,7 +9,7 @@ instalado faz sobe a versão aqui; o time atualiza com
 - **Quatro comandos e quatro tools MCP** (36 no total): `dashboards` (leitura ao vivo: lista, detalhe,
   catálogo, versões, dados de widget, fuso), `dashboard-acao` (ESCREVE: criar, editar, tema, renomear,
   apagar, restaurar e publicar; prévia sem `--confirmo`), `dashboard-ver` (PNG do painel num perfil de
-  tela próprio, com `--login` uma vez) e `dashboard-conferir` (recontagem de cada widget: `bate`,
+  tela próprio, que importa a sessão salva do GHL e não pede login) e `dashboard-conferir` (recontagem de cada widget: `bate`,
   `diverge`, `sem_conferencia`). Skill nova `automaster-dashboard` com o método (leitura, entrevista,
   plano, montagem, loop visual, loop de dados, publicação).
 - Painel nasce privado. `publicar` exige `--confirmo` e recusa se a última conferência divergiu.

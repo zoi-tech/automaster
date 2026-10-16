@@ -262,12 +262,12 @@ test("seletor que estoura o prazo: propaga, não fotografa e fecha tudo", async 
   assert.deepEqual(a.eventos.filter((e) => e.endsWith(".close")), ["pagina.close", "contexto.close"]);
 });
 
-test("--login abre o perfil visível na tela de login, espera a URL sair de /login e fecha", async () => {
+test("--login abre o perfil visível na raiz do app (o /login do GHL fica em branco) e fecha", async () => {
   limpar();
   const a = montar({ saiDoLogin: true });
   await runDashboardVer({ login: true }, a.abrir as any);
   assert.ok(a.eventos.includes("abrir:true"), "perfil não abriu visível");
-  assert.match(a.chamadas.goto[0]!.url, /gohighlevel\.com.*login|login.*gohighlevel\.com/);
+  assert.equal(a.chamadas.goto[0]!.url, "https://app.gohighlevel.com/");
   assert.equal(a.chamadas.shots.length, 0);
   assert.deepEqual(a.eventos.filter((e) => e.endsWith(".close")), ["pagina.close", "contexto.close"]);
 });

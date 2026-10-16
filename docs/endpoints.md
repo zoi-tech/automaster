@@ -1517,6 +1517,20 @@ nenhuma mudança no cliente.
 
 CLI: `npm run dashboards -- -l <loc> -o lista|detalhe|catalogo|versoes|dados|fuso [-i <id>] [--widget <wid>] --json`.
 
+### Captura do painel (`dashboard-ver`)
+
+Provado ao vivo na Xb9g em 2026-10-16. A página é
+`https://app.gohighlevel.com/v2/location/<loc>/dashboard?dashboardId=<id>`. Cada widget é um
+`.grid-stack-item` (GridStack); o tipo vem na classe `dashboard-widget-type-<chartType>` e o módulo
+em `dashboard-widget-module-<module>`. Os seletores de espera `.location-dashboard-numeric-card` e
+`.chart-container` aparecem já na primeira dobra, mas não cobrem todo tipo, então a contagem é por
+`.grid-stack-item` depois de rolar. O painel real deu 19 de 19 widgets num PNG de 1440x4169.
+
+Deslogado, o GHL não vai para `/login`: redireciona para `/?url=<rota>` e mostra o formulário de
+e-mail e senha. E `/login` direto fica em branco; o login de verdade é na raiz do app. O perfil de
+tela importa a sessão salva (`sessao/estado-ghl.json`) antes de carregar a página e não precisa
+de login próprio; o processo de fundo seguiu logado.
+
 ### Escrita
 
 Etapa 3, provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 3` privado, apagado no fim. CLI:
