@@ -434,7 +434,7 @@ test("conferirWidget: agenda bate por situação", async () => {
 
 test("conferirWidget: módulo sem fonte e widget custom saem sem_conferencia, nunca bate", async () => {
   const a = mundo(ghlRaw(0), ghlRaw(0));
-  for (const m of ["crm-contacts", "conversations", "email-stats", "call-stats", "facebook-ads"]) {
+  for (const m of ["conversations", "crm-sms", "leadgen-funnel-stats", "leadgen-payments-orders", "automation-admanager-google-ads"]) {
     const it = await conferirWidget(a.client, "L1", widget("W3", m, opts(), { apiConfig: { path: "/dashboards/x/y" } }) as never, SP, DIA);
     assert.equal(it.resultado, "sem_conferencia", m);
     assert.match(it.motivo ?? "", /fonte entra numa etapa seguinte/, m);
@@ -459,7 +459,7 @@ test("conferirPainel: um item por widget, na ordem, e o resumo conta cada result
     widget("A", "crm-opportunities", donutStatus), // bate
     widget("B", "automation-appointments", opts({ dateProperty: "dateAdded", groupBy: { fields: ["appoinmentStatus.keyword"] } })), // diverge: GHL 2, agenda 1
     widget("C", "custom", {}, { apiConfig: null }), // sem_conferencia
-    widget("D", "crm-contacts", opts(), { apiConfig: { path: "/dashboards/c/d" } }), // sem_conferencia
+    widget("D", "crm-sms", opts(), { apiConfig: { path: "/dashboards/c/d" } }), // sem_conferencia
   ] };
   const r = await conferirPainel(a.client, "L1", painel as never, SP, DIA);
   assert.deepEqual(r.itens.map((i) => [i.widgetId, i.resultado]), [
