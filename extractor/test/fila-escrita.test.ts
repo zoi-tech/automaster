@@ -8,7 +8,7 @@ const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sr
 
 const LEITURA = [
   "runSmoke", "runOportunidades", "runFormularios", "runWorkflowsAoVivo", "runAgenda", "runWhatsapp",
-  "runAnotacoes", "runTags", "runTimeline", "runConversas", "runConversasBuscar",
+  "runAnotacoes", "runTags", "runTimeline", "runConversas", "runConversasBuscar", "runDashboards",
 ];
 
 /** Função de escrita → valor exato de `escrita` passado ao withClient (tabela da etapa 2 do plano). */
@@ -48,10 +48,10 @@ function funcoesDaCli(): Map<string, string> {
   return funcoes;
 }
 
-test("as listas de leitura e escrita somam as 30 chamadas, sem repetição", () => {
-  assert.equal(LEITURA.length, 11);
+test("as listas de leitura e escrita somam as 31 chamadas, sem repetição", () => {
+  assert.equal(LEITURA.length, 12);
   assert.equal(Object.keys(ESCRITA).length, 19);
-  assert.equal(new Set([...LEITURA, ...Object.keys(ESCRITA)]).size, 30);
+  assert.equal(new Set([...LEITURA, ...Object.keys(ESCRITA)]).size, 31);
 });
 
 test("toda função da CLI que chama withClient está classificada como leitura ou escrita", () => {
@@ -69,7 +69,7 @@ test("as 19 de escrita entram na fila: passam { escrita: <valor da tabela> } ao 
   assert.deepEqual(erradas, []);
 });
 
-test("as 11 de leitura não entram na fila: não passam escrita ao withClient", () => {
+test("as 12 de leitura não entram na fila: não passam escrita ao withClient", () => {
   const funcoes = funcoesDaCli();
   const naFila = LEITURA.filter((n) => funcoes.get(n)?.includes("escrita:"));
   assert.deepEqual(naFila, []);

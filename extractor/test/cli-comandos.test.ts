@@ -14,7 +14,7 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const COMANDOS = [
   "agenda", "agenda-acao", "anotacao-acao", "anotacoes", "config", "contato-editar",
   "conversas", "conversas-anexar", "conversas-buscar", "conversas-enviar", "conversas-marcar",
-  "conversas-mensagem", "conversas-rascunho", "discover", "extract", "formulario-acao",
+  "conversas-mensagem", "conversas-rascunho", "dashboards", "discover", "extract", "formulario-acao",
   "formulario-estilo", "formularios", "grupo", "oportunidade-acao", "oportunidades",
   "pipeline", "sessao", "smoke", "tag-acao", "tags", "timeline", "whatsapp", "whatsapp-enviar",
   "workflow-acao", "workflow-editar", "workflows-ao-vivo",
