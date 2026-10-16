@@ -1,0 +1,233 @@
+{
+  "itens": [
+    {
+      "widgetId": "f164b0aa3aae6f7e2fe00165",
+      "titulo": "Valor fechado em 30 dias",
+      "modulo": "crm-opportunities",
+      "resultado": "bate",
+      "ghl": {
+        "total": 0
+      },
+      "recontagem": {
+        "total": 0
+      },
+      "filtro": {
+        "campoData": "last_status_change_at",
+        "inicio": 1789573096389,
+        "fim": 1792165096389,
+        "fuso": "America/Sao_Paulo",
+        "grupos": [
+          [
+            {
+              "campo": "status",
+              "valores": [
+                "won"
+              ]
+            },
+            {
+              "campo": "pipeline_id",
+              "valores": [
+                "NpSPpYjdKplzDPpt8ALT"
+              ]
+            }
+          ]
+        ],
+        "agrupar": null,
+        "soma": true
+      },
+      "divergencias": []
+    },
+    {
+      "widgetId": "8c2238a156c77c77733b1237",
+      "titulo": "Vendas fechadas em 30 dias",
+      "modulo": "crm-opportunities",
+      "resultado": "bate",
+      "ghl": {
+        "total": 0
+      },
+      "recontagem": {
+        "total": 0
+      },
+      "filtro": {
+        "campoData": "last_status_change_at",
+        "inicio": 1789573096389,
+        "fim": 1792165096389,
+        "fuso": "America/Sao_Paulo",
+        "grupos": [
+          [
+            {
+              "campo": "status",
+              "valores": [
+                "won"
+              ]
+            },
+            {
+              "campo": "pipeline_id",
+              "valores": [
+                "NpSPpYjdKplzDPpt8ALT"
+              ]
+            }
+          ]
+        ],
+        "agrupar": null,
+        "soma": false
+      },
+      "divergencias": []
+    },
+    {
+      "widgetId": "caa1a7fa15396ec65f667939",
+      "titulo": "Leads novos em 30 dias",
+      "modulo": "crm-contacts",
+      "resultado": "bate",
+      "ghl": {
+        "total": 509
+      },
+      "recontagem": {
+        "total": 509
+      },
+      "filtro": {
+        "campoData": "date_added",
+        "inicio": 1789573096389,
+        "fim": 1792165096389,
+        "fuso": "America/Sao_Paulo",
+        "grupos": [],
+        "agrupar": null,
+        "soma": false
+      },
+      "divergencias": []
+    },
+    {
+      "widgetId": "e0aedfb11964fd6a529b3635",
+      "titulo": "Reuniões marcadas em 30 dias",
+      "modulo": "automation-appointments",
+      "resultado": "bate",
+      "ghl": {
+        "total": 49
+      },
+      "recontagem": {
+        "total": 49
+      },
+      "filtro": {
+        "campoData": "date_added",
+        "inicio": 1789573096389,
+        "fim": 1792165096389,
+        "fuso": "America/Sao_Paulo",
+        "grupos": [],
+        "agrupar": null,
+        "soma": false
+      },
+      "divergencias": []
+    },
+    {
+      "widgetId": "405f4fe14748941302f879b6",
+      "titulo": "Leads novos por dia, últimos 30 dias",
+      "modulo": "crm-contacts",
+      "resultado": "sem_conferencia",
+      "ghl": null,
+      "recontagem": null,
+      "motivo": "agrupamento sem recontagem: date_added",
+      "filtro": null
+    },
+    {
+      "widgetId": "852b26d21ee8cbc8592b05e5",
+      "titulo": "De onde vêm os leads nos últimos 30 dias",
+      "modulo": "crm-opportunities",
+      "resultado": "bate",
+      "ghl": {
+        "total": 447,
+        "grupos": [
+          {
+            "id": "Lista Claro",
+            "value": 414
+          },
+          {
+            "id": "N/A​",
+            "value": 16
+          },
+          {
+            "id": "Tráfego Facebook",
+            "value": 9
+          },
+          {
+            "id": "Indicação Aline WA",
+            "value": 4
+          },
+          {
+            "id": "Disparo Promo 90 dias",
+            "value": 1
+          },
+          {
+            "id": "Forms / Demo do Site",
+            "value": 1
+          },
+          {
+            "id": "Indicação Assovesc",
+            "value": 1
+          },
+          {
+            "id": "Networking Felipe",
+            "value": 1
+          }
+        ]
+      },
+      "recontagem": {
+        "total": 447,
+        "grupos": [
+          {
+            "id": "N/A​",
+            "value": 16
+          },
+          {
+            "id": "Lista Claro",
+            "value": 414
+          },
+          {
+            "id": "Networking Felipe",
+            "value": 1
+          },
+          {
+            "id": "Indicação Aline WA",
+            "value": 4
+          },
+          {
+            "id": "Forms / Demo do Site",
+            "value": 1
+          },
+          {
+            "id": "Indicação Assovesc",
+            "value": 1
+          },
+          {
+            "id": "Tráfego Facebook",
+            "value": 9
+          },
+          {
+            "id": "Disparo Promo 90 dias",
+            "value": 1
+          }
+        ]
+      },
+      "filtro": {
+        "campoData": "date_added",
+        "inicio": 1789573096389,
+        "fim": 1792165096389,
+        "fuso": "America/Sao_Paulo",
+        "grupos": [],
+        "agrupar": "source",
+        "soma": false
+      },
+      "divergencias": []
+    }
+  ],
+  "resumo": {
+    "bate": 5,
+    "diverge": 0,
+    "sem_conferencia": 1
+  },
+  "periodo": {
+    "inicio": 1789573096389,
+    "fim": 1792165096389
+  },
+  "fuso": "America/Sao_Paulo",
+  "segundos": 75.427
+}

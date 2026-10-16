@@ -268,7 +268,7 @@ export async function executarDashboardAcao(
     if (!bruto || typeof bruto !== "object") throw new Error("--acao tema exige --tema '{\"metricColor\":\"#RRGGBB\"}'");
     const novo: Record<string, string> = temaAninhado(bruto).dashboardTheme;
     for (const [k, v] of Object.entries(novo)) {
-      if (!HEX.test(v)) problemas.push({ codigo: "cor_invalida", mensagem: `${k}: "${v}" não está no formato #RRGGBB.` });
+      if (k.endsWith("Color") && !HEX.test(v)) problemas.push({ codigo: "cor_invalida", mensagem: `${k}: "${v}" não está no formato #RRGGBB.` });
     }
     const m = { ...tema.dashboardTheme, ...novo };
     for (const k of ["metricColor", "titleColor"]) {

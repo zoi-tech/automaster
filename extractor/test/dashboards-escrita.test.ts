@@ -465,6 +465,13 @@ test("tema aceita contraste logo acima de 4.5 (#767676 sobre branco = 4.54)", as
   assert.equal(escritas().length, 1);
 });
 
+test("tema aceita themeName (não é cor) e ainda recusa cor fora do formato", async () => {
+  const { client, escritas } = falso();
+  await executarDashboardAcao(client, { ...base, acao: "tema", tema: '{"themeName":"custom","metricColor":"#767676"}' } as never);
+  assert.equal(escritas().length, 1);
+  await assert.rejects(executarDashboardAcao(client, { ...base, acao: "tema", tema: '{"themeName":"custom","metricColor":"red"}' } as never));
+});
+
 test("tema confere contra o fundo MESCLADO: trocar só o fundo para preto reprova metricColor escuro", async () => {
   const { client, escritas } = falso();
   await assert.rejects(
