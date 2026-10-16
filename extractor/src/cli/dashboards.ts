@@ -93,8 +93,10 @@ interface Resultado { arquivo: string; largura: number; altura: number; widgets:
 
 /** Mede o painel: rola o contêiner interno até o fim (carrega os widgets de baixo) e conta o que renderizou. */
 const MEDIR = `(async () => {
+  // sobe a partir da grade, não do 1º widget: tabela e quadro custom têm rolagem interna própria,
+  // e partir de dentro deles media só a tela (altura 900)
   const w = document.querySelectorAll(${JSON.stringify(SELETOR_WIDGET)});
-  let rolavel = w[0]?.parentElement;
+  let rolavel = document.querySelector(".grid-stack")?.parentElement ?? w[0]?.parentElement;
   while (rolavel && rolavel.scrollHeight <= rolavel.clientHeight + 1) rolavel = rolavel.parentElement;
   if (rolavel) {
     for (let y = 0; y < rolavel.scrollHeight; y += 600) { rolavel.scrollTo(0, y); await new Promise((r) => setTimeout(r, 250)); }
@@ -306,7 +308,10 @@ export async function executarDashboardAcao(
     for (const c of criar) if (!layout.some((i) => i.id === c.id)) throw new Error(`o layout não inclui o widget novo ${c.id}`);
     const tipo = new Map(painel.widgets.map((w) => [w.widgetId, w]));
     const novos = new Map(criar.map((c) => [c.id, c]));
-    problemas.push(...validarLayout(layout.map((i) => ({ ...i, chartType: novos.get(i.id)?.molde?.chartType ?? tipo.get(i.id)?.chartType ?? "" }))));
+    problemas.push(...validarLayout(layout.map((i) => {
+      const m = novos.get(i.id)?.molde, w = tipo.get(i.id);
+      return { ...i, chartType: m?.chartType ?? w?.chartType ?? "", minW: m?.layout?.minW ?? w?.layout.minW, minH: m?.layout?.minH ?? w?.layout.minH };
+    })));
     avisos = validarComposicao(layout.map((i): ItemPlano => {
       const c = novos.get(i.id);
       const w = tipo.get(i.id);

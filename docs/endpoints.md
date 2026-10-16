@@ -702,7 +702,7 @@ descartável criado e apagado na hora. Os 4 pipelines reais não foram tocados.
 | Pipelines e estágios | `GET backend.leadconnectorhq.com/opportunities/pipelines?locationId=<loc>` | ✓ |
 | Cards, com filtro | `GET services.../opportunities/search?location_id=&pipeline_id=&pipeline_stage_id=&status=&contact_id=&limit=` | ✓ |
 | Busca por termo | mesma rota, com `q=<termo>` | ✓ |
-| Paginação | mesma rota, com `page=<n>` a partir de 1 | ✓ |
+| Paginação | mesma rota, com `page=<n>` a partir de 1, **só até a página 100**; depois disso 400 `SEARCH_USE_START_AFTER_PAGINATION` (visto na Nick em 2026-10-16, mais de 10 mil cards). Para varrer tudo, mande `startAfter` e `startAfterId` do `meta` da página anterior | ✓ |
 | Um card | `GET services.../opportunities/<id>` | ✓ (404 `OPPORTUNITY_NOT_FOUND` se apagado) |
 
 `pipelines/search` **não** é busca de pipeline por nome: ela exige `pipelineId` e

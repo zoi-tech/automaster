@@ -4,6 +4,18 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.31.1 — conferência e captura em subconta grande (painel da Nick)
+
+- `dashboard-conferir` pagina as oportunidades pelo cursor (`startAfter`/`startAfterId`): a busca
+  recusa a página 101 em diante, e numa subconta com mais de 10 mil cards toda recontagem de
+  oportunidade saía `sem_conferencia` com HTTP 400.
+- Gráfico com o `groupBy.limit` cheio confere só os N grupos que o GHL mostra (antes acusava
+  `diverge` pelos grupos que o widget corta), e tabela confere o total, não as linhas da página.
+- `dashboard-ver` mede a altura a partir da grade: com uma tabela como primeiro widget, media só a
+  tela e o PNG saía com 900 px.
+- O validador do layout aceita o mínimo do próprio widget (o quadro de conversão é 3x4) em vez de
+  exigir 4x6 de todo `custom`.
+
 ## 0.31.0 — painéis nativos (dashboards) do GHL
 
 - **Quatro comandos e quatro tools MCP** (36 no total): `dashboards` (leitura ao vivo: lista, detalhe,

@@ -81,7 +81,7 @@ npm run smoke -- -l <loc> --contato <id> --gravar test/fixtures/api-forma.json  
 npm run discover -- --location <locationId>   # observar requests ao backend
 npm run typecheck                              # tsc sobre src E test (tsconfig.check.json)
 npm run lint                                   # eslint + typescript-eslint
-npm test                                       # suíte (742 testes)
+npm test                                       # suíte (772 testes)
 
 # Auditor (em auditor/) — usa venv: .venv/bin/...
 python -m venv .venv && .venv/bin/pip install -e .

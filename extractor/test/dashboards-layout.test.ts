@@ -134,6 +134,11 @@ test("abaixo_do_minimo: demais tipos exigem 4x6 e a mensagem cita o widget", () 
   assert.ok(codigos(validarLayout([it("d", 0, 0, 4, 5, "bar")])).includes("abaixo_do_minimo"));
 });
 
+test("abaixo_do_minimo: o mínimo do próprio widget vence o do tipo (conversão custom é 3x4)", () => {
+  assert.deepEqual(validarLayout([{ ...it("conv", 0, 0, 3, 4, "custom"), minW: 3, minH: 4 }]), []);
+  assert.ok(codigos(validarLayout([{ ...it("conv", 0, 0, 3, 3, "custom"), minW: 3, minH: 4 }])).includes("abaixo_do_minimo"));
+});
+
 test("buraco: faixa vazia inteira com widget abaixo que subiria", () => {
   const p = validarLayout([it("a", 0, 0, 6, 6), it("b", 6, 0, 6, 6), it("c", 0, 8, 12, 6)]);
   assert.ok(codigos(p).includes("buraco"));

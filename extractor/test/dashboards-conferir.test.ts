@@ -116,6 +116,25 @@ test("comparar: grupos iguais em outra ordem e com rótulos diferentes batem (ca
   assert.deepEqual(r.divergencias, []);
 });
 
+test("comparar: com o limite cheio confere só o top N que o GHL mostra (caso real da Nick, fonte do card)", () => {
+  const ghl = ghlRaw(5, [{ id: "N/A", value: 3 }, { id: "Site", value: 2 }]);
+  const rec = { total: 7, grupos: [{ id: "N/A", value: 3 }, { id: "Site", value: 2 }, { id: "Loja", value: 1 }, { id: "Mobiauto", value: 1 }] };
+  assert.equal(comparar(ghl, rec, 2).resultado, "bate");
+  // sem limite, os grupos de fora contam como divergência
+  assert.equal(comparar(ghl, rec).resultado, "diverge");
+  // grupo de fora maior que o menor mostrado: o top N do GHL está errado
+  const r = comparar(ghl, { total: 8, grupos: [...rec.grupos, { id: "Google", value: 3 }] }, 2);
+  assert.equal(r.resultado, "diverge");
+  assert.deepEqual(r.divergencias.map((d) => d.id), ["Google"]);
+});
+
+test("comparar: tabela confere o total, não as linhas da página (caso real da Nick, 10 de 38 vendas)", () => {
+  const linhas = [{ id: "c1", name: "marilucia" }, { id: "c2", name: "junior" }];
+  const r = comparar([{ metricKey: "count::id", data: linhas, total: 38 }], { total: 38 });
+  assert.equal(r.resultado, "bate");
+  assert.deepEqual(r.divergencias, []);
+});
+
 // ---------- filtroDoWidget ----------
 
 const opts = (extra: Record<string, unknown> = {}) => ({
@@ -222,23 +241,29 @@ const card = (id: string, extra: Record<string, unknown> = {}) => ({
   createdAt: "2026-10-15T15:00:00.000Z", updatedAt: "2026-10-15T15:00:00.000Z", lastStatusChangeAt: "2026-10-15T15:00:00.000Z",
   ...extra,
 });
-/** Servidor que ignora todo filtro (como se a rota não filtrasse) e entrega `paginas[page-1]`. */
+/** Servidor que ignora todo filtro (como se a rota não filtrasse) e pagina pelo cursor, como a rota real. */
 function servidorOpp(paginas: unknown[][]) {
   return clienteRota((_m, url) => {
-    const page = Number(new URL(url).searchParams.get("page") ?? "1");
+    const q = new URL(url).searchParams;
+    // a rota real recusa `page` acima de 100; aqui qualquer `page` é erro, só o cursor anda
+    if (q.has("page")) throw new Error("HTTP 400 SEARCH_USE_START_AFTER_PAGINATION");
+    const page = q.has("startAfterId") ? Number(q.get("startAfterId")!.slice(1)) + 1 : 1;
     return {
       opportunities: paginas[page - 1] ?? [],
-      meta: { total: paginas.flat().length, currentPage: page, nextPage: page < paginas.length ? page + 1 : null },
+      meta: {
+        total: paginas.flat().length, currentPage: page, nextPage: page < paginas.length ? page + 1 : null,
+        startAfter: page * 1000, startAfterId: `p${page}`,
+      },
     };
   });
 }
 
-test("recontarOportunidades: pagina até o fim e soma todas as páginas", async () => {
+test("recontarOportunidades: pagina pelo cursor até o fim e soma todas as páginas", async () => {
   const a = servidorOpp([[card("1"), card("2")], [card("3"), card("4")], [card("5")]]);
   const r = await recontarOportunidades(a.client, "L1", filtroOpp());
   assert.equal(r.total, 5);
-  const pages = a.chamadas.map((c) => new URL(c.url).searchParams.get("page"));
-  for (const p of ["1", "2", "3"]) assert.ok(pages.includes(p), `faltou a página ${p}: ${pages}`);
+  const cursores = a.chamadas.map((c) => new URL(c.url).searchParams.get("startAfterId"));
+  assert.deepEqual(cursores, [null, "p1", "p2"]);
   assert.ok(a.chamadas.every((c) => c.url.startsWith("https://services.leadconnectorhq.com/opportunities/search?")));
   assert.ok(a.chamadas.every((c) => new URL(c.url).searchParams.get("location_id") === "L1"));
 });

@@ -20,6 +20,9 @@ export interface OppFiltro {
   endDate?: number | string;  // fim, idem
   limit?: number;
   page?: number;
+  // cursor: a busca recusa page > 100 (400 SEARCH_USE_START_AFTER_PAGINATION); vem do `meta` da página anterior
+  startAfter?: number;
+  startAfterId?: string;
 }
 
 

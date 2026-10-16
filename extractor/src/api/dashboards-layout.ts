@@ -3,7 +3,9 @@
  * Grade de 12 colunas, linha de 54 px (`cellHeight`), igual ao GridStack do app.
  */
 export type Problema = { codigo: string; mensagem: string };
-export type ItemLayout = { id: string; x: number; y: number; w: number; h: number; chartType: string };
+// minW/minH: o mínimo do próprio widget (o catálogo o traz em `layout`), que vence o do tipo;
+// os `custom` variam de 3x4 (conversão) a 6x12 (funil).
+export type ItemLayout = { id: string; x: number; y: number; w: number; h: number; chartType: string; minW?: number; minH?: number };
 export type ItemPlano = ItemLayout & { titulo: string; module: string; options: Record<string, any>; identifier?: string };
 
 const COLUNAS = 12;
@@ -20,7 +22,8 @@ export function validarLayout(itens: ItemLayout[]): Problema[] {
     if (i.x < 0 || i.w < 1 || i.x + i.w > COLUNAS) {
       erros.push({ codigo: "fora_da_grade", mensagem: `O widget ${i.id} sai da grade de ${COLUNAS} colunas (x ${i.x}, largura ${i.w}).` });
     } else dentro.push(i);
-    const [mw, mh] = minimosDoTipo(i.chartType);
+    const [tw, th] = minimosDoTipo(i.chartType);
+    const [mw, mh] = [i.minW ?? tw, i.minH ?? th];
     if (i.w < mw || i.h < mh) {
       erros.push({ codigo: "abaixo_do_minimo", mensagem: `O widget ${i.id} (${i.chartType}) tem ${i.w}x${i.h}, abaixo do mínimo ${mw}x${mh}.` });
     }

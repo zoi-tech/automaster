@@ -35,22 +35,35 @@ interface Metrica { data?: { id?: string; label?: string; value: number }[] | { 
 function normalizar(raw: unknown): Medida {
   const m = ((raw as Metrica[] | null) ?? [])[0] ?? {};
   if (m.data && !Array.isArray(m.data)) return { total: Number(m.data.value) };
-  const grupos = (m.data ?? []).map((g) => ({ id: String(g.id ?? g.label), value: Number(g.value) }));
+  // tabela: `data` traz as linhas (cards, sem `value`) de uma página só; conta o `total`, não as linhas
+  const grupos = (m.data ?? []).filter((g) => typeof g.value === "number").map((g) => ({ id: String(g.id ?? g.label), value: Number(g.value) }));
   return grupos.length ? { total: Number(m.total ?? 0), grupos } : { total: Number(m.total ?? 0) };
 }
 
-export function comparar(ghlCru: unknown, recontagem: Medida): {
+/**
+ * `limite` = groupBy.limit do widget. Com ele cheio, o GHL mostra só os N maiores grupos e o `total`
+ * é a soma deles: confere cada grupo mostrado, o total contra a soma dos mesmos grupos na recontagem
+ * e que nenhum grupo de fora seja maior que o menor mostrado (senão o top N está errado).
+ */
+export function comparar(ghlCru: unknown, recontagem: Medida, limite?: number | null): {
   resultado: "bate" | "diverge"; ghl: Medida; recontagem: Medida; divergencias: Divergencia[];
 } {
   const ghl = normalizar(ghlCru);
   const a = new Map((ghl.grupos ?? []).map((g) => [g.id, g.value]));
   const b = new Map((recontagem.grupos ?? []).map((g) => [g.id, g.value]));
+  const topo = !!limite && a.size >= limite;
   const divergencias: Divergencia[] = [];
+  const menor = Math.min(...a.values());
   for (const id of new Set([...a.keys(), ...b.keys()])) {
     const x = a.get(id) ?? 0, y = b.get(id) ?? 0;
+    if (topo && !a.has(id)) {
+      if (y > menor + TOLERANCIA) divergencias.push({ id, ghl: x, recontagem: y });
+      continue;
+    }
     if (!(Math.abs(x - y) < TOLERANCIA)) divergencias.push({ id, ghl: x, recontagem: y });
   }
-  const bate = Math.abs(ghl.total - recontagem.total) < TOLERANCIA && divergencias.length === 0;
+  const totalRecontado = topo ? [...a.keys()].reduce((s, id) => s + (b.get(id) ?? 0), 0) : recontagem.total;
+  const bate = Math.abs(ghl.total - totalRecontado) < TOLERANCIA && divergencias.length === 0;
   return { resultado: bate ? "bate" : "diverge", ghl, recontagem, divergencias };
 }
 
@@ -167,10 +180,15 @@ const CAMPO_CARD: Record<string, keyof Card> = { status: "status", pipeline_id: 
 const cartoes = new WeakMap<object, Map<string, Promise<Card[]>>>();
 async function todosOsCards(client: GhlClient, loc: string, janela: { date?: number; endDate?: number }): Promise<Card[]> {
   const cards: Card[] = [];
-  for (let page = 1; page <= 500; page++) {
-    const r = (await listOpportunities(client, loc, { page, limit: 100, ...janela })) as { opportunities?: Card[]; meta?: { nextPage?: number | null } };
+  // pelo cursor do `meta`, não por `page`: a rota recusa page > 100 (subconta com mais de 10 mil cards)
+  let cursor: { startAfter?: number; startAfterId?: string } = {};
+  for (let volta = 0; volta < 2000; volta++) {
+    const r = (await listOpportunities(client, loc, { limit: 100, ...janela, ...cursor })) as {
+      opportunities?: Card[]; meta?: { nextPage?: number | null; startAfter?: number; startAfterId?: string };
+    };
     cards.push(...(r.opportunities ?? []));
-    if (!r.meta?.nextPage) break;
+    if (!r.meta?.nextPage || !r.meta.startAfterId) break;
+    cursor = { startAfter: r.meta.startAfter, startAfterId: r.meta.startAfterId };
   }
   return cards;
 }
@@ -342,7 +360,7 @@ export async function conferirWidget(
   const cru = await dadosWidget(client, loc, {
     chartType: widget.chartType ?? "", apiConfig: widget.apiConfig, options: materializar(widget.options, fr.filtro),
   });
-  const c = comparar(cru, medida);
+  const c = comparar(cru, medida, (widget.options as { groupBy?: { limit?: number | null } } | null)?.groupBy?.limit);
   return { ...base, resultado: c.resultado, ghl: c.ghl, recontagem: c.recontagem, filtro: fr.filtro, divergencias: c.divergencias, ...extra };
 }
 
