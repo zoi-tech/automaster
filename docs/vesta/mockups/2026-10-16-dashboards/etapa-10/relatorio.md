@@ -89,3 +89,10 @@ pelos cards confirma o zero.
 ## Decisão do usuário
 
 O usuário viu o painel no GHL e reprovou o resultado: quadros de número grandes demais, painel simplório e feio, fundo escuro. Pediu painéis bem mais completos, fundo branco por padrão, nunca perguntar o dispositivo (é sempre computador) e uma entrevista estilo grill a partir da leitura da subconta. O painel segue privado e é refeito nas etapas 11 e 12. Nada foi publicado.
+
+## Verificação de tela
+
+O painel desta etapa foi reprovado pelo usuário e refeito na etapa 12, no mesmo id. As provas
+de verificação (`r1-1440.png`, `r1-375.png`, `r1-detector-*.json`) são cópias das da etapa 12,
+porque o estado que esta etapa montou não existe mais; o relatório completo está em
+`../etapa-12/relatorio.md`.
