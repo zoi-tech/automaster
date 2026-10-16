@@ -209,3 +209,10 @@ def test_claude_md_lista_a_skill():
 
 
 # a skill fica em skills/automaster-dashboard/SKILL.md
+
+
+def test_divisoes_na_cor_de_destaque_e_painel_padrao(texto):
+    # pedido do usuário na aprovação: faixas de título na cor de destaque, e o painel da ZOI como padrão
+    assert "objectWidgetOptions" in texto
+    assert re.search(r"object-title[^\n]*(destaque|baseColor)|(destaque|baseColor)[^\n]*object-title", texto)
+    assert "etapa-12/plano.md" in texto
