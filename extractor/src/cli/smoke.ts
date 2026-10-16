@@ -21,6 +21,7 @@ import { fetchTemplates as waTemplates } from "../api/whatsapp.js";
 import { fetchSlaSettings } from "../api/settings.js";
 import { getContact } from "../api/contacts.js";
 import { fetchAuditLogs } from "../api/audit.js";
+import { listarPaineis, catalogoWidgets, fusoDaSubconta } from "../api/dashboards.js";
 import { emitir, falhar } from "../saida.js";
 import { forma, type Cassete } from "./cassete.js";
 
@@ -155,6 +156,13 @@ export const CHECAGENS: Checagem[] = [
   { nome: "tags/lista", chamar: (cl, c) => listarTags(cl, c.loc), conferir: lista(0) },
   { nome: "whatsapp/templates", chamar: (cl, c) => waTemplates(cl, c.loc), conferir: lista(0) },
   { nome: "conversas/sla", chamar: (cl, c) => fetchSlaSettings(cl, c.loc), conferir: objeto() },
+  { nome: "dashboards-lista", chamar: (cl, c) => listarPaineis(cl, c.loc), conferir: lista(1) },
+  { nome: "dashboards-catalogo", chamar: (cl, c) => catalogoWidgets(cl, c.loc), conferir: objetoCom("filters", "definitions") },
+  {
+    nome: "subconta-fuso",
+    chamar: (cl, c) => fusoDaSubconta(cl, c.loc),
+    conferir: (r) => (typeof r === "string" && r.includes("/") ? null : `esperado fuso IANA, veio ${tipo(r)}`),
+  },
   {
     nome: "contato/detalhe",
     precisa: temContato,

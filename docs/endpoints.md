@@ -1485,3 +1485,32 @@ exigiria disparar automação na base real de um cliente. Por isso a guarda `--a
 **Não existe contagem de contatos por tag** em lugar nenhum do GHL: o payload da tag tem só
 `name`, `locationId` e `id`, e o pedido de mostrar a contagem na tela de Tags está com status
 "planned" (129 votos). A prévia do apagar declara que não sabe esse número em vez de estimá-lo.
+
+## Dashboards
+
+Painéis nativos do GHL, **leitura** (etapa 1 do plano de dashboards). Host
+`https://backend.leadconnectorhq.com/reporting`, dois tokens. Provado ao vivo na Xb9g
+(`Xb9gDxwxYhdqtprGcb5E`), só leitura; o painel `66a8d9e97ec41f7c8672c320` nunca foi gravado.
+O app manda `Version: 2021-04-15`, mas o `GhlClient` manda `2021-07-28` e o servidor aceita:
+nenhuma mudança no cliente.
+
+| Rota | Forma real |
+|---|---|
+| `GET /dashboards?locationId` | `data = {defaultDashboardId, dashboard:[{_id,title,isDefault\|null,isFavorite}], sharedDashboards:[mesmo]}`. **Sem `isPrivate` nem `__v`.** |
+| `GET /dashboards/<id>?locationId` | `data = {dashboard, dashboardWidgets, widgets, dashboardPreferences, widgetPreferences, permission}`. Título, `isDefault`, `isPrivate`, `__v`, `themeConfig`, `updatedAt` ficam em `data.dashboard`. `dashboardWidgets[]` = `{widgetId, layout{x,y,w,h,minW,minH,noResize,cellHeight}}`; `widgets[]` = definição, e o id dela é `_id` (não `widgetId`), que casa com `dashboardWidgets[].widgetId`. |
+| `GET /dashboards/widgets-definitions?locationId` | `data` é objeto: `filters, advancedFilters, groups, aggregations, breakdowns, definitions, objectWidgetDefinitions, dateProperty, dateRangeOverride, layoutProperties, tableColumns, comparisonDateProperty, customObjectDefinitions, moduleHiddenScope`. |
+| `GET /dashboards/<id>/versions?locationId` | `data = {versions:[], drift:null, nextCursor:null}` (painel nunca versionado vem vazio). |
+| `POST <apiConfig.path>?locationId` | Corpo `{chartType, options}`. Responde `data:[{metricKey, data:[{label,value,id}], total}]`. Widget `custom` tem `apiConfig: null` (sem rota de dados). |
+| `GET https://services.leadconnectorhq.com/locations/<loc>` | `location.timezone` = fuso IANA (`America/Sao_Paulo`). |
+
+**Armadilhas**
+- `options` salvos no widget NÃO servem como corpo do POST: dão `422 ... groupBy.fields.0 ... must be either object or array`.
+  O app materializa: `groupBy.fields` vira `[{field,type:"field"}]`, o filtro de data entra como
+  `filters:[{group:"AND",filters:[{field:"date_added",operator:"time_series",value:[ini_ms,fim_ms]}]}]`
+  e vai `timezone`. A CLI (`-o dados`) faz isso com janela de 30 dias.
+- O POST de dados é leitura: `__v` (54) e `updatedAt` do painel ficaram idênticos antes e depois de 3 chamadas.
+  Mas o `GhlClient` marca todo POST como escrita, então o envelope traz `escrita.tentada: true` sem rastro.
+- "Oportunidades por Status" (`68aded75035add56a641d64a`, `donut`, `/dashboards/crm/opportunities`) devolveu
+  contagem por `status` (open/lost/abandoned) nos últimos 30 dias.
+
+CLI: `npm run dashboards -- -l <loc> -o lista|detalhe|catalogo|versoes|dados|fuso [-i <id>] [--widget <wid>] --json`.

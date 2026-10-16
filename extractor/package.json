@@ -35,6 +35,7 @@
     "workflow-acao": "tsx src/cli.ts workflow-acao",
     "workflow-editar": "tsx src/cli.ts workflow-editar",
     "formularios": "tsx src/cli.ts formularios",
+    "dashboards": "tsx src/cli.ts dashboards",
     "formulario-acao": "tsx src/cli.ts formulario-acao",
     "formulario-estilo": "tsx src/cli.ts formulario-estilo",
     "anotacoes": "tsx src/cli.ts anotacoes",
