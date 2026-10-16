@@ -559,7 +559,13 @@ test("`dashboard-acao --help` lista as ações e NÃO tem opção de painel púb
   assert.equal(r.status, 0, r.stderr);
   for (const a of ["criar", "editar", "tema", "renomear", "apagar", "restaurar"]) assert.match(r.stdout, new RegExp(a));
   for (const o of ["--confirmo", "--versao-esperada", "--plano", "--tema"]) assert.match(r.stdout, new RegExp(o));
-  assert.doesNotMatch(r.stdout, /p[úu]blic|compartilh|--private|--privado/i);
+  // "publicar" é uma ação (papéis), não visibilidade: só pode aparecer como valor de --acao
+  assert.doesNotMatch(r.stdout, /--publ|--public|--shared|--compartilh|--private|--privado|--visib/i);
+  for (const flag of ["--publico", "--public", "--privado", "--private"]) {
+    const x = spawnSync("npx", ["tsx", "src/cli.ts", "dashboard-acao", "-l", LOC, "--acao", "criar", "--titulo", "t", flag, "--json"], { cwd: RAIZ, encoding: "utf-8" });
+    assert.notEqual(x.status, 0, `${flag} deveria ser recusado pelo parser`);
+    assert.match(x.stderr, /unknown option/i, flag);
+  }
 });
 
 test("dashboard-acao apagar sem -i falha antes de pedir token (saída 1)", () => {
