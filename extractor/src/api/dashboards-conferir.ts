@@ -2,6 +2,7 @@ import type { GhlClient } from "./client.js";
 import { dadosWidget, type WidgetPainel, type Painel } from "./dashboards.js";
 import { listOpportunities } from "./opportunities.js";
 import { listCalendars } from "./calendars.js";
+import { insightsMeta, tokenMeta } from "./meta-ads.js";
 
 /**
  * Conferência: o número que o painel mostra (POST de dados) contra uma recontagem feita aqui pelas
@@ -21,6 +22,8 @@ export interface Item {
   widgetId: string; titulo: string | null; modulo: string | null; resultado: Resultado;
   ghl: Medida | null; recontagem: Medida | null; motivo?: string; filtro: Filtro | null;
   divergencias?: Divergencia[];
+  /** Quem fornece a recontagem; `independente: false` = o GHL conferido contra ele mesmo. */
+  fonte?: "ghl" | "meta"; independente?: boolean; resumo?: string;
 }
 
 const CAL = "https://services.leadconnectorhq.com";
@@ -55,11 +58,14 @@ export function comparar(ghlCru: unknown, recontagem: Medida): {
 
 const DATAS: Record<string, CampoData> = {
   date_added: "date_added", dateAdded: "date_added",
+  createdAt: "date_added", dateCreated: "date_added",
   date_updated: "updated_at", updated_at: "updated_at",
   last_status_change_date: "last_status_change_at", last_status_change_at: "last_status_change_at",
 };
-const CAMPOS = ["status", "pipeline_id", "assigned_to", "appointmentStatus"];
-const AGRUPAR = ["status", "pipeline_id", "assigned_to", "source", "appointmentStatus"];
+const CAMPOS = ["status", "pipeline_id", "assigned_to", "appointmentStatus", "direction", "callStatus", "adAccountId"];
+const AGRUPAR = ["status", "pipeline_id", "assigned_to", "source", "appointmentStatus", "callStatus"];
+// métricas do Graph (anúncios): a soma delas não é valor monetário de oportunidade
+const METRICAS_META = ["spend", "clicks", "impressions", "conversions"];
 
 type No = { group?: string; filters?: No[]; field?: string; operator?: string; value?: unknown };
 
@@ -100,6 +106,7 @@ export function filtroDoWidget(
     let soma = false;
     for (const ag of o.aggregations ?? []) {
       if (ag.operator === "sum" && /^monetary_?value$/i.test(ag.field)) soma = true;
+      else if (ag.operator === "sum" && METRICAS_META.includes(ag.field)) continue;
       else if (ag.operator !== "count") throw new Error(`agregação sem recontagem: ${ag.operator} em ${ag.field}`);
     }
     let grupos: Cond[][] = [];
@@ -189,6 +196,99 @@ export async function recontarAgenda(client: GhlClient, loc: string, f: Filtro):
   return medir(dentro, f, () => 1, (e) => e.appointmentStatus);
 }
 
+/** Só `assigned_to` (um valor, uma alternativa) chega às rotas de busca de contatos e conversas. */
+function atribuido(f: Filtro, rota: string): string | null {
+  if (f.agrupar) throw new Error(`agrupamento sem recontagem em ${rota}: ${f.agrupar}`);
+  const conds = f.grupos.flat();
+  for (const c of conds) if (c.campo !== "assigned_to") throw new Error(`condição sem recontagem em ${rota}: ${c.campo}`);
+  if (f.grupos.length > 1 || conds.length > 1 || (conds[0] && conds[0].valores.length !== 1)) {
+    throw new Error(`assigned_to com várias alternativas sem recontagem em ${rota}`);
+  }
+  return conds[0]?.valores[0] ?? null;
+}
+
+/** POST /contacts/search: o `total` da resposta é o do filtro inteiro, uma página basta. */
+export async function recontarContatos(client: GhlClient, loc: string, f: Filtro): Promise<Medida> {
+  if (f.campoData === "last_status_change_at") throw new Error("campo de data sem recontagem em contatos: last_status_change_at");
+  const dono = atribuido(f, "contatos");
+  const filters: unknown[] = [{ field: f.campoData === "date_added" ? "date_added" : "date_updated", operator: "range", value: { gte: f.inicio, lte: f.fim } }];
+  if (dono) filters.push({ field: "assigned_to", operator: "eq", value: dono });
+  const r = await client.postJson<{ total?: number }>(`${CAL}/contacts/search`, { locationId: loc, pageLimit: 1, page: 1, filters });
+  return { total: Number(r.total ?? 0) };
+}
+
+/** GET /conversations/search: startDate/endDate filtram a criação da conversa; o total vem na resposta. */
+export async function recontarConversas(client: GhlClient, loc: string, f: Filtro): Promise<Medida> {
+  if (f.campoData !== "date_added") throw new Error(`a busca de conversas só filtra criação, não ${f.campoData} (date_updated)`);
+  const dono = atribuido(f, "conversas");
+  const q = new URLSearchParams({ locationId: loc, limit: "1", startDate: String(f.inicio), endDate: String(f.fim) });
+  if (dono) q.set("assignedTo", dono);
+  const r = await client.getJson<{ total?: number }>(`${CAL}/conversations/search?${q}`);
+  return { total: Number(r.total ?? 0) };
+}
+
+/**
+ * POST backend/reporting/calls/get-call-status-summary: contagem por status da chamada. As datas vão em ISO
+ * (ms dá 422). O relatório é do próprio GHL, então esta conferência é o GHL contra o GHL.
+ */
+// O relatório devolve o rótulo de exibição; o widget agrupa pelo valor cru (medido ao vivo na Xb9g).
+const ROTULO_STATUS: Record<string, string> = { Answered: "completed", Missed: "no-answer", Voicemail: "voicemail", Ringing: "ringing", Failed: "failed" };
+export async function recontarLigacoes(client: GhlClient, loc: string, f: Filtro): Promise<Medida> {
+  if (f.grupos.length > 1) throw new Error("ligações com várias alternativas (OR) sem recontagem");
+  const conds = f.grupos[0] ?? [];
+  const valor = (campo: string) => {
+    const v = conds.find((c) => c.campo === campo)?.valores;
+    if (v && v.length !== 1 && campo === "direction") throw new Error("direction com mais de um valor sem recontagem");
+    return v;
+  };
+  const direction = valor("direction")?.[0];
+  const status = valor("callStatus");
+  const r = await client.postJson<{ callStatusStats?: Record<string, { count?: number }> }>(
+    `https://backend.leadconnectorhq.com/reporting/calls/get-call-status-summary?locationId=${loc}`,
+    { locationId: loc, startDate: new Date(f.inicio).toISOString(), endDate: new Date(f.fim).toISOString(), ...(direction ? { direction } : {}) },
+  );
+  const grupos = Object.entries(r.callStatusStats ?? {})
+    .map(([id, v]) => ({ id: ROTULO_STATUS[id] ?? id, value: Number(v.count ?? 0) }))
+    .filter((g) => !status || status.includes(g.id));
+  const total = grupos.reduce((s, g) => s + g.value, 0);
+  return f.agrupar === "callStatus" ? { total, grupos } : { total };
+}
+
+/** BLOQUEADO: nenhum bundle do app (reportingApp, lcEmailApp, emailMarketingApp) traz rota de relatório de e-mail da subconta. */
+export function recontarEmails(_client: GhlClient, _loc: string, _f: Filtro): Promise<Medida> {
+  return Promise.reject(new Error("rota do relatório de e-mail não encontrada (docs/endpoints.md, seção Dashboards)"));
+}
+
+/** Anúncios do Meta: Graph API com o token de AUTOMASTER_META_TOKEN. Conta e métrica saem das options do widget. */
+export async function recontarMetaAds(
+  widget: { options: unknown }, f: Filtro,
+  deps: { env?: Record<string, string | undefined>; fetch?: typeof fetch } = {},
+): Promise<{ ok: true; medida: Medida } | { ok: false; motivo: string }> {
+  const o = (widget.options ?? {}) as { aggregations?: { operator: string; field: string }[]; filters?: No[]; groupBy?: { groupFieldType?: string } };
+  const token = tokenMeta(deps.env);
+  if (!token) return { ok: false, motivo: "defina AUTOMASTER_META_TOKEN para conferir anúncios do Meta" };
+  const achaConta = (n: No): unknown => {
+    for (const c of n.filters ?? []) {
+      const v = c.group ? achaConta(c) : c.field === "adAccountId" ? c.value : undefined;
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  };
+  const conta = [o.filters?.map(achaConta).find((v) => v !== undefined)].flat()[0];
+  if (!conta) return { ok: false, motivo: "widget sem conta de anúncio (adAccountId) escolhida" };
+  const ag = o.aggregations?.[0];
+  const metrica = ag?.operator === "sum" ? ({ spend: "spend", clicks: "clicks", impressions: "impressions", conversions: "leads" } as const)[ag.field as "spend"] : undefined;
+  if (!metrica) return { ok: false, motivo: `agregação sem equivalente no Graph: ${ag?.operator} em ${ag?.field}` };
+  const porDia = o.groupBy?.groupFieldType === "time_series";
+  const r = await insightsMeta({ conta: String(conta), token, inicio: f.inicio, fim: f.fim, fuso: f.fuso, porDia }, deps.fetch);
+  if (!r.ok) return r;
+  const total = r.linhas.reduce((s, l) => s + l[metrica], 0);
+  if (!porDia) return { ok: true, medida: { total } };
+  const por = new Map<string, number>();
+  for (const l of r.linhas) por.set(l.dia ?? "", (por.get(l.dia ?? "") ?? 0) + l[metrica]);
+  return { ok: true, medida: { total, grupos: [...por].map(([id, value]) => ({ id, value })) } };
+}
+
 // ---------- despachante ----------
 
 /** As options salvas não valem como corpo: o app materializa período, fuso e groupBy antes de pedir os números. */
@@ -206,27 +306,43 @@ function materializar(options: unknown, f: Filtro): unknown {
 
 export async function conferirWidget(
   client: GhlClient, loc: string, widget: WidgetPainel, fuso: string, dateRange: Periodo,
+  deps: { env?: Record<string, string | undefined>; fetch?: typeof fetch } = {},
 ): Promise<Item> {
   const base = { widgetId: widget.widgetId, titulo: widget.titulo, modulo: widget.module };
   const sem = (motivo: string, filtro: Filtro | null = null): Item => ({ ...base, resultado: "sem_conferencia", ghl: null, recontagem: null, motivo, filtro });
   if (!widget.apiConfig) return sem("widget sem apiConfig (custom): não há número para conferir");
   const recontar = widget.module === "crm-opportunities" ? recontarOportunidades
-    : widget.module === "automation-appointments" ? recontarAgenda : null;
+    : widget.module === "automation-appointments" ? recontarAgenda
+    : widget.module === "crm-contacts" ? recontarContatos
+    : widget.module === "crm-conversations" ? recontarConversas
+    : widget.module === "revex-calls" ? recontarLigacoes
+    : widget.module === "automation-admanager-fb-ads" ? async (_c: GhlClient, _l: string, f: Filtro) => {
+      const r = await recontarMetaAds(widget, f, deps);
+      if (!r.ok) throw new Error(r.motivo);
+      return r.medida;
+    } : null;
+  if (widget.module === "crm-emails") return sem("rota do relatório de e-mail não encontrada (docs/endpoints.md, seção Dashboards)");
   if (!recontar) return sem("fonte entra numa etapa seguinte");
+  const extra: Partial<Item> = widget.module === "revex-calls"
+    ? { fonte: "ghl", independente: false, resumo: "Conferência GHL contra GHL: o relatório de ligações é do próprio GHL, não uma fonte independente." }
+    : widget.module === "automation-admanager-fb-ads" ? { fonte: "meta", independente: true } : {};
   const fr = filtroDoWidget(widget, fuso, dateRange);
   if (!fr.ok) return sem(fr.motivo);
+  let medida: Medida;
+  try { medida = await recontar(client, loc, fr.filtro); } catch (e) { return sem((e as Error).message, fr.filtro); }
   const cru = await dadosWidget(client, loc, {
     chartType: widget.chartType ?? "", apiConfig: widget.apiConfig, options: materializar(widget.options, fr.filtro),
   });
-  const c = comparar(cru, await recontar(client, loc, fr.filtro));
-  return { ...base, resultado: c.resultado, ghl: c.ghl, recontagem: c.recontagem, filtro: fr.filtro, divergencias: c.divergencias };
+  const c = comparar(cru, medida);
+  return { ...base, resultado: c.resultado, ghl: c.ghl, recontagem: c.recontagem, filtro: fr.filtro, divergencias: c.divergencias, ...extra };
 }
 
 export async function conferirPainel(
   client: GhlClient, loc: string, painel: Painel, fuso: string, dateRange: Periodo,
+  deps: { env?: Record<string, string | undefined>; fetch?: typeof fetch } = {},
 ): Promise<{ itens: Item[]; resumo: Record<Resultado, number> }> {
   const itens: Item[] = [];
-  for (const w of painel.widgets) itens.push(await conferirWidget(client, loc, w, fuso, dateRange));
+  for (const w of painel.widgets) itens.push(await conferirWidget(client, loc, w, fuso, dateRange, deps));
   const resumo = { bate: 0, diverge: 0, sem_conferencia: 0 };
   for (const i of itens) resumo[i.resultado]++;
   return { itens, resumo };

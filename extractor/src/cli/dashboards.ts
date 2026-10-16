@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import {
   listarPaineis, detalhePainel, catalogoWidgets, versoesPainel, dadosWidget, fusoDaSubconta,
-  criarPainel, salvarPainel, apagarPainel, restaurarVersao,
+  criarPainel, salvarPainel, apagarPainel, restaurarVersao, publicarPainel,
 } from "../api/dashboards.js";
 import { validarLayout, validarComposicao, contraste, minimosDoTipo } from "../api/dashboards-layout.js";
 import type { CorpoSalvar } from "../api/dashboards.js";
@@ -131,7 +131,9 @@ export async function runDashboardVer(
 
 // ---------- escrita ----------
 
-const ACOES_ESCRITA = ["criar", "editar", "tema", "renomear", "apagar", "restaurar"];
+const ACOES_ESCRITA = ["criar", "editar", "tema", "renomear", "apagar", "restaurar", "publicar"];
+const PAPEIS = ["account_admin", "account_user"];
+const ACESSOS = ["read", "write"];
 // Lista fixa do que o app manda ao criar um widget (copiada do molde); o resto o servidor preenche.
 const CAMPOS_WIDGET_NOVO = ["hasTrimmedFilters", "identifier", "className", "module", "moduleName", "eventSource", "group", "title", "chartType", "options", "savedOptionPairs", "locationId", "extras", "apiConfig", "externalDataConfig"];
 const objectId = () => randomBytes(12).toString("hex");
@@ -150,7 +152,7 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 
 interface OpcoesAcao {
   location: string; acao: string; id?: string; titulo?: string; plano?: string; tema?: string;
-  versao?: number | string; versaoEsperada?: number | string; confirmo?: boolean; json?: boolean;
+  versao?: number | string; versaoEsperada?: number | string; papeis?: string; forcar?: boolean; confirmo?: boolean; json?: boolean;
 }
 interface PlanoEdicao {
   criar?: { id: string; titulo?: string; options?: Record<string, any>; molde?: Record<string, any> }[];
@@ -162,6 +164,18 @@ interface PlanoEdicao {
 function lerPlano(texto: string | undefined): PlanoEdicao {
   if (!texto) throw new Error("--acao editar exige --plano <json|arquivo>");
   return JSON.parse(fs.existsSync(texto) ? fs.readFileSync(texto, "utf-8") : texto);
+}
+
+/** O último `dashboard-conferir` gravado no rastro do painel: o de maior `em` entre os de acao=conferir. */
+function ultimoConferir(loc: string, id: string): { diverge: number } | null {
+  const dir = path.join(DUMPS_DIR, "_dashboards", loc, id);
+  if (!fs.existsSync(dir)) return null;
+  let melhor: { em: string; diverge: number } | null = null;
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+    const j = JSON.parse(fs.readFileSync(path.join(dir, f), "utf-8"));
+    if (j.acao === "conferir" && (!melhor || j.em > melhor.em)) melhor = { em: j.em, diverge: j.resumo?.diverge ?? 0 };
+  }
+  return melhor;
 }
 
 const exigeId = (o: OpcoesAcao) => {
@@ -293,6 +307,21 @@ export async function executarDashboardAcao(
       idsServidor = new Map((await detalhePainel(client, loc, id)).widgets.map((w) => [w.widgetId, w.dashboardWidgetId ?? w.widgetId]));
       return enviar({ ...corpo, activityBuffer: {}, layout: posicionar, version: v });
     };
+  } else if (o.acao === "publicar") {
+    if (!o.papeis) throw new Error("--acao publicar exige --papeis account_admin:read,account_user:read");
+    const acessos = o.papeis.split(",").map((p) => {
+      const [role, access] = p.trim().split(":");
+      if (!PAPEIS.includes(role) || !ACESSOS.includes(access)) {
+        throw new Error(`papel inválido: "${p}". Use papel:acesso com papel em ${PAPEIS.join("|")} e acesso em ${ACESSOS.join("|")}`);
+      }
+      return { role, permission: access };
+    });
+    mudancas.push(...acessos.map((a) => `${a.role} passa a ver o painel "${painel.titulo}" (${a.permission})`));
+    const c = ultimoConferir(loc, id);
+    if (c && c.diverge > 0 && !o.forcar) {
+      problemas.push({ codigo: "diverge", mensagem: `o último dashboard-conferir achou ${c.diverge} widget(s) que diverge(m): corrija o filtro ou use --forcar` });
+    }
+    escrever = () => publicarPainel(client, loc, id, acessos);
   } else if (o.acao === "apagar") {
     mudancas.push(`apagar o painel "${painel.titulo}"`);
     escrever = () => apagarPainel(client, loc, id, painel.__v);
@@ -337,6 +366,11 @@ export async function runDashboardConferir(opts: { location: string; id?: string
     const painel = await detalhePainel(client, opts.location, opts.id!);
     const fuso = await fusoDaSubconta(client, opts.location);
     const r = await conferirPainel(client, opts.location, painel, fuso, dateRange);
+    // leitura: o rastro é escrito direto (registroEscrita marcaria o envelope como escrita)
+    const dir = path.join(DUMPS_DIR, "_dashboards", opts.location, opts.id!);
+    fs.mkdirSync(dir, { recursive: true });
+    const em = new Date().toISOString();
+    fs.writeFileSync(path.join(dir, `${em.replace(/[:.]/g, "-")}-conferir.json`), JSON.stringify({ em, acao: "conferir", resumo: r.resumo }, null, 2));
     emitir(opts.json, { ...r, periodo: dateRange, fuso, segundos: (Date.now() - t0) / 1000 });
   });
 }
@@ -369,15 +403,17 @@ export function registrarDashboards(program: Command): void {
     .action((o) => runDashboardVer(o).then(() => undefined).catch(falhar));
   program
     .command("dashboard-acao")
-    .description("ESCREVE painel privado: criar | editar | tema | renomear | apagar | restaurar. Sem --confirmo é só prévia")
+    .description("ESCREVE painel privado: criar | editar | tema | renomear | apagar | restaurar | publicar. Sem --confirmo é só prévia")
     .requiredOption("-l, --location <id>", "locationId da subconta")
-    .requiredOption("--acao <acao>", "criar | editar | tema | renomear | apagar | restaurar")
+    .requiredOption("--acao <acao>", "criar | editar | tema | renomear | apagar | restaurar | publicar")
     .option("-i, --id <id>", "id do painel (todas menos criar)")
     .option("--titulo <texto>", "título (criar, renomear)")
     .option("--plano <json|arquivo>", "editar: {criar:[{id,titulo,molde}],atualizar:[],remover:[],layout:[{id,x,y,w,h}]}")
     .option("--tema <json>", "tema: cores #RRGGBB (titleColor, backgroundColor, baseColor, metricColor, linkColor)")
     .option("--versao <n>", "restaurar: versão para a qual voltar")
     .option("--versao-esperada <n>", "versão que a prévia mostrou (obrigatória com --confirmo)")
+    .option("--papeis <lista>", "publicar: papel:acesso separados por vírgula (account_admin:read,account_user:read)")
+    .option("--forcar", "publicar mesmo com o último dashboard-conferir divergente")
     .option("--confirmo", "grava de verdade; sem isso é só prévia")
     .option("--json", "imprime o resultado em JSON no stdout")
     .action((o) => runDashboardAcao(o).catch(falhar));

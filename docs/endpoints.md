@@ -1546,6 +1546,20 @@ Etapa 3, provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 3` privad
   para investigar; o comando não o expõe).
 - O painel padrão (`isDefault`) recusa `editar` e `apagar` no comando, na prévia e na gravação.
 
+### Publicar (etapa 8)
+
+`dashboard-acao --acao publicar -i <id> --papeis account_admin:read,account_user:read --versao-esperada <n> [--forcar] --confirmo`.
+Provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 8` privado, publicado e apagado na mesma prova.
+
+- `POST /dashboards/<id>/permissions?locationId` com `{locationId, isPrivate:false, permissionAccess:[{role, permission}]}` -> 200
+  `{"message":"Successfully updated permissions","data":null}`. **A chave do acesso é `permission`, não `access`**: com `access`
+  o servidor responde `422 permissionAccess.0.permission must be a valid enum value`. Chave extra (`access`) é ignorada.
+- Enum de `permission` aceito: `read`, `write` (`view`, `viewer`, `VIEW`, `edit` dão 422). `role` aceito: `account_admin`, `account_user`.
+- `GET /dashboards/<id>/permissions?locationId` -> `data = {permission:[{role,permission}], isPrivate, dashboardOwner}`; depois do POST
+  mostra `isPrivate:false` e a lista enviada (a lista é substituída, não mesclada). O POST não sobe o `__v` do painel.
+- Guarda: `dashboard-conferir` grava `_dashboards/<loc>/<id>/<carimbo>-conferir.json` `{em, acao:"conferir", resumo}`; `publicar` recusa
+  se o de maior `em` tem `resumo.diverge > 0` (a prévia lista o mesmo em `problemas`), salvo `--forcar`.
+
 ### Conferência (etapa 5)
 
 `npm run dashboard-conferir -- -l <loc> -i <painel> [--dias 30] --json` compara o número de cada widget (POST
@@ -1569,3 +1583,47 @@ calendário por widget, 8 calendários, rate limit).
   Reconferido ao vivo: 51 = 51, `bate`.
 - Widgets agrupados por campo personalizado, `lost_reason_id` ou série de tempo, e os custom, saem
   `sem_conferencia` com o motivo.
+
+### Conferência: contatos novos e conversas (etapa 6)
+
+Painel `ZZ TESTE AUTOMASTER etapa 6` privado na Xb9g (nenhum painel real tinha widget de `crm-contacts` nem de
+`crm-conversations`), dois cartões numéricos, janela de 15 dias, apagado no fim. Widgets criados com `module`
+`crm-contacts`/`crm-conversations`, `apiConfig.path` `/dashboards/crm/contacts` e `/dashboards/crm/conversations`
+(`group`/`identifier` `<módulo>-count`; o servidor aceitou). Contatos novos: GHL 33, recontagem 33, `bate`.
+Conversas: GHL 459, recontagem 97, `diverge`.
+
+- **`POST services.leadconnectorhq.com/contacts/search`** `{locationId, pageLimit:1, page:1, filters:[{field:"date_added",
+  operator:"range", value:{gte:<ms>, lte:<ms>}}, {field:"assigned_to", operator:"eq", value:<userId>}]}` -> `{contacts,
+  total}`. O `total` é o do filtro inteiro, então uma chamada basta. `range` é inclusivo e `gte == lte` dá 422; o campo
+  é `date_added` (`dateAdded` dá 422) e a atualização é `date_updated`.
+- **`GET services.leadconnectorhq.com/conversations/search?locationId&limit=1&startDate=<ms>&endDate=<ms>[&assignedTo]`** ->
+  `{conversations, total}`. `startDate`/`endDate` filtram a CRIAÇÃO da conversa; não há filtro por atualização.
+- **Divergência real em conversas**: o widget conta como "Atividade" as conversas cuja última mensagem é de atividade
+  (459 - 97 = 362 na janela; 456 - 94 = 362 em 01 a 15/10, o mesmo número) e a busca nunca as devolve
+  (`lastMessageType=TYPE_ACTIVITY_*` dá 0). Em um dia sem essas conversas (15/10) bate, 4 x 4. Não é erro de filtro: o
+  item continua `diverge`. `messages/export` dá 401 com os tokens da sessão.
+- Sem recontagem (`sem_conferencia` com o motivo, sem consultar a busca): agrupamento, condição fora de `assigned_to`,
+  mais de uma alternativa OR ou mais de um valor, `last_status_change_at` em contatos e atualização em conversas.
+
+### Conferência: e-mail, ligações e anúncios do Meta (etapa 7)
+
+Provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 7` privado (apagado no fim). Bundles lidos: `reportingApp` build 306
+(129 chunks async), `lcEmailApp` 1966, `emailMarketingApp` 6, via `production.app-manifest.leadconnectorhq.com/latest/manifest.json`.
+
+- **Ligações:** `POST https://backend.leadconnectorhq.com/reporting/calls/get-call-status-summary?locationId=<loc>`, corpo
+  `{locationId, startDate, endDate[, direction]}` com datas ISO (`new Date(ms).toISOString()`; ms dá 422). Resposta
+  `{callStatusStats:{<status>:{count,change}}, callDurationSummary}`. **As chaves de `callStatusStats` são rótulos de exibição**
+  (`Answered`, `Missed`, `Voicemail`, `Ringing`, `Failed`); o widget agrupa pelo valor cru (`completed`, `no-answer`, `voicemail`,
+  `ringing`, `failed`). `recontarLigacoes` traduz esses cinco. Total bate: 69 (365 dias) e 170 (1500 dias) na Xb9g, direction `inbound`.
+- É o GHL contra o GHL: o item sai com `fonte:"ghl"`, `independente:false` e `resumo` dizendo isso.
+- **E-mail: rota NÃO encontrada.** O prefixo `reporting/emails` (`EmailReportingService`) existe no serviço-base, mas nenhum chunk do
+  `reportingApp` o usa; `lcEmailApp` e `emailMarketingApp` não têm rota de relatório de conta (só `/__live/report/<campanha>`,
+  por campanha). Cerca de 170 caminhos sob `/reporting/emails/` (`get-email-*`, `stats`, `summary`, `overview`, `metrics`...) deram
+  404 com POST. A única rota de e-mail do reportingApp é `GET email-isv/analytics/email/health-report-data?locationId&startDate&endDate`
+  (widget `email-health-report`): responde `400 LESS_THAN_500_EMAILS_SENT` na Xb9g e traz taxas de saúde, não contagem. Pendente:
+  capturar a aba Network de uma tela de relatório de e-mail; widgets `crm-emails` saem `sem_conferencia` com esse motivo.
+- **Meta:** `GET https://graph.facebook.com/v21.0/act_<id>/insights?fields=spend,impressions,clicks,actions&time_range={since,until}
+  &access_token=` (`time_increment=1` com groupBy por dia; datas locais no fuso da subconta). `spend` vem em reais; leads =
+  `actions` com `action_type` exatamente `lead`. Erro `code` 100/200 = token sem acesso à conta. Token só em `AUTOMASTER_META_TOKEN`.
+- **Pendência:** sem token no ambiente, a prova foi o `sem_conferencia` com `defina AUTOMASTER_META_TOKEN`. Conferência com token
+  real (widget `automation-admanager-fb-ads`, conta `act_589801984042614`) não foi exercitada; o Ad Manager do GHL na Xb9g está desconectado.

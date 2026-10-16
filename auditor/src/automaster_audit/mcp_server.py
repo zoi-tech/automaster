@@ -34,6 +34,9 @@ from .mcp import (
     oportunidades as _m_oportunidades,
 )
 from .mcp import (
+    paineis as _m_paineis,
+)
+from .mcp import (
     tags as _m_tags,
 )
 from .mcp import (
@@ -63,6 +66,7 @@ TOOLS = {
     **_m_formularios.TOOLS,
     **_m_workflows.TOOLS,
     **_m_emails.TOOLS,
+    **_m_paineis.TOOLS,
 }
 
 # Re-export: a tool é chamada por nome a partir daqui, e os testes também.
@@ -73,6 +77,7 @@ from .mcp.dump import achados, buscar, comparar, dumps, inventario, jornada, wor
 from .mcp.emails import modelos_email  # noqa: F401
 from .mcp.formularios import formulario_acao, formulario_estilo, formularios  # noqa: F401
 from .mcp.oportunidades import oportunidade_acao, oportunidades, pipeline  # noqa: F401
+from .mcp.paineis import dashboard_acao, dashboard_conferir, dashboard_ver, dashboards  # noqa: F401
 from .mcp.tags import tag_acao, tags  # noqa: F401
 from .mcp.workflows import (  # noqa: F401  # noqa: E402,F401
     _WF_EDITAR_COM_CORPO,

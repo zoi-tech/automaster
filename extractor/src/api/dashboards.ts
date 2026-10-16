@@ -139,3 +139,12 @@ export async function apagarPainel(client: GhlClient, loc: string, id: string, v
 export async function restaurarVersao(client: GhlClient, loc: string, id: string, v: number | string): Promise<unknown> {
   return client.postJson(`${BASE}/dashboards/${enc(id)}/versions/${enc(String(v))}/restore?locationId=${enc(loc)}`, {});
 }
+
+/** Torna o painel visível: `isPrivate:false` e o acesso de cada papel pedido (só eles). */
+export async function publicarPainel(
+  client: GhlClient, loc: string, id: string, papeis: { role: string; permission: string }[],
+): Promise<unknown> {
+  return client.postJson(`${BASE}/dashboards/${enc(id)}/permissions?locationId=${enc(loc)}`, {
+    locationId: loc, isPrivate: false, permissionAccess: papeis,
+  });
+}
