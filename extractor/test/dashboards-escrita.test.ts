@@ -328,7 +328,7 @@ test("editar aceita --plano como caminho de arquivo", async () => {
   const arq = path.join(HOME, "plano.json");
   fs.writeFileSync(arq, plano(planoValido));
   await executarDashboardAcao(client, { ...base, acao: "editar", plano: arq } as never);
-  assert.equal(escritas().length, 1);
+  assert.equal(escritas().length, 2); // widget novo: 1º PUT cria, 2º posiciona
 });
 
 test("widget novo sem molde erra mandando copiar um widget do mesmo tipo", async () => {
