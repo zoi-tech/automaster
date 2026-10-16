@@ -132,7 +132,7 @@ export async function runDashboardVer(
       emitir(opts.json, { login: "ok" });
       return vazio;
     }
-    await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/dashboard?dashboardId=${opts.id}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/dashboard/${opts.id}`, { waitUntil: "domcontentloaded" });
     if (page.url().includes("/login")) {
       throw new ErroSessao("login_pendente", "o perfil de tela não está logado: rode npm run dashboard-ver -- --login");
     }

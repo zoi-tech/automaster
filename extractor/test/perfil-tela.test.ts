@@ -23,7 +23,7 @@
  *       - Entra na fila de escrita (`entrarNaFila(caminhosDaSessao().escrita, log)`) ANTES de
  *         chamar `abrir`, solta no fim; chama `abrir({ visivel: !!opts.login })` e SEMPRE `fechar()`
  *         do que `abrir` devolveu, inclusive no erro.
- *       - Normal: `page.goto("https://app.gohighlevel.com/v2/location/<loc>/dashboard?dashboardId=<id>",
+ *       - Normal: `page.goto("https://app.gohighlevel.com/v2/location/<loc>/dashboard/<id>",
  *         { waitUntil não pode ser "networkidle" })`; se `page.url()` contém "/login", rejeita com
  *         erro de `codigo === "login_pendente"` e mensagem com "npm run dashboard-ver -- --login".
  *         Senão `page.waitForSelector(<seletor de widget>, { timeout <= 40000 })`, mede/rola o painel
@@ -236,7 +236,7 @@ test("carrega a rota exata do painel, sem networkidle, e espera seletor de widge
   limpar();
   const a = montar();
   await runDashboardVer({ location: "LOC1", id: "PNL1" }, a.abrir as any);
-  assert.equal(a.chamadas.goto[0]!.url, "https://app.gohighlevel.com/v2/location/LOC1/dashboard?dashboardId=PNL1");
+  assert.equal(a.chamadas.goto[0]!.url, "https://app.gohighlevel.com/v2/location/LOC1/dashboard/PNL1");
   assert.notEqual(a.chamadas.goto[0]!.opts?.waitUntil, "networkidle");
   assert.ok(a.chamadas.seletor.length >= 1, "não esperou widget");
   for (const s of a.chamadas.seletor) {

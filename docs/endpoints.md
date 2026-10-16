@@ -1520,7 +1520,8 @@ CLI: `npm run dashboards -- -l <loc> -o lista|detalhe|catalogo|versoes|dados|fus
 ### Captura do painel (`dashboard-ver`)
 
 Provado ao vivo na Xb9g em 2026-10-16. A página é
-`https://app.gohighlevel.com/v2/location/<loc>/dashboard?dashboardId=<id>`. Cada widget é um
+`https://app.gohighlevel.com/v2/location/<loc>/dashboard/<id>`. Com `?dashboardId=<id>` o app
+ignora o id e abre o painel padrão (ou o último aberto), sem erro nenhum. Cada widget é um
 `.grid-stack-item` (GridStack); o tipo vem na classe `dashboard-widget-type-<chartType>` e o módulo
 em `dashboard-widget-module-<module>`. Os seletores de espera `.location-dashboard-numeric-card` e
 `.chart-container` aparecem já na primeira dobra, mas não cobrem todo tipo, então a contagem é por
