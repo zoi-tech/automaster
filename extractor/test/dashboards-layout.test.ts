@@ -108,10 +108,10 @@ test("sobreposicao: objectWidget entra na conta como qualquer widget", () => {
   assert.ok(codigos(p).includes("sobreposicao"));
 });
 
-test("abaixo_do_minimo: numeric aceita 3x4 e recusa w 2 ou h 3", () => {
-  assert.deepEqual(validarLayout([it("n", 0, 0, 3, 4, "numeric")]), []);
-  assert.ok(codigos(validarLayout([it("n", 0, 0, 2, 4, "numeric")])).includes("abaixo_do_minimo"));
-  assert.ok(codigos(validarLayout([it("n", 0, 0, 3, 3, "numeric")])).includes("abaixo_do_minimo"));
+test("abaixo_do_minimo: numeric aceita 3x3 (provado ao vivo) e recusa w 2 ou h 2", () => {
+  assert.deepEqual(validarLayout([it("n", 0, 0, 3, 3, "numeric")]), []);
+  assert.ok(codigos(validarLayout([it("n", 0, 0, 2, 3, "numeric")])).includes("abaixo_do_minimo"));
+  assert.ok(codigos(validarLayout([it("n", 0, 0, 3, 2, "numeric")])).includes("abaixo_do_minimo"));
 });
 
 test("abaixo_do_minimo: table exige 6x6", () => {
