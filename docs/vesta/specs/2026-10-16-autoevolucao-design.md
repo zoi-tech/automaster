@@ -89,13 +89,15 @@ imperativa, opcional), `duplicata_de` (número de issue, opcional), `nova` (bool
   esperada, prévia que precisa ser repetida.
 - `argumento` — valor inválido ou faltando no que o Claude mandou.
 - `nao_encontrado` — subconta, dump, snapshot ou item que não existe.
+- `ambiente` — falta algo na máquina (extractor não provisionado, Python, `node`).
 - `extractor:<code>` — falha vinda do envelope do extractor, com o código dele
-  (`login_pendente`, `sessao_indisponivel`, `http_NNN`, `erro`). `_run_extractor` preenche.
+  (`login_pendente`, `sessao_indisponivel`, `http_NNN`, `erro`), ou `extractor:timeout`
+  quando o comando estoura 600 s. `_run_extractor` preenche.
 - `falha` — defeito do próprio automaster.
 
 O registro automático relata só `falha`, `extractor:http_*`, `extractor:erro` e a exceção
-inesperada (abaixo). `guarda`, `argumento`, `nao_encontrado`, `extractor:login_pendente` e
-`extractor:sessao_indisponivel` não viram relato automático; se forem sinal de problema
+inesperada (abaixo). `guarda`, `argumento`, `nao_encontrado`, `ambiente`, `extractor:login_pendente`,
+`extractor:sessao_indisponivel` e `extractor:timeout` não viram relato automático; se forem sinal de problema
 (guarda que trava o uso certo, argumento confuso), a revisão da conversa pega com contexto.
 `TypeError` (o Claude mandou argumento que a tool não conhece) vira `dificuldade`, porque
 costuma indicar descrição de tool confusa. Pesquisa A4.
@@ -177,13 +179,21 @@ a lista aparecer.
 
 ## Limpeza dos ids já publicados
 
-Os docs versionados do repositório público já têm ids reais de subconta e de workflow de
-clientes (`docs/backlog-arquitetura.md:55`, `:86`;
-`docs/vesta/research/2026-10-09-sessao-de-fundo-research.md:228`, pesquisa A13). Uma etapa
-própria troca esses ids, e qualquer outro id real de cliente achado em `docs/`, `CLAUDE.md`,
-`skills/` e `CHANGELOG.md`, por marcadores (`<loc-cliente>`, `<workflow>`). A subconta de
-teste `idTeste0000000000004` fica. O histórico do git continua com os ids; reescrever
-histórico está fora.
+O repositório público tem ids reais de subconta, contato e workflow em uns 25 arquivos
+versionados: `docs/` (endpoints, planos, pesquisas e mockups da Vesta), `CHANGELOG.md`,
+`skills/automaster-leitura/SKILL.md`, testes do extractor e o cassete do CI
+(`extractor/test/fixtures/api-forma.json`). Pesquisa A13, ampliada na fase de plano.
+
+Uma etapa própria troca cada id real por um marcador no padrão que a versão pública já usa,
+`idTeste` seguido de zeros e número até 20 caracteres (`idTeste0000000000058`, o próximo
+livre), o mesmo id real virando sempre o mesmo marcador em todos os arquivos. Vale também
+para a subconta da ZOI. Testes e cassete continuam passando depois da troca.
+
+Um teste novo falha se entrar no repositório um id com cara de GHL que não seja marcador:
+20 caracteres alfanuméricos com pelo menos uma maiúscula, uma minúscula e um dígito, fora do
+padrão `idTeste`. Exceções legítimas ficam numa lista no próprio teste.
+
+O histórico do git continua com os ids; reescrever histórico está fora.
 
 ## Fora de escopo
 
@@ -215,8 +225,10 @@ plugin ou do Claude Code.
   inteira falhar.
 - **A11, A12** — mantido: filtro antes de publicar, mascarando a mais; assinatura em hex
   curto que o filtro não toca. Motivo: edição não apaga o histórico da issue.
-- **A13** — limpeza dos ids de cliente já publicados entra nesta feature, numa etapa
-  própria, sem reescrever histórico. Motivo: decisão do usuário.
+- **A13** — limpeza dos ids reais já publicados entra nesta feature, numa etapa própria,
+  em todo o repositório (docs, skill, CHANGELOG, testes, cassete), com teste que barra id
+  novo, sem reescrever histórico. Motivo: decisão do usuário; o escopo subiu de 3 docs para
+  uns 25 arquivos quando o plano mediu.
 - **A14** — `fcntl.flock` em volta da publicação. Motivo: sessões paralelas abririam a
   mesma issue duas vezes.
 - **A15** — matcher do `SessionStart` passa a `startup|clear|resume|compact`. Motivo: depois
