@@ -55,6 +55,8 @@ type Lancar = (
     handleSIGTERM: boolean;
     handleSIGINT: boolean;
     handleSIGHUP: boolean;
+    args?: string[];
+    ignoreDefaultArgs?: string[];
   },
 ) => Promise<BrowserContext>;
 
@@ -73,6 +75,8 @@ export class ChromeDeFundo implements Navegador {
     private readonly log: (m: string) => void,
     private readonly lancar: Lancar = (p, op) => chromium.launchPersistentContext(p, op),
     private readonly comandoDe: (pid: number) => string | null = comandoDoPid,
+    // onde gravar a sessão do GHL (cookies e localStorage) para o Playwright MCP importar; sem ele, não grava
+    private readonly arquivoEstado?: string,
   ) {}
 
   private async abrir(comJanela: boolean): Promise<void> {
@@ -102,6 +106,8 @@ export class ChromeDeFundo implements Navegador {
       handleSIGTERM: false,
       handleSIGINT: false,
       handleSIGHUP: false,
+      // o Google recusa login OAuth em navegador com a marca de automação (`--enable-automation`): sem ela, a janela de login aceita "Sign in with Google"
+      ...(comJanela ? { ignoreDefaultArgs: ["--enable-automation"], args: ["--disable-blink-features=AutomationControlled"] } : {}),
     });
     this.contexto = contexto;
     this.comJanela = comJanela;
@@ -142,9 +148,26 @@ export class ChromeDeFundo implements Navegador {
     this.navegacoes++;
     this.ultima = { em: new Date().toISOString(), url: pagina.url() };
     const completos = { ...tokens, cookies: await cabecalhosCookie(contexto), userAgent: uaDoPerfil(this.perfil) };
+    if (this.arquivoEstado) await this.gravarEstado(contexto, this.arquivoEstado);
     // parado de verdade entre capturas: a SPA do GHL não fica rodando (e navegando) sozinha
     await pagina.goto("about:blank").catch(() => {});
     return completos;
+  }
+
+  /** Só cookies e origens do GHL, 0600, escrita atômica. Falha vira linha no log, não derruba a captura. */
+  private async gravarEstado(contexto: BrowserContext, arquivo: string): Promise<void> {
+    try {
+      const estado = await contexto.storageState();
+      const doGhl = (dominio: string) => /gohighlevel\.com|leadconnectorhq\.com/.test(dominio);
+      const cookies = estado.cookies.filter((c) => doGhl(c.domain));
+      const origins = estado.origins.filter((o) => doGhl(new URL(o.origin).hostname));
+      const tmp = `${arquivo}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify({ cookies, origins }), { mode: 0o600 });
+      fs.chmodSync(tmp, 0o600);
+      fs.renameSync(tmp, arquivo);
+    } catch (e) {
+      this.log(`não gravei a sessão em ${arquivo}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async capturar(subconta: string): Promise<Tokens> {
@@ -196,7 +219,7 @@ export class ChromeDeFundo implements Navegador {
       if (e instanceof SemTokens) {
         throw new ErroSessao(
           "login_pendente",
-          "O GHL pediu login e ninguém entrou na janela do Chrome em 4 min e meio. Faça login nela (e-mail e senha ou Google) e repita.",
+          "O GHL pediu login e ninguém entrou na janela do Chrome em 4 min e meio. Faça login nela com e-mail e senha (o Google recusa login feito na janela automatizada) e repita.",
         );
       }
       throw e;

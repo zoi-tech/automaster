@@ -23,7 +23,7 @@ usa perfil e login próprios.
 - **Prazo:** o pedido de tokens pode levar até uns 5 min quando o GHL pede login (janela
   aberta). Use timeout de pelo menos 330 s e não repita o pedido por tempo esgotado: cada
   repetição abriria outra espera de login.
-- **Regras:** nunca gravar os tokens em disco; nunca abrir `~/.automaster/chrome-profile` em
+- **Regras:** nunca gravar os tokens em disco (a sessão do GHL, cookies e localStorage do GHL, vai para `~/.automaster/sessao/estado-ghl.json` com 0600); nunca abrir `~/.automaster/chrome-profile` em
   outro Chrome; o processo morre após 4 h sem pedido e sobe de novo no próximo.
 - **Exemplo:**
   `curl -s --unix-socket ~/.automaster/sessao/sock -X POST -H 'content-type: application/json' -d '{"subconta":"<locationId>"}' http://fundo/tokens`

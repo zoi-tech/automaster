@@ -25,9 +25,12 @@ export async function cabecalhosCookie(
   return r;
 }
 
-/** Diretório do perfil persistente do Chrome (fora do repo). */
+/**
+ * Diretório do perfil persistente do Chrome (fora do repo). `AUTOMASTER_PERFIL` troca o caminho
+ * (ex.: para apontar outra ferramenta ao mesmo perfil); o processo de fundo e os comandos usam o mesmo.
+ */
 export function defaultUserDataDir(): string {
-  return path.join(os.homedir(), ".automaster", "chrome-profile");
+  return process.env.AUTOMASTER_PERFIL || path.join(os.homedir(), ".automaster", "chrome-profile");
 }
 
 /**

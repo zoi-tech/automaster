@@ -31,6 +31,7 @@ test("caminhosDaSessao(dir) põe socket, log, logins e trava de escrita dentro d
     log: path.join(dir, "fundo.log"),
     logins: path.join(dir, "logins.jsonl"),
     escrita: path.join(dir, "escrita.lock"),
+    estado: path.join(dir, "estado-ghl.json"),
   });
 });
 

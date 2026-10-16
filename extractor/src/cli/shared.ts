@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { entrarNaFila } from "../auth/lock.js";
 import type { Tokens } from "../auth/token.js";
@@ -8,7 +9,8 @@ import { opcoesPadrao, renovarNoFundo, tokensDoFundo } from "../fundo/cliente.js
 import { caminhosDaSessao } from "../fundo/comum.js";
 import { marcarRastro } from "../saida.js";
 
-export const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.resolve(process.cwd(), "..", "dumps");
+// Mesmo default do auditor (`mcp/base.py:_root`): extrair e ler têm de apontar para a mesma pasta.
+export const DUMPS_DIR = process.env.AUTOMASTER_DUMPS || path.join(os.homedir(), ".automaster", "dumps");
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 

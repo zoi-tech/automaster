@@ -40,7 +40,7 @@ export function opcoesPadrao(log: (m: string) => void): OpcoesFundo {
     // vale para `.ts` com tsx e para `.js` no dist
     main: fileURLToPath(new URL(`./main${path.extname(aqui)}`, import.meta.url)),
     // AUTOMASTER_PERFIL existe só para a prova ao vivo usar um perfil descartável
-    perfil: process.env.AUTOMASTER_PERFIL || defaultUserDataDir(),
+    perfil: defaultUserDataDir(),
     versao: impressaoDigital(),
     esperaSubidaMs: PRAZOS.subidaMs,
     avisoMs: 5_000,

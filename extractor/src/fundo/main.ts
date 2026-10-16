@@ -15,7 +15,7 @@ executarFundo({
   perfil: p,
   versao: impressaoDigital(),
   log,
-  navegador: new ChromeDeFundo(p, caminhos.logins, log),
+  navegador: new ChromeDeFundo(p, caminhos.logins, log, undefined, undefined, caminhos.estado),
 }).catch((e: unknown) => {
   log(`não subiu: ${e instanceof Error ? e.message : String(e)}`);
   process.exit(1);

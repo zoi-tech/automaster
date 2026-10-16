@@ -4,6 +4,22 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.29.0 — extração grava onde o MCP lê; perfil configurável; login Google na janela
+
+- **Extração grava em `~/.automaster/dumps`** quando `AUTOMASTER_DUMPS` não está definido, o mesmo
+  default do MCP. Antes, a CLI gravava em `<repo>/dumps` quando rodada de dentro de `extractor/`,
+  e as tools liam um snapshot antigo (issue #4).
+- **`AUTOMASTER_PERFIL`** troca o caminho do perfil do Chrome também para o `discover` e para o
+  `sessao status` (antes só o cliente do processo de fundo lia a variável).
+- **Sessão do GHL exportada** para `~/.automaster/sessao/estado-ghl.json` (0600) depois de cada captura
+  bem-sucedida: só cookies e localStorage dos domínios do GHL, para o Playwright MCP importar com
+  `storageState`. Não é o perfil compartilhado, porque dois Chromes não abrem o mesmo perfil ao mesmo
+  tempo. Isto grava cookies de sessão em disco; o CLAUDE.md foi ajustado para dizer isso (issue #3).
+- **Janela de login sem a marca de automação** (`--enable-automation` removida, `AutomationControlled`
+  desligado), para o Google aceitar "Sign in with Google". Não verificado contra o Google ainda
+  (issue #2). A mensagem de `login_pendente` agora manda usar e-mail e senha.
+- Erro de perfil aberto por outro Chrome já existe desde a 0.28.0; a issue #1 segue esse caminho.
+
 ## 0.28.0 — sessão de fundo: um Chrome invisível para todos os comandos ao vivo
 
 - **Processo de fundo dono do perfil** `~/.automaster/chrome-profile`: mantém um Chrome

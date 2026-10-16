@@ -13,6 +13,7 @@ export interface Caminhos {
   log: string;
   logins: string;
   escrita: string;
+  estado: string;
 }
 
 export const PRAZOS = {
@@ -46,6 +47,7 @@ export function caminhosDaSessao(dir = path.join(os.homedir(), ".automaster", "s
     log: path.join(dir, "fundo.log"),
     logins: path.join(dir, "logins.jsonl"),
     escrita: path.join(dir, "escrita.lock"),
+    estado: path.join(dir, "estado-ghl.json"),
   };
 }
 

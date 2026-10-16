@@ -89,8 +89,10 @@ def _versoes() -> dict[str, str]:
 
 
 @pytest.mark.parametrize("arquivo", [".claude-plugin/plugin.json", "extractor/package.json", "auditor/pyproject.toml"])
-def test_versao_e_0_28_0(arquivo):
-    assert _versoes()[arquivo] == "0.28.0", f"{arquivo} está em {_versoes()[arquivo]}, esperado 0.28.0"
+def test_versao_e_0_28_0_ou_mais(arquivo):
+    # a sessão de fundo entrou na 0.28.0; as versões seguintes só sobem, e test_versoes.py garante que andam juntas
+    atual = tuple(int(p) for p in _versoes()[arquivo].split("."))
+    assert atual >= (0, 28, 0), f"{arquivo} está em {_versoes()[arquivo]}, esperado 0.28.0 ou mais"
 
 
 @pytest.mark.parametrize("termo", ["0.12.0", "0.22.0", "fila", "processo de fundo"])
