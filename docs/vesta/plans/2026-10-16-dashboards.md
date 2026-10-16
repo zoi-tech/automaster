@@ -480,7 +480,14 @@ um grill-me, com perguntas tiradas de uma leitura a fundo da subconta.
   achou (funil, agenda, origem, vendedores, conversas, formulários, anúncios quando houver), com
   mistura de números, tendências, funil, tabela e ranking; números do topo baixos (altura 3, no
   máximo 4); seções por tema com título de seção (`objectWidget`).
-- `validarComposicao` ganha `painel_simploria` (menos de 12 widgets) e `numero_alto_demais`
+- Cara profissional, não amadora (pedido explícito do usuário): o painel abre com um cabeçalho
+  (título do painel e o período), cada seção tem título e separação visual (objetos de layout do
+  GHL: texto/título e divisor, `chartType` `objectWidget`; os tipos exatos saem do catálogo ao
+  vivo), grade alinhada com larguras repetidas por linha, hierarquia clara (resumo no topo,
+  detalhe abaixo), títulos de widget que dizem a pergunta e o período. A skill traz um molde de
+  layout profissional (seções, larguras e alturas) e o checklist visual ganha estes itens.
+- `validarComposicao` ganha `sem_secoes` (painel com mais de 8 widgets e nenhum objeto de título
+  de seção) além de `painel_simploria` (menos de 12 widgets) e `numero_alto_demais`
   (`numeric` com `h` maior que 4).
 - `criar` grava o tema padrão branco: fundo `#FFFFFF`, títulos escuros, a cor da marca nos números,
   linhas e barras (`themeName: "custom"`); `tema` continua trocando só o que vier.
