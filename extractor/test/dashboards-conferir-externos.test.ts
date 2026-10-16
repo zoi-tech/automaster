@@ -20,14 +20,10 @@
  *     total = soma dos `count`; `grupos` (id = callStatus) só quando filtro.agrupar == "callStatus".
  *     Condição `direction` (eq/in com um valor) do widget vira o campo `direction` do corpo.
  *
- *   recontarEmails(client, loc, filtro): Promise<Medida>
- *     ROTA NÃO ENCONTRADA no bundle (o `reportingApp` só traz o prefixo de serviço `reporting/emails`;
- *     as 10 rotas chutadas sob ele deram 404 ao vivo). O implementador precisa achá-la (bundle do
- *     `lcEmailApp`/`emailMarketingApp` ou aba Network) ANTES de implementar, e anotar em
- *     docs/endpoints.md. Estes testes só fixam o que independe do nome final: POST sob
- *     https://backend.leadconnectorhq.com/reporting/emails/, locationId na query e no corpo,
- *     startDate/endDate em ISO. Se a rota correta for GET ou outro prefixo, ajuste ESTE teste e
- *     registre o motivo.
+ *   E-mail (crm-emails): FORA desta entrega. A rota do relatório de e-mail não existe nos bundles
+ *     (reportingApp, lcEmailApp, emailMarketingApp; ~170 caminhos sob /reporting/emails/ deram 404).
+ *     conferirWidget devolve sem_conferencia com motivo contendo "e-mail" e "rota" ("rota do relatório
+ *     de e-mail não encontrada"), sem chamar rota de relatório e sem fonte "ghl" falsa. Pendência.
  *
  *   recontarMetaAds(widget: { options }, filtro, deps?: { env?: Record<string,string|undefined>; fetch?: typeof fetch })
  *     : Promise<{ ok: true; medida: Medida } | { ok: false; motivo: string }>
@@ -51,7 +47,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  filtroDoWidget, recontarEmails, recontarLigacoes, recontarMetaAds, conferirWidget, conferirPainel,
+  filtroDoWidget, recontarLigacoes, recontarMetaAds, conferirWidget, conferirPainel,
 } from "../src/api/dashboards-conferir.js";
 
 const SP = "America/Sao_Paulo";
@@ -170,22 +166,6 @@ test("recontarLigacoes: período sem ligação (callStatusStats vazio) dá total
   assert.equal(m.total, 0);
 });
 
-// ---------- recontarEmails ----------
-
-test("recontarEmails: POST sob /reporting/emails/ com locationId na query e no corpo, período em ISO", async () => {
-  const a = clienteRota(() => ({}));
-  await recontarEmails(a.client, "L1", filtro({ grupos: [[{ campo: "status", valores: ["events_delivered"] }]] })).catch(() => {});
-  assert.ok(a.chamadas.length >= 1, "não chamou nenhuma rota");
-  const c = a.chamadas[0];
-  assert.equal(c.metodo, "post");
-  const u = new URL(c.url);
-  assert.ok(u.href.startsWith(`${R}/emails/`), `rota fora de /reporting/emails/: ${c.url}`);
-  assert.equal(u.searchParams.get("locationId"), "L1");
-  assert.equal(c.corpo.locationId, "L1");
-  assert.equal(c.corpo.startDate, ISO_INI);
-  assert.equal(c.corpo.endDate, ISO_FIM);
-});
-
 // ---------- despachante: e-mail e ligações ----------
 
 const opts = (extra: Record<string, unknown> = {}) => ({
@@ -237,18 +217,20 @@ test("conferirWidget: ligações — a direção do widget chega ao relatório e
   assert.deepEqual(ts?.value, [DIA.inicio, DIA.fim]);
 });
 
-test("conferirWidget: e-mail nunca sai 'sem fonte' e leva fonte ghl, independente:false e o resumo GHL contra GHL", async () => {
+test("conferirWidget: e-mail sai sem_conferencia (rota do relatório não encontrada), sem rede de relatório e sem fonte falsa", async () => {
   const a = clienteRota((m, url) => {
     if (m === "post" && url.startsWith(`${R}/dashboards/crm/emails`)) return numero(5);
-    return {}; // o formato da resposta do relatório de e-mail não é fixado aqui
+    throw new Error(`rota inesperada ${m} ${url}`);
   });
   const o = { aggregations: [{ operator: "count", field: "id" }], dateProperty: "createdAt", dateRangeOverride: { operator: "dashboard_date_range" }, filters: [ou(e(cond("status", "eq", "events_delivered")))] };
-  const it = await conferirWidget(a.client, "L1", widget("W3", "crm-emails", o, "/dashboards/crm/emails"), SP, DIA).catch(() => null);
-  assert.ok(it, "conferirWidget lançou em vez de devolver um item");
+  const it = await conferirWidget(a.client, "L1", widget("W3", "crm-emails", o, "/dashboards/crm/emails"), SP, DIA);
+  assert.equal(it.resultado, "sem_conferencia");
+  assert.match(it.motivo ?? "", /e-mail/);
+  assert.match(it.motivo ?? "", /rota/);
   assert.notEqual(it.motivo, "fonte entra numa etapa seguinte");
-  assert.equal(it.fonte, "ghl");
-  assert.equal(it.independente, false);
-  assert.match(it.resumo ?? "", /GHL contra (o )?GHL/i);
+  assert.ok(!a.chamadas.some((c) => c.url.includes("/reporting/emails/") || c.url.includes("/emails/")), "chamou rota de relatório de e-mail");
+  assert.notEqual(it.fonte, "ghl");
+  assert.notEqual(it.independente, false);
 });
 
 test("conferirWidget: oportunidades NÃO ganham o selo 'GHL contra GHL' (quem lê o painel não pode confundir as fontes)", async () => {
