@@ -151,6 +151,16 @@ test("recontarLigacoes: agrupar por callStatus devolve um grupo por status", asy
   assert.deepEqual(Object.fromEntries((m.grupos ?? []).map((g: { id: string; value: number }) => [g.id, g.value])), { completed: 16, failed: 1, "no-answer": 2 });
 });
 
+test("recontarLigacoes: rótulos de exibição (No answer, Busy, Missed...) viram o valor cru; desconhecido é normalizado", async () => {
+  const a = clienteRota(() => resumoLig({ Answered: 5, "No answer": 2, Missed: 1, Busy: 3, Voicemail: 1, "Canceled Call": 4 }));
+  const m = await recontarLigacoes(a.client, "L1", filtro({ agrupar: "callStatus" }));
+  assert.deepEqual(Object.fromEntries((m.grupos ?? []).map((g: { id: string; value: number }) => [g.id, g.value])),
+    { completed: 5, "no-answer": 3, busy: 3, voicemail: 1, "canceled-call": 4 });
+  const b = clienteRota(() => resumoLig({ "No answer": 2, Busy: 3, Answered: 1 }));
+  const so = await recontarLigacoes(b.client, "L1", filtro({ grupos: [[{ campo: "callStatus", valores: ["no-answer", "busy"] }]] }));
+  assert.equal(so.total, 5);
+});
+
 test("recontarLigacoes: a condição direction do widget vai no corpo", async () => {
   const a = clienteRota(() => resumoLig({ completed: 1 }));
   await recontarLigacoes(a.client, "L1", filtro({ grupos: [[{ campo: "direction", valores: ["inbound"] }]] }));

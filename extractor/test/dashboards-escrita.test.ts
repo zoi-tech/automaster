@@ -150,8 +150,8 @@ const comIds = (client: unknown, o: object) =>
 const G1 = "aaaaaaaaaaaaaaaaaaaa0001";
 const CAMPOS_WIDGET_NOVO = [
   "_id", "apiConfig", "chartType", "className", "deleted", "eventSource", "externalDataConfig", "extras",
-  "group", "hasTrimmedFilters", "identifier", "locationId", "metricId", "module", "moduleName", "options",
-  "savedOptionPairs", "title",
+  "group", "hasTrimmedFilters", "identifier", "locationId", "metricId", "module", "moduleName", "objectWidgetOptions",
+  "options", "savedOptionPairs", "title",
 ];
 const moldeCompleto = {
   ...molde, deleted: false, _id: "x", hasTrimmedFilters: false, identifier: "i", className: "c", moduleName: "m",
@@ -282,6 +282,16 @@ test("editar com widget novo: 2 PUTs. 1º cria (ObjectId gerado, corpo do molde)
     { id: G1, x: 6, y: 0, w: 3, h: 4, minW: 3, minH: 3 }, // minW/minH do tipo numeric, 3x3 (molde sem layout)
   ]);
   assert.equal(s.aplicado, true);
+});
+
+test("widget novo copia objectWidgetOptions do molde: título de seção (object-title) nasce com o texto", async () => {
+  const { client, escritas } = falso();
+  const owo = { text: "Funil de vendas", fontSize: 18 };
+  await comIds(client, { ...base, acao: "editar", plano: plano({
+    criar: [{ id: "n", titulo: "t", molde: { ...moldeCompleto, objectWidgetOptions: owo } }],
+    layout: [...layoutBase, { id: "n", x: 6, y: 0, w: 3, h: 4 }],
+  }) });
+  assert.deepEqual((escritas()[0].corpo as Record<string, any>).activityBuffer.create[0][G1].objectWidgetOptions, owo);
 });
 
 test("item novo do layout herda minW/minH de molde.layout quando o molde tem", async () => {

@@ -425,6 +425,36 @@ test("conferirWidget: o POST de dados vai materializado na mesma janela da recon
   assert.deepEqual(corpo.options.groupBy.fields, [{ field: "status", type: "field" }]);
 });
 
+test("filtroDoWidget: dateRangeOverride till_date ignora o período do painel: do início dos tempos até o fim do painel", () => {
+  const f = ok(filtroDoWidget({ options: opts({ dateRangeOverride: { operator: "till_date" } }), module: "crm-opportunities" }, SP, DIA));
+  assert.equal(f.inicio, 0);
+  assert.equal(f.fim, DIA.fim);
+});
+
+test("filtroDoWidget: dateRangeOverride que a conferência não reproduz (today, last_month, custom...) sai sem_conferencia", () => {
+  for (const op of ["today", "last_month", "custom"]) {
+    const r = filtroDoWidget({ options: opts({ dateRangeOverride: { operator: op } }), module: "crm-opportunities" }, SP, DIA);
+    assert.equal(r.ok, false, op);
+    assert.match((r as { motivo: string }).motivo, new RegExp(op), op);
+  }
+});
+
+test("conferirWidget: widget till_date (estoque de hoje) reconta tudo e pede ao GHL sem a janela do painel", async () => {
+  const antigo = { createdAt: "2020-01-01T12:00:00.000Z" };
+  const a = clienteRota((m, url) => {
+    if (m === "post") return { data: ghlRaw(2, [{ id: "open", value: 2 }]) };
+    assert.equal(new URL(url).searchParams.get("date"), null, "till_date não manda janela de criação à busca");
+    return { opportunities: [card("1", antigo), card("2", antigo), card("3", { ...antigo, status: "won" })], meta: { nextPage: null } };
+  });
+  const o = opts({ dateRangeOverride: { operator: "till_date" }, filters: [ou(ands(cond("status", "eq", "open")))], groupBy: { fields: ["status"] } });
+  const it = await conferirWidget(a.client, "L1", widget("W9", "crm-opportunities", o) as never, SP, DIA);
+  assert.equal(it.resultado, "bate", JSON.stringify(it));
+  assert.equal(it.recontagem?.total, 2);
+  const corpo = a.chamadas.find((c) => c.metodo === "post")!.corpo as { options: any };
+  const ts = (corpo.options.filters as any[]).flatMap((g) => g.filters).find((c) => c.operator === "time_series");
+  assert.deepEqual(ts?.value, [0, DIA.fim]);
+});
+
 test("conferirWidget: agenda bate por situação", async () => {
   const o = opts({ dateProperty: "dateAdded", groupBy: { fields: ["appoinmentStatus.keyword"], limit: 10, orderBy: "desc" } });
   const a = mundo(ghlRaw(0), ghlRaw(1, [{ id: "showed", value: 1 }]));
