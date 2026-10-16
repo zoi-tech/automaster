@@ -1,7 +1,6 @@
 from conftest import wf
 
 from automaster_audit.dashboard import build_dashboard
-from automaster_audit.dashboard_html import write_dashboard_html
 from automaster_audit.loader import load_dump
 
 
@@ -35,14 +34,3 @@ def test_dashboard_reverse_index_and_called_by(make_dump):
     assert sub["called_by"] == ["Caller"]
     assert sub["has_entry"] is True  # chamado por outro
     assert caller_wf["calls"] == ["[X] Y → Z"]
-
-
-def test_dashboard_html_safe_and_selfcontained(make_dump, tmp_path):
-    path = make_dump(workflows=[wf(name="</script><img src=x onerror=alert(1)>")], tags=[])
-    out = write_dashboard_html(build_dashboard(load_dump(path)), tmp_path / "d.html", title="T")
-    html = out.read_text(encoding="utf-8")
-    assert "</script><img" not in html
-    # auto-contido: sem recurso externo (script/link/@import http). Fonte vai como data: URI.
-    assert 'src="http' not in html and 'href="http' not in html and "@import" not in html
-    assert "unpkg" not in html
-    assert "const DATA =" in html

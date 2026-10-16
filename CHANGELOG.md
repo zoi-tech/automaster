@@ -4,6 +4,16 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.30.0 — sem interfaces: só funcionamento
+
+- **Removidas as interfaces do auditor**: a TUI (`automaster-audit tui`, extra `[tui]`) e os HTMLs
+  (`graph`, `dashboard`, `validation`, `journey`). Saem junto o design system, as fontes embutidas e
+  os módulos de render. O que sobra é texto e dado: `audit` (report.md/json), `paths`, `diff`,
+  `verify-contracts` e todas as tools MCP. As tools `inventario` e `jornada` seguem funcionando, só
+  que sem a página.
+- **`contato timeline` não grava mais HTML**: sempre devolve JSON, sem abrir navegador.
+- O extra `[tui]` some do `pyproject.toml`, e a CI instala só `[dev]`.
+
 ## 0.29.0 — extração grava onde o MCP lê; perfil configurável; login Google na janela
 
 - **Extração grava em `~/.automaster/dumps`** quando `AUTOMASTER_DUMPS` não está definido, o mesmo

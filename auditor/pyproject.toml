@@ -4,21 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "automaster-audit"
-version = "0.29.0"
+version = "0.30.0"
 description = "Auditor de workflows GHL extraídos pelo Automaster v2"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
-tui = ["textual>=8,<9", "textualeffects==0.2.0"]
 
 [project.scripts]
 automaster-audit = "automaster_audit.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/automaster_audit"]
-# lidos em tempo de execução (schema pelo loader, tcss pela TUI): vão no wheel
-artifacts = ["src/automaster_audit/dump_schema.json", "src/automaster_audit/tui/tema.tcss"]
+# lido em tempo de execução (schema pelo loader): vai no wheel
+artifacts = ["src/automaster_audit/dump_schema.json"]
 
 [tool.ruff]
 # 120 e não o padrão 88: o código escreve longo de propósito (descrições de tool,

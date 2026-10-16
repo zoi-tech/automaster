@@ -4,11 +4,8 @@ import { stampNow } from "../dump/writer.js";
 import {
   fetchAuditLogs, fetchContactAppointments, fetchContactOpportunityIds, type AuditLog
 } from "../api/audit.js";
-import { renderTimelineHtml } from "../timeline_html.js";
 import { getContact, updateContactFields, addContactTags, removeContactTags } from "../api/contacts.js";
 import fs from "node:fs";
-import os from "node:os";
-import { execFile } from "node:child_process";
 import { DUMPS_DIR, latestDumpDir, latestDumpEntity, withClient } from "./shared.js";
 import { emitir, falhar } from "../saida.js";
 
@@ -27,28 +24,7 @@ function workflowNamesFromLatestDump(locationId: string): Map<string, string> {
   return names;
 }
 
-/** id → nome de pipelines e stages do dump mais recente (melhor esforço). */
-function stageNamesFromLatestDump(locationId: string): { pipelines: Map<string, string>; stages: Map<string, string> } {
-  const pipelines = new Map<string, string>();
-  const stages = new Map<string, string>();
-  const raw = latestDumpEntity(locationId, "pipelines") as { pipelines?: any[] } | undefined;
-  for (const p of raw?.pipelines ?? []) {
-    if (p.id && p.name) pipelines.set(p.id, p.name);
-    for (const s of p.stages ?? []) if (s.id && s.name) stages.set(s.id, s.name);
-  }
-  return { pipelines, stages };
-}
 
-/** id → nome dos usuários do dump mais recente da subconta (melhor esforço). */
-function userNamesFromLatestDump(locationId: string): Map<string, string> {
-  const names = new Map<string, string>();
-  const raw = latestDumpEntity(locationId, "users") as { users?: any[] } | undefined;
-  for (const u of raw?.users ?? []) {
-    const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(" ");
-    if (u.id && name) names.set(u.id, name);
-  }
-  return names;
-}
 
 async function runTimeline(opts: { location: string; id: string; days: string; json?: boolean }): Promise<void> {
   const locationId = opts.location;
@@ -92,30 +68,13 @@ async function runTimeline(opts: { location: string; id: string; days: string; j
       console.warn(`aviso: agendamentos indisponíveis (${e instanceof Error ? e.message.slice(0, 80) : e})`);
     }
 
-    const { pipelines, stages } = stageNamesFromLatestDump(locationId);
     const wfNames = workflowNamesFromLatestDump(locationId);
     const events = [...logs, ...oppLogs, ...apptLogs];
-    if (opts.json) {
-      // sourceId → nome do workflow: o campo que costura a timeline às tools do dump
-      const withNames = events.map((l) =>
-        l.sourceId && wfNames.has(String(l.sourceId)) ? { ...l, sourceWorkflowName: wfNames.get(String(l.sourceId)) } : l,
-      );
-      emitir(true, { locationId, id: opts.id, days, events: withNames });
-      return;
-    }
-    const html = renderTimelineHtml(events, {
-      locationId,
-      id: opts.id,
-      days,
-      wfNames,
-      userNames: userNamesFromLatestDump(locationId),
-      pipelineNames: pipelines,
-      stageNames: stages,
-    });
-    const out = path.join(os.tmpdir(), `timeline-${opts.id}-${Date.now()}.html`);
-    fs.writeFileSync(out, html, "utf-8");
-    log(`timeline (efêmera): ${out}`);
-    if (process.platform === "darwin") execFile("open", [out]);
+    // sourceId → nome do workflow: o campo que costura a timeline às tools do dump
+    const withNames = events.map((l) =>
+      l.sourceId && wfNames.has(String(l.sourceId)) ? { ...l, sourceWorkflowName: wfNames.get(String(l.sourceId)) } : l,
+    );
+    emitir(true, { locationId, id: opts.id, days, events: withNames });
   });
 }
 
