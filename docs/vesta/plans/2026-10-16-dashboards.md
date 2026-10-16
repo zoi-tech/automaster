@@ -446,3 +446,60 @@ abas 3a–3c e 4): um painel real montado pelo método dentro do GHL.
 **Como fazer:**
 - Versão: o working tree já está em 0.30.0 (não commitado, fora deste plano). Esta etapa sobe para
   0.31.0 nos três arquivos e escreve a seção do CHANGELOG; `auditor/tests/test_versoes.py` confere.
+
+---
+
+## Ajuste pedido na parada 2 (2026-10-16)
+
+O usuário viu o painel da etapa 10 no GHL e reprovou: quadros de número grandes demais, painel
+simplório (6 widgets) e feio, fundo grafite. Pediu: painéis bem mais completos; fundo dos quadros
+branco por padrão; nunca perguntar o dispositivo (é sempre computador); entrevista praticamente
+um grill-me, com perguntas tiradas de uma leitura a fundo da subconta.
+
+## Etapa 11 — Leitura a fundo, entrevista estilo grill, composição completa e tema branco
+
+**Tela:** não.
+
+**Arquivos:**
+- mudar `skills/automaster-dashboard/SKILL.md`
+- mudar `extractor/src/api/dashboards-layout.ts` (regras novas de composição)
+- mudar `extractor/src/cli/dashboards.ts` (tema padrão branco quando o painel nasce)
+- mudar `auditor/tests/test_skill_dashboard.py`, `extractor/test/dashboards-layout.test.ts`,
+  `extractor/test/dashboards-escrita.test.ts`
+
+**O que prova a etapa:**
+- Skill, seção 1: a leitura cobre funis e estágios, calendários, workflows (gatilhos e o que
+  disparam), formulários e surveys, canais de conversa em uso, campos personalizados de valor,
+  usuários e anúncios conectados; termina num retrato escrito do que o cliente opera.
+- Skill, seção 2: a entrevista é um grill (como a skill `grill-me`): uma pergunta por vez pelo
+  `AskUserQuestion`, cada uma citando o que a leitura achou ("vi 4 funis, o 00 tem 6 estágios…"),
+  seguindo cada resposta até fechar o ramo, com opção recomendada. Não pergunta dispositivo: o
+  painel é sempre para computador. O teste reprova a palavra "celular" ou "dispositivo" como
+  pergunta.
+- Skill, seção 3: painel completo — pelo menos 12 widgets cobrindo cada atividade que a leitura
+  achou (funil, agenda, origem, vendedores, conversas, formulários, anúncios quando houver), com
+  mistura de números, tendências, funil, tabela e ranking; números do topo baixos (altura 3, no
+  máximo 4); seções por tema com título de seção (`objectWidget`).
+- `validarComposicao` ganha `painel_simploria` (menos de 12 widgets) e `numero_alto_demais`
+  (`numeric` com `h` maior que 4).
+- `criar` grava o tema padrão branco: fundo `#FFFFFF`, títulos escuros, a cor da marca nos números,
+  linhas e barras (`themeName: "custom"`); `tema` continua trocando só o que vier.
+
+**Como fazer:**
+- Ler `~/.claude/skills/grill-me/SKILL.md` e copiar o espírito para a seção 2, adaptado ao painel.
+
+## Etapa 12 — Refazer o painel da ZOI pelo método novo
+
+**Tela:** sim — o painel dentro do GHL.
+
+**Arquivos:**
+- criar `docs/vesta/mockups/2026-10-16-dashboards/etapa-12/` (plano, PNGs por volta, conferência,
+  relatório, provas de verificação `r<N>-375.png`, `r<N>-1440.png`, `r<N>-detector-*.json`)
+
+**O que prova a etapa:**
+- Na Xb9g, pela skill nova: leitura a fundo, entrevista estilo grill com o usuário, plano mostrado,
+  o painel `ZZ TESTE AUTOMASTER painel ZOI` (`6ad2421cd7803e179ee56ca2`) refeito com pelo menos 12
+  widgets, fundo branco, números do topo baixos; loop visual até passar; conferência sem
+  `diverge` sem causa.
+- O usuário vê no GHL e aprova ou pede ajuste; a decisão fica no relatório.
+- Suítes completas, typecheck, lint e ruff passam.
