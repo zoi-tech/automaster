@@ -64,7 +64,7 @@ async function runDashboards(opts: {
 
 // Candidatos a confirmar ao vivo: seletor de widget e contêiner que rola.
 const SELETOR_WIDGET = ".location-dashboard-numeric-card, .chart-container";
-const URL_LOGIN = "https://app.gohighlevel.com/login";
+const URL_LOGIN = "https://app.gohighlevel.com/";
 
 interface Resultado { arquivo: string; largura: number; altura: number; widgets: number; vazios: string[] }
 
