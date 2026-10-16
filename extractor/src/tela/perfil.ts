@@ -13,7 +13,7 @@ type Lancar = (dir: string, options: Record<string, unknown>) => Promise<Browser
 
 export async function abrirPerfilDeTela(
   opts: { visivel: boolean },
-  lancar: Lancar = chromium.launchPersistentContext as unknown as Lancar,
+  lancar: Lancar = chromium.launchPersistentContext.bind(chromium) as unknown as Lancar,
 ): Promise<PerfilTela> {
   const raiz = path.join(os.homedir(), ".automaster");
   const dir = process.env.AUTOMASTER_PERFIL_TELA || path.join(raiz, "perfil-tela");
