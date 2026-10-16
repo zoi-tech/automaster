@@ -93,6 +93,12 @@ Cara profissional:
   por um título de seção. Os objetos de layout do GHL têm `chartType` `objectWidget`:
   `object-title`, `object-textbox`, `object-image` e `object-embed`. Não há divisor próprio: o
   `object-title` de largura 12 e altura 1 é o separador entre seções.
+- Toda faixa `object-title` (cabeçalho e seções) leva a cor de destaque: em
+  `objectWidgetOptions`, `backgroundColor` igual ao `baseColor` do tema e `textColor` escuro
+  com contraste de pelo menos 4.5 sobre ela (na ZOI, `#b5ff81` com `#101828`).
+- Padrão de referência para qualquer cliente: o painel da ZOI aprovado pelo usuário, com plano
+  em `docs/vesta/mockups/2026-10-16-dashboards/etapa-12/plano.md` (cabeçalho, KPIs 3x3 no topo,
+  alertas logo abaixo, uma seção por atividade da subconta, 50+ widgets).
 - Grade alinhada, com larguras repetidas por linha: 4 de 3, 2 de 6, 8 + 4, ou 12.
 - Hierarquia: resumo no topo, detalhe embaixo; dentro da seção, o bloco mais importante à esquerda.
 
