@@ -122,3 +122,5 @@ def test_nenhuma_frase_proibida(texto):
 
 def test_claude_md_lista_a_skill():
     assert "skills/automaster-dashboard/" in (RAIZ / "CLAUDE.md").read_text(encoding="utf-8")
+
+# a skill fica em skills/automaster-dashboard/SKILL.md
