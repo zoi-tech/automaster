@@ -16,6 +16,8 @@ export interface OppFiltro {
   contact_id?: string;
   assigned_to?: string;
   q?: string;            // termo livre
+  date?: number | string;     // início, filtra pela CRIAÇÃO do card (ms ou mm-dd-yyyy; ISO dá 4xx)
+  endDate?: number | string;  // fim, idem
   limit?: number;
   page?: number;
 }

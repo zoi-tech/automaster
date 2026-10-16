@@ -19,6 +19,8 @@ export interface WidgetDef {
 
 export interface WidgetPainel {
   widgetId: string;
+  /** `_id` da linha de `dashboardWidgets`: é por ele que o PUT acha o item do layout (por widgetId é no-op silencioso). */
+  dashboardWidgetId?: string;
   titulo: string | null;
   chartType: string | null;
   module: string | null;
@@ -60,10 +62,11 @@ export async function detalhePainel(client: GhlClient, loc: string, id: string):
   const d = (await client.getJson<Cru>(`${BASE}/dashboards/${enc(id)}?locationId=${enc(loc)}`)).data;
   const p = d.dashboard as Record<string, unknown>;
   const defs = new Map(((d.widgets as (WidgetDef & { _id?: string })[]) ?? []).map((w) => [w.widgetId ?? w._id, w]));
-  const widgets = ((d.dashboardWidgets as { widgetId: string; layout: LayoutWidget }[]) ?? []).map((dw) => {
+  const widgets = ((d.dashboardWidgets as { _id?: string; widgetId: string; layout: LayoutWidget }[]) ?? []).map((dw) => {
     const def = defs.get(dw.widgetId) ?? null;
     return {
       widgetId: dw.widgetId,
+      ...(dw._id ? { dashboardWidgetId: dw._id } : {}),
       titulo: def?.title ?? null,
       chartType: def?.chartType ?? null,
       module: def?.module ?? null,
@@ -106,4 +109,33 @@ export async function fusoDaSubconta(client: GhlClient, loc: string): Promise<st
   const r = await client.getJson<{ location: { timezone: string } }>(
     `https://services.leadconnectorhq.com/locations/${enc(loc)}`);
   return r.location.timezone;
+}
+
+// ---------- escrita ----------
+
+/** Sempre privado: não há parâmetro de visibilidade de propósito. */
+export async function criarPainel(client: GhlClient, loc: string, titulo: string): Promise<unknown> {
+  return client.postJson(`${BASE}/dashboards`, { locationId: loc, title: titulo, isPrivate: true, permissionAccess: [] });
+}
+
+export interface CorpoSalvar {
+  title: string;
+  activityBuffer: { create?: Record<string, unknown>[]; update?: Record<string, unknown>[]; delete?: string[] };
+  layout: { id: string; x: number; y: number; w: number; h: number; minW?: number; minH?: number }[];
+  themeConfig: unknown;
+  version: number;
+}
+
+export async function salvarPainel(client: GhlClient, loc: string, id: string, c: CorpoSalvar): Promise<unknown> {
+  const { title, activityBuffer, layout, themeConfig, version } = c;
+  return client.putJson(`${BASE}/dashboards/${enc(id)}?locationId=${enc(loc)}`, { title, activityBuffer, layout, themeConfig, version });
+}
+
+/** O DELETE leva `{locationId, version}` no corpo, não na query. */
+export async function apagarPainel(client: GhlClient, loc: string, id: string, version: number): Promise<unknown> {
+  return client.deleteJson(`${BASE}/dashboards/${enc(id)}`, { locationId: loc, version });
+}
+
+export async function restaurarVersao(client: GhlClient, loc: string, id: string, v: number | string): Promise<unknown> {
+  return client.postJson(`${BASE}/dashboards/${enc(id)}/versions/${enc(String(v))}/restore?locationId=${enc(loc)}`, {});
 }

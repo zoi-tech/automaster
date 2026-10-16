@@ -1514,3 +1514,58 @@ nenhuma mudança no cliente.
   contagem por `status` (open/lost/abandoned) nos últimos 30 dias.
 
 CLI: `npm run dashboards -- -l <loc> -o lista|detalhe|catalogo|versoes|dados|fuso [-i <id>] [--widget <wid>] --json`.
+
+### Escrita
+
+Etapa 3, provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 3` privado, apagado no fim. CLI:
+`npm run dashboard-acao -- -l <loc> --acao criar|editar|tema|renomear|apagar|restaurar [-i <id>] --versao-esperada <n> --confirmo --json`
+(sem `--confirmo` é prévia, sem nenhuma escrita).
+
+- **Header obrigatório no PUT:** `x-reporting-api-version: 3`. Sem ele o PUT responde `409 dashboard_version_error`
+  ("outdated dashboard version") mesmo com `version` certo; o `GhlClient` o manda em todo `/reporting/`.
+- `POST /dashboards` `{locationId,title,isPrivate:true,permissionAccess:[]}` -> `data._id`, `__v` 0, sem tema.
+- `PUT /dashboards/<id>?locationId` `{title,activityBuffer,layout,themeConfig,version}`; `version` = `__v` lido. Cada PUT que
+  muda widget, layout ou tema sobe o `__v` em 1; só trocar o título NÃO sobe. `activityBuffer` leva só as chaves
+  usadas (`create`, `update`, `delete`) e `{}` quando não há mudança de widget.
+- **Layout:** cada item exige `x,y,w,h,minW,minH` numéricos (senão 422). Mínimos do tipo: numeric 3x4, table 6x6, funnel 5x6,
+  demais 4x6. O item é achado pelo `_id` da linha de `dashboardWidgets`; por `widgetId` o servidor responde 200 e não faz
+  nada (sem subir `__v`).
+- **Tema:** o GET devolve plano, o PUT só aplica `{dashboardTheme:{themeName,titleColor,backgroundColor,metricColor,linkColor,...},
+  widgetTheme:{}}`. Tema plano dá 200 e é ignorado; tema vazio dá 422 (painel novo nasce sem tema: o app manda
+  `{themeName:"none",titleColor:"#101828",backgroundColor:"#FFFFFF",metricColor:"#334155",linkColor:"#2970ff"}`).
+- **Widget novo:** chave de `create` e `_id` precisam ser ObjectId de 24 hex (`novo1` dá 400 genérico). Corpo = lista fixa copiada
+  do molde (`deleted:false,_id,hasTrimmedFilters,identifier,className,module,moduleName,eventSource,group,title,chartType,options,
+  savedOptionPairs,locationId,extras,apiConfig,externalDataConfig,metricId`), sem `dashboardId`/`createdBy`/`__v`. O layout
+  enviado junto do create é ignorado (nasce 3x3 sem x/y), então `editar` com widget novo faz 2 PUTs: o 1º cria, o 2º posiciona
+  (relê o detalhe para pegar o `_id` da linha nova; `version` = o `__v` devolvido).
+- `DELETE /dashboards/<id>` com `{locationId,version}` no corpo: 200 (`version` 0 vale).
+- **Versões desligadas na subconta:** `GET .../versions` vem vazio, `POST .../versions/commit {trigger:"idle"}` responde
+  `minted:false, reason:"disabled"` e `POST .../versions/1/restore` dá `404 dashboard_version_not_found`. Logo `restaurar`
+  não tem para onde voltar aqui; o rastro em `_dashboards/<loc>/<id>/` guarda o `__v` e o corpo enviado.
+- `POST /dashboards/<id>/duplicate` `{locationId,targetLocationId,title,isPrivate:true}` -> `data.targetDashboardId` (usado só
+  para investigar; o comando não o expõe).
+- O painel padrão (`isDefault`) recusa `editar` e `apagar` no comando, na prévia e na gravação.
+
+### Conferência (etapa 5)
+
+`npm run dashboard-conferir -- -l <loc> -i <painel> [--dias 30] --json` compara o número de cada widget (POST
+de dados, com período e fuso materializados) com uma recontagem pelas rotas de leitura. Xb9g, painel "Visão
+Geral das Vendas", janela de 30 dias: 6 widgets conferíveis, 6 `bate`, 13 `sem_conferencia`, 0 `diverge`. Tempo
+medido: 92 s (5 min antes de paginar cards uma vez só por janela); a maior parte é a agenda (um `events` por
+calendário por widget, 8 calendários, rate limit).
+
+- **Cartão numérico**: `data` é objeto `{label, value}` sem `total`; gráfico traz lista com `id` e `total`.
+- **Grupo sem valor**: o GHL rotula `N/A` e põe um espaço de largura zero (U+200B) no `id` (`"N/A​"`).
+  Cards sem `source` caem aí na recontagem; sem isso "Oportunidades por Fontes" divergia 16 x 0.
+- **`GET /opportunities/search` aceita `date` e `endDate`** (ms ou `mm-dd-yyyy`; ISO e `startDate` dão 4xx) e
+  filtram pela data de CRIAÇÃO do card (428 cards de 01 a 10/10 = contagem local por `createdAt`; `updatedAt`
+  daria 476, `lastStatusChangeAt` 470). Usado só quando o widget é de criação, com 1 dia de folga, e o filtro
+  exato fica no automaster. Sem filtro a subconta tem 7520 cards (75 páginas).
+- **Agenda, widget com `dateProperty: dateAdded`**: o widget filtra pela data de CRIAÇÃO do agendamento, mas
+  `GET /calendars/events` filtra por `startTime`. Compromissos criados na janela e marcados para o futuro ficam
+  de fora quando `endTime` = fim da janela: "por status" deu `confirmed` 10 (recontagem) x 15 (GHL). Com
+  `endTime` = fim + 365 dias e filtro local por `dateAdded` a recontagem dá 51 = GHL (conferido ao vivo). Está no
+  código: `recontarAgenda` busca `startTime` = início da janela e `endTime` = fim + 365 dias e recorta por `dateAdded`.
+  Reconferido ao vivo: 51 = 51, `bate`.
+- Widgets agrupados por campo personalizado, `lost_reason_id` ou série de tempo, e os custom, saem
+  `sem_conferencia` com o motivo.

@@ -67,6 +67,8 @@ export class GhlClient {
     };
     const cookie = this.tokens.cookies?.[new URL(url).host];
     if (cookie) h.cookie = cookie;
+    // Sem esse header o PUT de painel responde 409 "outdated dashboard version" mesmo com a versão certa.
+    if (new URL(url).pathname.startsWith("/reporting/")) h["x-reporting-api-version"] = "3";
     return h;
   }
 

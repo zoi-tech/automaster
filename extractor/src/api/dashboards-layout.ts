@@ -9,6 +9,9 @@ export type ItemPlano = ItemLayout & { titulo: string; module: string; options: 
 const COLUNAS = 12;
 const MINIMOS: Record<string, [number, number]> = { numeric: [3, 4], table: [6, 6], funnel: [5, 6] };
 
+/** Mínimos de largura e altura por tipo de widget (o que o GridStack do app impõe). */
+export const minimosDoTipo = (chartType: string): [number, number] => MINIMOS[chartType] ?? [4, 6];
+
 export function validarLayout(itens: ItemLayout[]): Problema[] {
   const erros: Problema[] = [];
   const dentro: ItemLayout[] = [];
@@ -16,7 +19,7 @@ export function validarLayout(itens: ItemLayout[]): Problema[] {
     if (i.x < 0 || i.w < 1 || i.x + i.w > COLUNAS) {
       erros.push({ codigo: "fora_da_grade", mensagem: `O widget ${i.id} sai da grade de ${COLUNAS} colunas (x ${i.x}, largura ${i.w}).` });
     } else dentro.push(i);
-    const [mw, mh] = MINIMOS[i.chartType] ?? [4, 6];
+    const [mw, mh] = minimosDoTipo(i.chartType);
     if (i.w < mw || i.h < mh) {
       erros.push({ codigo: "abaixo_do_minimo", mensagem: `O widget ${i.id} (${i.chartType}) tem ${i.w}x${i.h}, abaixo do mínimo ${mw}x${mh}.` });
     }
