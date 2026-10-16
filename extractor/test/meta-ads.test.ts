@@ -79,6 +79,15 @@ test("insightsMeta: conta sem o prefixo act_ ganha o prefixo", async () => {
   assert.match(new URL(f.urls[0]).pathname, /^\/v21\.0\/act_123\/insights$/);
 });
 
+test("insightsMeta: conta que não é só dígitos não chega à URL", async () => {
+  for (const conta of ["123/../me", "123?x=1", "act_12#3", "abc", "123%2f"]) {
+    const f = fetchFalso({ data: [linha()] });
+    const r = await insightsMeta({ ...base, conta }, f.fn);
+    assert.equal(r.ok, false);
+    assert.equal(f.urls.length, 0);
+  }
+});
+
 test("insightsMeta: time_range usa as datas LOCAIS (o último instante do dia em Brasília cai em 16/10 UTC)", async () => {
   const f = fetchFalso({ data: [linha()] });
   await insightsMeta(base, f.fn);

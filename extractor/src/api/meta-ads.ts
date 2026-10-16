@@ -16,6 +16,8 @@ export async function insightsMeta(
   o: { conta: string; token: string; inicio: number; fim: number; fuso: string; porDia?: boolean },
   fetchFn: typeof fetch = fetch,
 ): Promise<ResultadoMeta> {
+  // O id vem do widget e entra no caminho de uma URL que leva o token: só dígitos.
+  if (!/^(act_)?\d+$/.test(o.conta)) return { ok: false, motivo: `conta de anúncio inválida: ${o.conta}` };
   const conta = o.conta.startsWith("act_") ? o.conta : `act_${o.conta}`;
   const q = new URLSearchParams({
     fields: "spend,impressions,clicks,actions",
