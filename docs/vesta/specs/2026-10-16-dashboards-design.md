@@ -67,6 +67,35 @@ Skill `skills/automaster-dashboard/`: o que é design e processo. Grade e hierar
 (números-chave em cima, funil e tendência no meio, tabelas embaixo), nomes de widget, cores,
 a escada de widgets, e os dois loops.
 
+## Método de composição (sem modelo fixo)
+
+Nenhum painel sai de molde. A skill é um método em quatro passos, decidido com o usuário na
+fase de mockup:
+
+1. **Leitura da subconta.** Antes de perguntar, o automaster lê o que existe: funis e
+   estágios, calendários, canais de conversa ativos, fontes de lead que aparecem nas
+   oportunidades, se há conta de anúncio ligada, usuários. Isso vira as opções da entrevista;
+   nada é perguntado no vácuo.
+2. **Entrevista.** Perguntas ao usuário da ZOI pelo menu, uma por vez, com opções tiradas da
+   leitura: quem vai olhar o painel (dono, gerente, recepção); com que frequência e onde
+   (todo dia no celular, toda semana no computador); que perguntas o painel precisa responder
+   (seleção múltipla, sugeridas pelo que a subconta tem: "quanto vendi", "de onde vêm os
+   leads", "quem falta na consulta", "quanto tempo levo para responder"); qual é a principal;
+   período padrão e comparação.
+3. **Plano do painel.** Cada pergunta vira um widget pelo tipo de pergunta: "quanto" vira
+   número; "como evolui" vira linha; "quem é maior" vira barra horizontal (top N); "parte de um
+   todo" com até 5 partes vira donut, mais que isso vira barra; "em que etapa" vira funil;
+   "quais são" vira tabela. A ordem de importância da entrevista vira a posição: a principal em
+   cima à esquerda. O plano (pergunta, widget, módulo, filtro, data, posição) é mostrado antes de
+   gravar.
+4. **Montagem e loops.** Grava privado, roda os dois loops, publica.
+
+Fixas são só as regras de composição: no máximo 4 números no topo; donut só até 5 fatias;
+larguras mínimas por tipo; grade sem buraco; títulos que dizem a pergunta e o período, não o
+nome técnico do widget; cores da marca do cliente pelo `themeConfig` do painel
+(`titleColor`, `backgroundColor`, `baseColor`, `metricColor`, `linkColor`), com contraste
+conferido.
+
 ## Ciclo de vida do painel
 
 Todo painel nasce PRIVADO na própria subconta de destino (`isPrivate: true`), só visível ao

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Mockup — painéis montados pelo automaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Reprodução da página de dashboard do GHL (tela existente): Inter, cinzas do app, cor por painel via themeConfig. */
+:root{
+  --background:oklch(0.975 0.004 255);--foreground:oklch(0.21 0.03 265);
+  --muted:oklch(0.95 0.006 255);--muted-foreground:oklch(0.45 0.03 260);
+  --border:oklch(0.9 0.01 255);--card:oklch(1 0 0);
+  --primary:oklch(0.55 0.2 260);--primary-foreground:oklch(1 0 0);
+  --ring:oklch(0.55 0.2 260);--ok:oklch(0.52 0.14 150);--warn:oklch(0.55 0.15 60);--bad:oklch(0.55 0.2 27);
+  --radius:8px;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s8:48px;
+  --z-header:10;
+  --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);font-size:16px;line-height:1.55;color:var(--foreground);background:var(--background);font-feature-settings:"tnum" 1}
+h1,h2,h3{line-height:1.25;margin:0}
+h1{font-size:22px}h2{font-size:18px}h3{font-size:15px;font-weight:600}
+p{margin:0 0 var(--s3);max-width:70ch}
+.wrap{max-width:1360px;margin:0 auto;padding:var(--s5) var(--s4)}
+.intro{margin-bottom:var(--s5)}
+.intro p{color:var(--muted-foreground)}
+nav.tabs{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s5)}
+button{font:inherit;cursor:pointer}
+.tab{min-height:44px;padding:0 var(--s4);border:1px solid var(--border);background:var(--card);border-radius:var(--radius);color:var(--foreground);font-weight:500;transition:transform .15s cubic-bezier(0.16,1,0.3,1)}
+.tab:hover{border-color:var(--primary)}
+.tab:active{transform:scale(.98)}
+.tab[aria-selected="true"]{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+button:focus-visible{outline:3px solid var(--ring);outline-offset:2px}
+section[hidden]{display:none}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:var(--s5)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--s5);align-items:start}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+/* Entrevista: transcrição do Claude Code */
+.chat{display:flex;flex-direction:column;gap:var(--s4)}
+.q{border-left:3px solid var(--primary);padding-left:var(--s4)}
+.q .n{font-size:14px;color:var(--muted-foreground)}
+.opts{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s2);padding:0;list-style:none}
+.opts li{border:1px solid var(--border);border-radius:999px;padding:2px var(--s3);font-size:14px}
+.opts li.on{border-color:var(--ok);background:oklch(0.96 0.04 150);font-weight:600}
+.lido{font-size:15px;background:var(--muted);border-radius:var(--radius);padding:var(--s4)}
+.lido ul{margin:var(--s2) 0 0;padding-left:var(--s5)}
+/* Plano */
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:var(--s2) var(--s3);border-bottom:1px solid var(--border);vertical-align:top}
+th{font-weight:600;color:var(--muted-foreground);font-size:13px}
+td.num{text-align:right}
+.scroll-x{overflow-x:auto}
+.fora{color:var(--warn);font-weight:600}
+/* Página do GHL */
+.ghl{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--dash-bg)}
+.ghl-top{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;padding:var(--s3) var(--s4);background:var(--card);border-bottom:1px solid var(--border)}
+.sel{display:flex;align-items:center;gap:var(--s2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--s2) var(--s3);font-weight:500}
+.priv{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:999px;padding:0 var(--s2)}
+.sp{flex:1}
+.range{border:1px solid var(--border);border-radius:var(--radius);padding:var(--s2) var(--s3);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:54px;gap:0;padding:var(--s2)}
+.w{margin:var(--s2);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.w-h{padding:var(--s3) var(--s4) var(--s2);border-bottom:1px solid var(--border)}
+.w-h h3{color:var(--dash-title);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w-h .sub{font-size:12px;color:var(--muted-foreground)}
+.w-b{flex:1;padding:var(--s4);min-height:0;display:flex;flex-direction:column;justify-content:flex-start}
+.w-b.mid{justify-content:center}
+.big{font-size:32px;font-weight:700;color:var(--dash-metric);letter-spacing:-.01em}
+.chip{display:inline-flex;align-items:center;gap:2px;font-size:13px;font-weight:600;border-radius:999px;padding:0 var(--s2);margin-right:var(--s2)}
+.chip.up{background:oklch(0.95 0.05 150);color:oklch(0.42 0.12 150)}
+.chip.down{background:oklch(0.95 0.04 27);color:oklch(0.45 0.17 27)}
+.vs{font-size:13px;color:var(--muted-foreground)}
+.sec{grid-column:1/-1;display:flex;align-items:flex-end;padding:0 var(--s4) var(--s1)}
+.sec h2{font-size:16px;color:var(--dash-title)}
+.hb{display:grid;grid-template-columns:minmax(0,max-content) 1fr auto;gap:var(--s2) var(--s3);align-items:center;font-size:13px}
+.hb .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .bar{height:14px;border-radius:3px;background:var(--dash-base)}
+.fn{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.fn .row{display:grid;grid-template-columns:minmax(0,16ch) 1fr 6ch 5ch;gap:var(--s3);align-items:center}
+.fn .bar{height:22px;border-radius:3px;background:var(--dash-base)}
+.fn .val{font-weight:600;text-align:right}
+.fn .pct{color:var(--muted-foreground);text-align:right}
+.don{display:flex;align-items:center;gap:var(--s4);font-size:13px}
+.don svg{flex:none}
+.leg{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.ln svg{width:100%;flex:1;min-height:0}
+.ln .eixo{display:flex;justify-content:space-between;font-size:12px;color:var(--muted-foreground);padding-left:30px}
+.ln .ymax{font-size:12px;color:var(--muted-foreground)}
+.ln{flex:1;min-height:0;display:flex;flex-direction:column}
+.ln .leg{flex-direction:row;gap:var(--s4)}
+.tb{font-size:13px}
+.tb table{table-layout:fixed}
+.tb td{overflow-wrap:anywhere}
+.tb td,.tb th{padding:6px var(--s2)}
+/* Validação */
+.res{font-weight:600}
+.res.bate{color:var(--ok)}.res.diverge{color:var(--bad)}.res.sem{color:var(--muted-foreground)}
+.loop{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:var(--s3)}
+.loop li{border:1px solid var(--border);border-radius:var(--radius);padding:var(--s3) var(--s4)}
+.thumb{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:10px;gap:3px;background:var(--muted);padding:6px;border-radius:6px;margin-top:var(--s2)}
+.thumb b{background:var(--card);border:1px solid var(--border);border-radius:2px}
+.thumb b.err{border:2px solid var(--bad)}
+@media (max-width:767px){
+  .grid{grid-template-columns:1fr;grid-auto-rows:auto}
+  .grid>*{grid-column:1/-1!important;grid-row:auto!important}
+  .w{min-height:calc(var(--h)*40px)}
+  .big{font-size:28px}
+  .hb{grid-template-columns:1fr auto}
+  .hb .lab{grid-column:1/-1;margin-bottom:-4px}
+  .tb thead{display:none}
+  .tb tr{display:block;padding:var(--s2) 0;border-bottom:1px solid var(--border)}
+  .tb td{display:grid;grid-template-columns:12ch 1fr;gap:var(--s2);border:0;padding:2px 0}
+  .tb td::before{content:attr(data-l);color:var(--muted-foreground)}
+  .fn .row{grid-template-columns:minmax(0,11ch) 1fr 5ch 4ch;gap:var(--s2)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="intro">
+    <h1>Painéis montados pelo automaster dentro do GHL</h1>
+    <p>Sem modelo fixo: o automaster lê a subconta, entrevista quem pediu, transforma cada pergunta do dono num widget e monta o painel privado. Abaixo, o fluxo para uma clínica e três painéis diferentes saídos das mesmas regras.</p>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Etapas">
+    <button class="tab" role="tab" aria-selected="true" aria-controls="t-entrevista" id="b-entrevista">1. Leitura e entrevista</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="t-plano" id="b-plano">2. Plano do painel</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="t-clinica" id="b-clinica">3a. Painel da clínica</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="t-loja" id="b-loja">3b. Painel da concessionária</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="t-servico" id="b-servico">3c. Painel do prestador de serviço</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="t-valida" id="b-valida">4. Validação e publicação</button>
+  </nav>
+
+  <section id="t-entrevista" role="tabpanel" aria-labelledby="b-entrevista">
+    <div class="cols">
+      <div class="panel">
+        <h2>O que o automaster leu antes de perguntar</h2>
+        <div class="lido" style="margin-top:var(--s3)">
+          Subconta <strong>Clínica Sorriso Pleno</strong>
+          <ul>
+            <li>2 funis: "Avaliação → Tratamento" (4 estágios) e "Retorno"</li>
+            <li>3 calendários: Avaliação, Limpeza, Retorno · 3 profissionais</li>
+            <li>Canais ativos: WhatsApp, Instagram, formulário do site</li>
+            <li>Fontes de lead nas oportunidades: Instagram, Google, Indicação, Facebook Ads, Site</li>
+            <li>Conta de anúncio Meta ligada</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel chat">
+        <h2>Entrevista (no Claude Code, pelo menu)</h2>
+        <div class="q"><div class="n">1 de 5</div>Quem vai olhar este painel?
+          <ul class="opts"><li class="on">Dono (dentista)</li><li class="on">Recepção</li><li>Gerente comercial</li></ul></div>
+        <div class="q"><div class="n">2 de 5</div>Quando e onde?
+          <ul class="opts"><li class="on">Todo dia, no celular</li><li>Toda semana, no computador</li></ul></div>
+        <div class="q"><div class="n">3 de 5</div>Que perguntas o painel responde? (sugeridas pelo que a subconta tem)
+          <ul class="opts"><li class="on">Quantas consultas marquei?</li><li class="on">Quem faltou?</li><li class="on">De onde vêm os pacientes?</li><li class="on">Quantos orçamentos viram tratamento?</li><li>Quanto tempo levo para responder?</li><li>Quanto custa cada paciente?</li></ul></div>
+        <div class="q"><div class="n">4 de 5</div>Qual é a principal?
+          <ul class="opts"><li class="on">Quem faltou</li><li>Consultas marcadas</li><li>Orçamento em tratamento</li></ul></div>
+        <div class="q"><div class="n">5 de 5</div>Período padrão
+          <ul class="opts"><li class="on">Últimos 30 dias, comparando com os 30 anteriores</li><li>Este mês</li><li>Esta semana</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t-plano" role="tabpanel" aria-labelledby="b-plano" hidden>
+    <div class="panel">
+      <h2>Plano mostrado antes de gravar</h2>
+      <p style="margin-top:var(--s2)">Cada pergunta vira um widget pelo tipo de pergunta. A principal ("quem faltou") vai para o topo à esquerda.</p>
+      <div class="scroll-x"><table>
+        <thead><tr><th>Pergunta do dono</th><th>Tipo</th><th>Widget</th><th>Módulo e filtro</th><th>Data</th><th>Grade (x,y,l,a)</th></tr></thead>
+        <tbody>
+          <tr><td>Quem faltou?</td><td>quanto</td><td>número: Faltas</td><td>agenda · status = faltou</td><td>data da consulta</td><td>0,1,3,4</td></tr>
+          <tr><td>Quem faltou?</td><td>quanto</td><td>número: Comparecimento</td><td>agenda · compareceu ÷ (compareceu + faltou)</td><td>data da consulta</td><td>3,1,3,4</td></tr>
+          <tr><td>Quantas consultas marquei?</td><td>quanto</td><td>número: Consultas marcadas</td><td>agenda · todos os calendários</td><td>data da consulta</td><td>6,1,3,4</td></tr>
+          <tr><td>Orçamento vira tratamento?</td><td>quanto</td><td>número: Tratamentos fechados</td><td>oportunidades · funil Avaliação, ganho</td><td>criação</td><td>9,1,3,4</td></tr>
+          <tr><td>Quantas consultas marquei?</td><td>como evolui</td><td>linha: marcadas × comparecidas por semana</td><td>agenda</td><td>data da consulta</td><td>0,6,8,7</td></tr>
+          <tr><td>Quem faltou?</td><td>parte de um todo (4)</td><td>donut: status das consultas</td><td>agenda</td><td>data da consulta</td><td>8,6,4,7</td></tr>
+          <tr><td>Orçamento vira tratamento?</td><td>em que etapa</td><td>funil: Avaliação → Tratamento</td><td>oportunidades · funil Avaliação</td><td>criação</td><td>0,14,7,7</td></tr>
+          <tr><td>De onde vêm os pacientes?</td><td>quem é maior (5)</td><td>barra: pacientes por origem</td><td>contatos · origem</td><td>criação</td><td>7,14,5,7</td></tr>
+          <tr><td>Quem faltou?</td><td>quais são</td><td>tabela: faltas da semana</td><td>agenda · faltou, 7 dias</td><td>data da consulta</td><td>0,21,12,6</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:var(--s4)">Três seções com título (objeto Título do GHL): Agenda, Tratamentos, Origem. Cores da marca pelo tema do painel: base verde-água, números em grafite.</p>
+    </div>
+  </section>
+
+  <section id="t-clinica" role="tabpanel" aria-labelledby="b-clinica" hidden></section>
+  <section id="t-loja" role="tabpanel" aria-labelledby="b-loja" hidden></section>
+  <section id="t-servico" role="tabpanel" aria-labelledby="b-servico" hidden></section>
+
+  <section id="t-valida" role="tabpanel" aria-labelledby="b-valida" hidden>
+    <div class="cols">
+      <div class="panel">
+        <h2>Loop visual (painel da clínica)</h2>
+        <ol class="loop" style="margin-top:var(--s3)">
+          <li><strong>Volta 1: reprovado.</strong> O título "De onde vêm os pacientes (últimos 30 dias)" saiu cortado com 5 colunas de largura. Correção: título curto "Origem dos pacientes", período no subtítulo.
+            <div class="thumb" aria-hidden="true"><b style="grid-column:1/4;grid-row:1/4"></b><b style="grid-column:4/7;grid-row:1/4"></b><b style="grid-column:7/10;grid-row:1/4"></b><b style="grid-column:10/13;grid-row:1/4"></b><b style="grid-column:1/9;grid-row:4/9"></b><b style="grid-column:9/13;grid-row:4/9"></b><b style="grid-column:1/8;grid-row:9/14"></b><b class="err" style="grid-column:8/13;grid-row:9/14"></b></div></li>
+          <li><strong>Volta 2: aprovado.</strong> Nenhum widget vazio, nada cortado, 4 números alinhados, sem rolagem lateral, a principal no topo à esquerda.</li>
+        </ol>
+      </div>
+      <div class="panel">
+        <h2>Loop de dados</h2>
+        <div class="scroll-x"><table style="margin-top:var(--s3)">
+          <thead><tr><th>Widget</th><th class="num">GHL</th><th class="num">Recontagem</th><th>Resultado</th></tr></thead>
+          <tbody>
+            <tr><td>Faltas</td><td class="num">35</td><td class="num">35</td><td class="res bate">bate</td></tr>
+            <tr><td>Comparecimento</td><td class="num">81%</td><td class="num">81%</td><td class="res bate">bate</td></tr>
+            <tr><td>Consultas marcadas</td><td class="num">224</td><td class="num">224</td><td class="res bate">bate</td></tr>
+            <tr><td>Tratamentos fechados</td><td class="num">31</td><td class="num">27</td><td class="res diverge">diverge</td></tr>
+            <tr><td colspan="4" style="color:var(--muted-foreground)">Causa: o widget contava pela mudança de status, então entraram 4 cards reabertos. Trocado para data de criação. Nova volta: 27 e 27, bate.</td></tr>
+            <tr><td>Origem dos pacientes</td><td class="num">212</td><td class="num">212</td><td class="res bate">bate</td></tr>
+            <tr><td>Status das consultas</td><td class="num">224</td><td class="num">224</td><td class="res bate">bate</td></tr>
+          </tbody>
+        </table></div>
+        <p style="margin-top:var(--s4)">Painel ainda <strong>privado</strong>. Publicar libera para Dono e Recepção (só leitura) e pede confirmação.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const PAINEIS = {
+  clinica: {
+    nome:"Consultas e tratamentos", cliente:"Clínica Sorriso Pleno", periodo:"Últimos 30 dias",
+    tema:{titleColor:"#0F172A",backgroundColor:"#F4F7F7",baseColor:"#0E7C86",metricColor:"#1E293B",onBase:"#FFFFFF"},
+    w:[
+      {k:"sec",y:0,t:"Agenda"},
+      {k:"num",x:0,y:1,w:3,h:4,t:"Faltas",v:"35",d:"8%",seta:"↓",bom:true,vs:"vs 30 dias antes"},
+      {k:"num",x:3,y:1,w:3,h:4,t:"Comparecimento",v:"81%",d:"3 p.p.",seta:"↑",bom:true,vs:"vs 30 dias antes"},
+      {k:"num",x:6,y:1,w:3,h:4,t:"Consultas marcadas",v:"224",d:"12%",seta:"↑",bom:true,vs:"vs 30 dias antes"},
+      {k:"num",x:9,y:1,w:3,h:4,t:"Tratamentos fechados",v:"27",d:"17%",seta:"↑",bom:true,vs:"vs 30 dias antes"},
+      {k:"line",x:0,y:5,w:8,h:7,t:"Consultas por semana",sub:"marcadas e comparecidas",s:[["Marcadas",[38,44,41,47,52,46]],["Comparecidas",[30,36,33,39,43,38]]],eixo:["8/set","15/set","22/set","29/set","6/out","13/out"]},
+      {k:"donut",x:8,y:5,w:4,h:7,t:"Status das consultas",d:[["Compareceu",149],["Faltou",35],["Cancelou",22],["Remarcou",18]]},
+      {k:"sec",y:12,t:"Tratamentos e origem"},
+      {k:"funnel",x:0,y:13,w:7,h:6,t:"Da avaliação ao tratamento",sub:"criadas nos últimos 30 dias",d:[["Avaliação",212],["Orçamento enviado",118],["Negociação",64],["Tratamento fechado",27]]},
+      {k:"hbar",x:7,y:13,w:5,h:6,t:"Origem dos pacientes",sub:"novos contatos, 30 dias",d:[["Instagram",74],["Google",51],["Indicação",38],["Facebook Ads",29],["Site",20]]},
+      {k:"table",x:0,y:19,w:12,h:6,t:"Faltas da semana",cols:["Paciente","Consulta","Profissional","Origem"],rows:[["Mariana Couto","14/out, 09:00","Dra. Helena","Instagram"],["Roberto Alves","14/out, 15:30","Dr. Caio","Indicação"],["Fernanda Lima","15/out, 10:00","Dra. Helena","Google"],["João Pedro Reis","16/out, 08:30","Dra. Sofia","Facebook Ads"]]}
+    ]
+  },
+  loja: {
+    nome:"Vendas da semana", cliente:"Prime Veículos", periodo:"Últimos 7 dias",
+    tema:{titleColor:"#1C1917",backgroundColor:"#F7F5F2",baseColor:"#C2410C",metricColor:"#1C1917",onBase:"#FFFFFF"},
+    w:[
+      {k:"num",x:0,y:0,w:3,h:4,t:"Leads novos",v:"412",d:"22%",seta:"↑",bom:true,vs:"vs semana anterior"},
+      {k:"num",x:3,y:0,w:3,h:4,t:"Test drives marcados",v:"63",d:"9%",seta:"↑",bom:true,vs:"vs semana anterior"},
+      {k:"num",x:6,y:0,w:3,h:4,t:"Carros vendidos",v:"18",d:"5%",seta:"↓",bom:false,vs:"vs semana anterior"},
+      {k:"num",x:9,y:0,w:3,h:4,t:"Valor vendido",v:"R$ 1,26 mi",d:"4%",seta:"↑",bom:true,vs:"vs semana anterior"},
+      {k:"funnel",x:0,y:4,w:7,h:6,t:"Funil de vendas",sub:"leads criados na semana",d:[["Lead",412],["Contato feito",268],["Test drive",63],["Proposta",41],["Venda",18]]},
+      {k:"hbar",x:7,y:4,w:5,h:6,t:"Leads por campanha",sub:"Meta Ads, 7 dias",d:[["SUVs seminovos",132],["Financiamento fácil",96],["Feirão de outubro",71],["Remarketing",58],["Compass 2023",41]]},
+      {k:"hbar",x:0,y:10,w:6,h:6,t:"Vendas por vendedor",sub:"carros vendidos, 7 dias",d:[["Rafael",6],["Juliana",5],["Marcos",4],["Patrícia",3]]},
+      {k:"line",x:6,y:10,w:6,h:6,t:"Leads por dia",sub:"todas as origens",s:[["Leads",[51,64,58,72,49,61,57]]],eixo:["seg","ter","qua","qui","sex","sáb","dom"]},
+      {k:"table",x:0,y:16,w:12,h:6,t:"Leads sem contato há mais de 24 h",cols:["Lead","Entrou","Campanha","Vendedor"],rows:[["Carlos Menezes","13/out, 18:12","SUVs seminovos","Rafael"],["Aline Duarte","13/out, 21:40","Financiamento fácil","sem dono"],["Tiago Ramos","14/out, 07:55","Feirão de outubro","Marcos"],["Luana Prado","14/out, 09:03","Remarketing","sem dono"]]}
+    ]
+  },
+  servico: {
+    nome:"Atendimento", cliente:"Alfa Climatização", periodo:"Este mês",
+    tema:{titleColor:"#0B1B33",backgroundColor:"#F3F6FA",baseColor:"#1D4ED8",metricColor:"#0B1B33",onBase:"#FFFFFF"},
+    w:[
+      {k:"num",x:0,y:0,w:4,h:4,t:"Conversas esperando resposta",v:"14",d:"6",seta:"↓",bom:true,vs:"vs ontem"},
+      {k:"num",x:4,y:0,w:4,h:4,t:"Conversas novas",v:"286",d:"11%",seta:"↑",bom:true,vs:"vs mês passado"},
+      {k:"num",x:8,y:0,w:4,h:4,t:"Orçamentos enviados",v:"52",d:"8%",seta:"↑",bom:true,vs:"vs mês passado"},
+      {k:"line",x:0,y:4,w:8,h:7,t:"Conversas por dia",sub:"por canal",s:[["WhatsApp",[12,15,9,14,18,11,13,16,10,14]],["Instagram",[3,4,2,5,3,4,2,3,4,3]]],eixo:["1","3","5","7","9","11","13","15","17","19"]},
+      {k:"donut",x:8,y:4,w:4,h:7,t:"Conversas por canal",d:[["WhatsApp",201],["Instagram",52],["Formulário",21],["E-mail",12]]},
+      {k:"hbar",x:0,y:11,w:6,h:6,t:"Mensagens por atendente",sub:"enviadas este mês",d:[["Bruna",412],["Diego",355],["Kelly",298],["Automação",187]]},
+      {k:"funnel",x:6,y:11,w:6,h:6,t:"Do orçamento ao serviço",sub:"criados este mês",d:[["Visita técnica",88],["Orçamento enviado",52],["Aprovado",31],["Instalado",24]]},
+      {k:"table",x:0,y:17,w:12,h:6,t:"Conversas esperando resposta",cols:["Contato","Canal","Última mensagem","Esperando há"],rows:[["Paulo Henrique","WhatsApp","Qual o prazo da instalação?","3 h 10 min"],["Condomínio Vila Rica","E-mail","Segue a planta do salão","2 h 45 min"],["Sabrina Torres","Instagram","Vocês atendem em Joinville?","1 h 20 min"],["Marcelo Brito","WhatsApp","Pode ser sábado?","40 min"]]}
+    ]
+  }
+};
+const PAL_EXTRA = ["#94A3B8","#CBD5E1","#64748B","#E2E8F0"];
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = n => n.toLocaleString("pt-BR");
+function cab(w){return `<div class="w-h"><h3 title="${esc(w.t)}">${esc(w.t)}</h3>${w.sub?`<div class="sub">${esc(w.sub)}</div>`:""}</div>`}
+function corpo(w,tema){
+  if(w.k==="num") return `<div class="w-b mid"><div class="big">${esc(w.v)}</div><div><span class="chip ${w.bom?"up":"down"}">${w.seta} ${esc(w.d)}</span><span class="vs">${esc(w.vs)}</span></div></div>`;
+  if(w.k==="hbar"){const m=Math.max(...w.d.map(d=>d[1]));return `<div class="w-b"><div class="hb">${w.d.map(([l,v])=>`<span class="lab" title="${esc(l)}">${esc(l)}</span><span class="bar" style="width:${Math.max(4,v/m*100)}%"></span><span>${fmt(v)}</span>`).join("")}</div></div>`}
+  if(w.k==="funnel"){const m=w.d[0][1];return `<div class="w-b"><div class="fn">${w.d.map(([l,v],i)=>`<div class="row"><span>${esc(l)}</span><span class="bar" style="width:${Math.max(3,v/m*100)}%"></span><span class="val">${fmt(v)}</span><span class="pct">${i?Math.round(v/w.d[i-1][1]*100)+"%":""}</span></div>`).join("")}</div></div>`}
+  if(w.k==="donut"){const tot=w.d.reduce((a,d)=>a+d[1],0),cores=[tema.baseColor,...PAL_EXTRA];let off=0,r=42,c=2*Math.PI*r;
+    const arcs=w.d.map(([l,v],i)=>{const len=v/tot*c,s=`<circle r="${r}" cx="60" cy="60" fill="none" stroke="${cores[i]}" stroke-width="18" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"></circle>`;off+=len;return s}).join("");
+    return `<div class="w-b mid"><div class="don"><svg width="150" height="150" viewBox="0 0 120 120" role="img" aria-label="${esc(w.t)}">${arcs}<text x="60" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="${tema.metricColor}">${fmt(tot)}</text></svg><ul class="leg">${w.d.map(([l,v],i)=>`<li><i style="background:${cores[i]}"></i>${esc(l)} · ${fmt(v)}</li>`).join("")}</ul></div></div>`}
+  if(w.k==="line"){const W=600,H=160,all=w.s.flatMap(s=>s[1]),mx=Math.ceil(Math.max(...all)*1.1/10)*10,n=w.eixo.length,cores=[tema.baseColor,"#94A3B8"];
+    const pts=v=>v.map((y,i)=>`${(i/(n-1))*W},${H-(y/mx)*H}`).join(" ");
+    const grid=[0,.5,1].map(f=>`<line x1="0" x2="${W}" y1="${H-f*H}" y2="${H-f*H}" stroke="#E2E8F0" vector-effect="non-scaling-stroke"/>`).join("");
+    return `<div class="w-b ln"><div class="ymax">máx. ${fmt(mx)}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(w.t)}">${grid}${w.s.map((s,i)=>`<polyline fill="none" stroke="${cores[i]}" stroke-width="2.5" points="${pts(s[1])}" vector-effect="non-scaling-stroke"/>`).join("")}</svg><div class="eixo" style="padding-left:0">${w.eixo.map(e=>`<span>${esc(e)}</span>`).join("")}</div><ul class="leg">${w.s.map((s,i)=>`<li><i style="background:${cores[i]}"></i>${esc(s[0])}</li>`).join("")}</ul></div>`}
+  if(w.k==="table") return `<div class="w-b tb"><table><thead><tr>${w.cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${w.rows.map(r=>`<tr>${r.map((c,i)=>`<td data-l="${esc(w.cols[i])}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+function painel(id){
+  const p=PAINEIS[id],t=p.tema,el=document.getElementById("t-"+({clinica:"clinica",loja:"loja",servico:"servico"})[id]);
+  const ws=p.w.map(w=>w.k==="sec"
+    ?`<div class="sec" style="grid-row:${w.y+1}/span 1"><h2>${esc(w.t)}</h2></div>`
+    :`<article class="w" style="grid-column:${w.x+1}/span ${w.w};grid-row:${w.y+1}/span ${w.h};--h:${w.h}">${cab(w)}${corpo(w,t)}</article>`).join("");
+  el.innerHTML=`<div class="ghl" style="--dash-bg:${t.backgroundColor};--dash-title:${t.titleColor};--dash-base:${t.baseColor};--dash-metric:${t.metricColor};--dash-on-base:${t.onBase}">
+    <div class="ghl-top"><span class="sel">${esc(p.nome)} <span class="priv"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Privado</span></span><span class="vs">${esc(p.cliente)}</span><span class="sp"></span><span class="range">${esc(p.periodo)}</span></div>
+    <div class="grid">${ws}</div></div>`;
+}
+["clinica","loja","servico"].forEach(painel);
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+function abrir(b){tabs.forEach(x=>{const on=x===b;x.setAttribute("aria-selected",on);x.tabIndex=on?0:-1;document.getElementById(x.getAttribute("aria-controls")).hidden=!on});}
+tabs.forEach((b,i)=>{b.addEventListener("click",()=>abrir(b));b.addEventListener("keydown",e=>{const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;if(d){const n=tabs[(i+d+tabs.length)%tabs.length];abrir(n);n.focus();}})});
+function porHash(){const b=tabs.find(b=>b.id==="b-"+location.hash.slice(1));abrir(b||tabs[0]);}
+window.addEventListener("hashchange",porHash);porHash();
+</script>
+</body>
+</html>
