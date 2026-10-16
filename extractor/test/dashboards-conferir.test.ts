@@ -339,7 +339,7 @@ function servidorAgenda(porCal: Record<string, unknown[]>) {
   });
 }
 
-test("recontarAgenda: uma chamada de eventos por calendário, em ms exatos da janela, e soma", async () => {
+test("recontarAgenda: uma chamada de eventos por calendário, startTime no início da janela e endTime = fim + 365 dias (o widget filtra por criação), e soma", async () => {
   const a = servidorAgenda({ C1: [ev("1", "showed"), ev("2", "noshow")], C2: [ev("3", "showed")] });
   const r = await recontarAgenda(a.client, "L1", filtroAg());
   assert.equal(r.total, 3);
@@ -347,9 +347,21 @@ test("recontarAgenda: uma chamada de eventos por calendário, em ms exatos da ja
   assert.deepEqual(evs.map((p) => p.get("calendarId")).sort(), ["C1", "C2"]);
   for (const p of evs) {
     assert.equal(p.get("startTime"), String(DIA.inicio));
-    assert.equal(p.get("endTime"), String(DIA.fim));
+    assert.equal(p.get("endTime"), String(DIA.fim + 365 * 86_400_000));
     assert.equal(p.get("locationId"), "L1");
   }
+});
+
+test("recontarAgenda: o recorte da janela é local, por dateAdded, não por startTime", async () => {
+  const e = (id: string, dateAdded: string, startTime: string) => ({ id, appointmentStatus: "new", startTime, dateAdded });
+  const a = servidorAgenda({ C1: [
+    e("criadoDentroMarcadoDepois", "2026-10-15T12:00:00.000Z", "2026-12-20 10:00:00"), // entra
+    e("criadoForaStartDentro", "2026-10-10T12:00:00.000Z", "2026-10-15 10:00:00"), // não entra
+    e("criado23h30Local", "2026-10-16T02:30:00.000Z", "2026-11-01 10:00:00"), // 15/10 23:30 em Brasília: entra
+    e("criadoDia16", "2026-10-16T03:00:00.000Z", "2026-11-01 10:00:00"), // não entra
+  ] });
+  const r = await recontarAgenda(a.client, "L1", filtroAg({ agrupar: "appointmentStatus" }));
+  assert.equal(r.total, 2);
 });
 
 test("recontarAgenda: agrupa por situação e aplica o filtro de appointmentStatus", async () => {
