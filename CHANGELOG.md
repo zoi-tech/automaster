@@ -4,6 +4,27 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.31.0 — painéis nativos (dashboards) do GHL
+
+- **Quatro comandos e quatro tools MCP** (36 no total): `dashboards` (leitura ao vivo: lista, detalhe,
+  catálogo, versões, dados de widget, fuso), `dashboard-acao` (ESCREVE: criar, editar, tema, renomear,
+  apagar, restaurar e publicar; prévia sem `--confirmo`), `dashboard-ver` (PNG do painel num perfil de
+  tela próprio, com `--login` uma vez) e `dashboard-conferir` (recontagem de cada widget: `bate`,
+  `diverge`, `sem_conferencia`). Skill nova `automaster-dashboard` com o método (leitura, entrevista,
+  plano, montagem, loop visual, loop de dados, publicação).
+- Painel nasce privado. `publicar` exige `--confirmo` e recusa se a última conferência divergiu.
+- Header `x-reporting-api-version: 3` em todo `/reporting/`; sem ele o PUT dá 409.
+- O histórico de versões está desligado na subconta, então `restaurar` não tem para onde voltar.
+- **Conferência, fontes e limites:** oportunidades, contatos, conversas e agenda recontam pelas rotas de
+  leitura; ligações recontam pelo GHL contra o GHL (não é independente). Conversas de atividade
+  divergem: o widget as conta e a busca nunca as devolve.
+- **Pendência, e-mail:** rota de relatório de e-mail da conta não encontrada; widgets `crm-emails`
+  saem `sem_conferencia`.
+- **Pendência, Meta:** a conferência dos anúncios exige `AUTOMASTER_META_TOKEN`; sem token vira
+  `sem_conferencia` e não foi exercitada com token real.
+- Dois endurecimentos de segurança: conta de anúncio só aceita dígitos antes de entrar na URL do Graph,
+  e o GHL deslogado cai em `/?url=` (o `--login` espera `/v2/`).
+
 ## 0.30.0 — sem interfaces: só funcionamento
 
 - **Removidas as interfaces do auditor**: a TUI (`automaster-audit tui`, extra `[tui]`) e os HTMLs

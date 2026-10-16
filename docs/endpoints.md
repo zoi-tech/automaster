@@ -1494,6 +1494,8 @@ Painéis nativos do GHL, **leitura** (etapa 1 do plano de dashboards). Host
 O app manda `Version: 2021-04-15`, mas o `GhlClient` manda `2021-07-28` e o servidor aceita:
 nenhuma mudança no cliente.
 
+### Leitura
+
 | Rota | Forma real |
 |---|---|
 | `GET /dashboards?locationId` | `data = {defaultDashboardId, dashboard:[{_id,title,isDefault\|null,isFavorite}], sharedDashboards:[mesmo]}`. **Sem `isPrivate` nem `__v`.** |
