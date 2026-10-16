@@ -3,10 +3,10 @@
  *
  * src/api/dashboards.ts
  *   publicarPainel(client, loc, id, papeis): POST `${BASE}/dashboards/<id>/permissions` (a query, se a prova
- *     ao vivo exigir, é livre: o teste só confere o prefixo). Corpo (HIPÓTESE A CONFIRMAR NA PROVA AO VIVO no
- *     painel `ZZ TESTE AUTOMASTER etapa 8`; ajuste aqui e na constante `acessoDe` abaixo se divergir):
- *       { locationId: loc, isPrivate: false, permissionAccess: [{ role: "account_admin", access: "read" }, ...] }
- *     Só os papéis pedidos entram. A rota veio do bundle (pesquisa A1); a forma do corpo não estava lá.
+ *     ao vivo exigir, é livre: o teste só confere o prefixo). Corpo (CONFIRMADO ao vivo: a chave é `permission`, valores read|write;
+ *     com `access` o servidor responde 422):
+ *       { locationId: loc, isPrivate: false, permissionAccess: [{ role: "account_admin", permission: "read" }, ...] }
+ *     Só os papéis pedidos entram. A rota veio do bundle (pesquisa A1); a forma do corpo veio da prova ao vivo.
  *
  * src/cli/dashboards.ts
  *   executarDashboardAcao(client, o, log?) com o.acao === "publicar" e dois campos novos em `o`:
@@ -72,8 +72,8 @@ function falso() {
   return { client, chamadas, escritas: () => chamadas.filter((c) => c.metodo !== "get") };
 }
 
-/** Hipótese do corpo de acesso: um item { role, access } por papel pedido. */
-const acessoDe = (role: string, access: string) => ({ role, access });
+/** Corpo confirmado ao vivo: um item { role, permission } por papel pedido. */
+const acessoDe = (role: string, permission: string) => ({ role, permission });
 const PAPEIS = "account_admin:read,account_user:read";
 const base = { location: LOC, id: ID, acao: "publicar", papeis: PAPEIS, versaoEsperada: 7 };
 const pub = (client: unknown, o: object) =>
