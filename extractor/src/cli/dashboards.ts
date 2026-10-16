@@ -100,7 +100,8 @@ export async function runDashboardVer(
     if (opts.login) {
       await page.goto(URL_LOGIN, { waitUntil: "domcontentloaded" });
       log("faça o login na janela; ela fecha sozinha quando o GHL sair da tela de login (até 10 min)");
-      await page.waitForURL((u) => !u.href.includes("/login"), { timeout: 600_000 });
+      // logado, o GHL cai em /v2/...; o formulário também pode viver em "/" ou "/login"
+      await page.waitForURL((u) => u.pathname.startsWith("/v2/"), { timeout: 600_000 });
       const vazio: Resultado = { arquivo: "", largura: 0, altura: 0, widgets: 0, vazios: [] };
       emitir(opts.json, { login: "ok" });
       return vazio;
@@ -109,7 +110,15 @@ export async function runDashboardVer(
     if (page.url().includes("/login")) {
       throw new ErroSessao("login_pendente", "o perfil de tela não está logado: rode npm run dashboard-ver -- --login");
     }
-    await page.waitForSelector(SELETOR_WIDGET, { timeout: 40_000 });
+    try {
+      await page.waitForSelector(SELETOR_WIDGET, { timeout: 40_000 });
+    } catch (e) {
+      // deslogado, o GHL redireciona para "/?url=..." (sem "/login") e mostra o formulário de e-mail/senha
+      if (await page.$("input[type=password]").catch(() => null)) {
+        throw new ErroSessao("login_pendente", "o perfil de tela não está logado: rode npm run dashboard-ver -- --login");
+      }
+      throw e;
+    }
     const m = (await page.evaluate(MEDIR)) as Omit<Resultado, "arquivo">;
     await page.setViewportSize({ width: m.largura, height: m.altura }); // painel inteiro numa tela só
     await page.waitForTimeout(1500);
