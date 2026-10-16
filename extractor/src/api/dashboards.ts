@@ -13,6 +13,8 @@ export interface WidgetDef {
   title: string;
   chartType: string;
   module: string;
+  /** Nos objetos de layout (objectWidget) diz qual: object-title, object-textbox, object-image, object-embed. */
+  identifier?: string;
   options: unknown;
   apiConfig: { path: string };
 }

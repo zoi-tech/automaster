@@ -24,6 +24,11 @@ instalado faz sobe a versão aqui; o time atualiza com
   `sem_conferencia` e não foi exercitada com token real.
 - Dois endurecimentos de segurança: conta de anúncio só aceita dígitos antes de entrar na URL do Graph,
   e o GHL deslogado cai em `/?url=` (o `--login` espera `/v2/`).
+- **Painel completo e profissional (etapa 11):** a skill lê a subconta a fundo até um retrato, entrevista
+  em estilo grill (uma pergunta por vez, citando a leitura, sem perguntar dispositivo) e planeja pelo
+  menos 12 widgets em seções com cabeçalho e títulos de seção (`object-title`), num molde de layout com
+  números do topo baixos. `criar` já nasce com tema branco e a cor da marca (`--cor-marca`, padrão
+  `#1F7A3A`). Avisos novos de composição: `painel_simploria`, `numero_alto_demais`, `sem_secoes`.
 
 ## 0.30.0 — sem interfaces: só funcionamento
 

@@ -4,10 +4,11 @@
  */
 export type Problema = { codigo: string; mensagem: string };
 export type ItemLayout = { id: string; x: number; y: number; w: number; h: number; chartType: string };
-export type ItemPlano = ItemLayout & { titulo: string; module: string; options: Record<string, any> };
+export type ItemPlano = ItemLayout & { titulo: string; module: string; options: Record<string, any>; identifier?: string };
 
 const COLUNAS = 12;
-const MINIMOS: Record<string, [number, number]> = { numeric: [3, 4], table: [6, 6], funnel: [5, 6] };
+// objectWidget (título de seção, texto, imagem, embed): o título de seção do catálogo é 12x1.
+const MINIMOS: Record<string, [number, number]> = { numeric: [3, 3], table: [6, 6], funnel: [5, 6], objectWidget: [1, 1] };
 
 /** Mínimos de largura e altura por tipo de widget (o que o GridStack do app impõe). */
 export const minimosDoTipo = (chartType: string): [number, number] => MINIMOS[chartType] ?? [4, 6];
@@ -82,6 +83,19 @@ export function validarComposicao(plano: ItemPlano[]): Problema[] {
     if (i.w <= 4 && [...i.titulo].length > 32) {
       avisos.push({ codigo: "titulo_longo", mensagem: `O título do widget ${i.id} passa de 32 caracteres numa largura de ${i.w} colunas.` });
     }
+  }
+  // Objetos de layout (objectWidget: título, texto, imagem, embed) não contam como widget de dado.
+  const widgets = plano.filter((i) => i.chartType !== "objectWidget");
+  if (widgets.length && widgets.length < 12) {
+    avisos.push({ codigo: "painel_simploria", mensagem: `O painel tem ${widgets.length} widgets; um painel completo tem pelo menos 12.` });
+  }
+  for (const i of widgets) {
+    if (i.chartType === "numeric" && i.h > 4) {
+      avisos.push({ codigo: "numero_alto_demais", mensagem: `O número ${i.id} tem altura ${i.h}; número do topo fica em 3, no máximo 4.` });
+    }
+  }
+  if (widgets.length > 8 && !plano.some((i) => i.chartType === "objectWidget" && i.identifier === "object-title")) {
+    avisos.push({ codigo: "sem_secoes", mensagem: `${widgets.length} widgets sem nenhum título de seção (object-title de largura 12).` });
   }
   return avisos;
 }

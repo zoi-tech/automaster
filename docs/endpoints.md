@@ -1514,6 +1514,10 @@ nenhuma mudança no cliente.
   Mas o `GhlClient` marca todo POST como escrita, então o envelope traz `escrita.tentada: true` sem rastro.
 - "Oportunidades por Status" (`68aded75035add56a641d64a`, `donut`, `/dashboards/crm/opportunities`) devolveu
   contagem por `status` (open/lost/abandoned) nos últimos 30 dias.
+- **Objetos de layout** (`objectWidgetDefinitions` do catálogo, todos `chartType: "objectWidget"`, o tipo no
+  `identifier`): `object-title` (título, nasce 12x1), `object-textbox`, `object-image` e `object-embed`. Não há
+  divisor próprio: o `object-title` de largura 12 é o separador de seção. O validador local aceita objeto de
+  layout a partir de 1x1, e `validarComposicao` só conta `object-title` como título de seção (`sem_secoes`).
 
 CLI: `npm run dashboards -- -l <loc> -o lista|detalhe|catalogo|versoes|dados|fuso [-i <id>] [--widget <wid>] --json`.
 
@@ -1544,12 +1548,15 @@ Etapa 3, provado ao vivo na Xb9g num painel `ZZ TESTE AUTOMASTER etapa 3` privad
 - `PUT /dashboards/<id>?locationId` `{title,activityBuffer,layout,themeConfig,version}`; `version` = `__v` lido. Cada PUT que
   muda widget, layout ou tema sobe o `__v` em 1; só trocar o título NÃO sobe. `activityBuffer` leva só as chaves
   usadas (`create`, `update`, `delete`) e `{}` quando não há mudança de widget.
-- **Layout:** cada item exige `x,y,w,h,minW,minH` numéricos (senão 422). Mínimos do tipo: numeric 3x4, table 6x6, funnel 5x6,
-  demais 4x6. O item é achado pelo `_id` da linha de `dashboardWidgets`; por `widgetId` o servidor responde 200 e não faz
+- **Layout:** cada item exige `x,y,w,h,minW,minH` numéricos (senão 422). Mínimos do tipo: numeric 3x3 (o app sugere minH 4, mas o PUT aceita h 3 com minH 3 e o cartão fica mais baixo; provado ao vivo em 2026-10-16), table 6x6, funnel 5x6,
+  objectWidget 1x1, demais 4x6. O item é achado pelo `_id` da linha de `dashboardWidgets`; por `widgetId` o servidor responde 200 e não faz
   nada (sem subir `__v`).
 - **Tema:** o GET devolve plano, o PUT só aplica `{dashboardTheme:{themeName,titleColor,backgroundColor,metricColor,linkColor,...},
   widgetTheme:{}}`. Tema plano dá 200 e é ignorado; tema vazio dá 422 (painel novo nasce sem tema: o app manda
   `{themeName:"none",titleColor:"#101828",backgroundColor:"#FFFFFF",metricColor:"#334155",linkColor:"#2970ff"}`).
+  `criar` faz o POST e logo um PUT com o tema branco `themeName:"custom"`, fundo `#FFFFFF`, título `#101828` e a cor
+  da marca (`--cor-marca`, padrão `#1F7A3A`) em `metricColor`, `baseColor` e `linkColor`; cor fora de `#RRGGBB` ou
+  com contraste abaixo de 4.5:1 no branco é recusada antes do POST.
 - **Widget novo:** chave de `create` e `_id` precisam ser ObjectId de 24 hex (`novo1` dá 400 genérico). Corpo = lista fixa copiada
   do molde (`deleted:false,_id,hasTrimmedFilters,identifier,className,module,moduleName,eventSource,group,title,chartType,options,
   savedOptionPairs,locationId,extras,apiConfig,externalDataConfig,metricId`), sem `dashboardId`/`createdBy`/`__v`. O layout

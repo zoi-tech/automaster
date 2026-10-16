@@ -184,9 +184,20 @@ function temaAninhado(t: Record<string, any>): { dashboardTheme: Record<string, 
   };
 }
 const HEX = /^#[0-9a-fA-F]{6}$/;
+const COR_MARCA_PADRAO = "#1F7A3A"; // verde, 5.4:1 no branco
+/** Tema com que o painel nasce: fundo branco, título escuro, a cor da marca em números, linhas e barras. */
+function temaBranco(corMarca: string): { dashboardTheme: Record<string, string>; widgetTheme: Record<string, never> } {
+  if (!HEX.test(corMarca)) throw new Error(`--cor-marca "${corMarca}" não está no formato #RRGGBB`);
+  const c = contraste(corMarca, "#FFFFFF");
+  if (c < 4.5) throw new Error(`--cor-marca ${corMarca} tem contraste ${c.toFixed(2)}:1 no fundo branco, abaixo de 4.5:1`);
+  return {
+    dashboardTheme: { themeName: "custom", backgroundColor: "#FFFFFF", titleColor: "#101828", metricColor: corMarca, baseColor: corMarca, linkColor: corMarca },
+    widgetTheme: {},
+  };
+}
 
 interface OpcoesAcao {
-  location: string; acao: string; id?: string; titulo?: string; plano?: string; tema?: string;
+  location: string; acao: string; id?: string; titulo?: string; plano?: string; tema?: string; corMarca?: string;
   versao?: number | string; versaoEsperada?: number | string; papeis?: string; forcar?: boolean; confirmo?: boolean; json?: boolean;
 }
 interface PlanoEdicao {
@@ -230,13 +241,17 @@ export async function executarDashboardAcao(
 
   if (o.acao === "criar") {
     if (!o.titulo) throw new Error("--acao criar exige --titulo");
-    mudancas.push(`criar o painel privado "${o.titulo}"`);
+    const temaNovo = temaBranco(o.corMarca ?? COR_MARCA_PADRAO);
+    mudancas.push(`criar o painel privado "${o.titulo}"`, `tema: fundo branco #FFFFFF, cor da marca ${temaNovo.dashboardTheme.metricColor}`);
     if (!o.confirmo) {
       return { acao: o.acao, aplicado: false, motivo: "prévia: nada foi gravado; repita com --confirmo", painel: { id: null, titulo: o.titulo, isDefault: false, isPrivate: true }, versao: null, mudancas, problemas, avisos };
     }
     const resposta = await criarPainel(client, loc, o.titulo);
-    const novoId = (resposta as { data?: { _id?: string } })?.data?._id ?? "novo";
+    const criado = (resposta as { data?: { _id?: string; __v?: number } })?.data;
+    const novoId = criado?._id ?? "novo";
     const registro = registroEscrita(loc, "_dashboards", novoId, { acao: o.acao, titulo: o.titulo, resposta });
+    // Painel nasce sem tema; o tema branco entra num PUT logo depois do POST.
+    await salvarPainel(client, loc, novoId, { title: o.titulo, activityBuffer: {}, layout: [], themeConfig: temaNovo, version: criado?.__v ?? 0 });
     return { acao: o.acao, aplicado: true, painel: { id: novoId, titulo: o.titulo, isDefault: false, isPrivate: true }, mudancas, problemas, avisos, registro, resposta };
   }
 
@@ -298,6 +313,7 @@ export async function executarDashboardAcao(
       return {
         ...i, chartType: c?.molde?.chartType ?? w?.chartType ?? "", module: c?.molde?.module ?? w?.module ?? "",
         titulo: c?.titulo ?? c?.molde?.title ?? w?.titulo ?? "", options: { ...(c ? c.molde?.options : w?.options as object), ...c?.options },
+        identifier: c?.molde?.identifier ?? w?.definicao?.identifier,
       };
     }));
     // O id do plano é temporário: o servidor exige ObjectId, e o layout o referencia pelo id novo.
@@ -444,6 +460,7 @@ export function registrarDashboards(program: Command): void {
     .option("-i, --id <id>", "id do painel (todas menos criar)")
     .option("--titulo <texto>", "título (criar, renomear)")
     .option("--plano <json|arquivo>", "editar: {criar:[{id,titulo,molde}],atualizar:[],remover:[],layout:[{id,x,y,w,h}]}")
+    .option("--cor-marca <#RRGGBB>", "criar: cor da marca nos números, linhas e barras do tema branco", COR_MARCA_PADRAO)
     .option("--tema <json>", "tema: cores #RRGGBB (titleColor, backgroundColor, baseColor, metricColor, linkColor)")
     .option("--versao <n>", "restaurar: versão para a qual voltar")
     .option("--versao-esperada <n>", "versão que a prévia mostrou (obrigatória com --confirmo)")
