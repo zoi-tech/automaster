@@ -52,6 +52,16 @@
  *     sem versão /--versao-esperada/; divergência /o painel mudou desde a prévia/; layout /sobrepõem/
  *     (a mensagem lista cada problema); cor /#RRGGBB/; contraste /contraste/.
  *   O comando `dashboard-acao` (--help) não tem opção de painel público/compartilhado.
+ *
+ * Etapa 11 — tema padrão branco quando o painel nasce:
+ *   criar com confirmo faz 2 escritas, nesta ordem: o POST de sempre (corpo exato, privado) e um
+ *   PUT `${BASE}/dashboards/<idNovo>?locationId=<loc>` com activityBuffer {} e
+ *   themeConfig { dashboardTheme:{ themeName:"custom", backgroundColor:"#FFFFFF", titleColor:<escuro,
+ *   contraste >= 7 no branco>, metricColor/baseColor/linkColor: <cor da marca> }, widgetTheme:{} }.
+ *   A cor da marca vem de o.corMarca (CLI --cor-marca #RRGGBB); o padrão é "#1F7A3A" (verde, 5.4:1
+ *   no branco). corMarca fora de #RRGGBB recusa com /#RRGGBB/ e abaixo de 4.5:1 no branco com
+ *   /contraste/, as duas ANTES do POST (zero escritas). A prévia de criar cita o fundo branco.
+ *   O `tema` segue trocando só o que vier.
  */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -67,6 +77,7 @@ after(() => fs.rmSync(HOME, { recursive: true, force: true }));
 
 const { criarPainel, salvarPainel, apagarPainel, restaurarVersao } = await import("../src/api/dashboards.js");
 const { executarDashboardAcao } = await import("../src/cli/dashboards.js");
+const { contraste } = await import("../src/api/dashboards-layout.js");
 
 const R = "https://backend.leadconnectorhq.com/reporting";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -508,16 +519,92 @@ test("restaurar com confirmo: um POST na versão pedida", async () => {
   assert.deepEqual(escritas().map((c) => [c.metodo, c.url]), [["post", `${R}/dashboards/${ID}/versions/3/restore?locationId=${LOC}`]]);
 });
 
-test("criar com confirmo: um POST privado, sem exigir --versao-esperada nem id", async () => {
+test("criar com confirmo: o POST é privado, sem exigir --versao-esperada nem id; depois só o PUT do tema", async () => {
   const { client, escritas } = falso();
   const s = await executarDashboardAcao(client, {
     location: LOC, confirmo: true, acao: "criar", titulo: "ZZ TESTE AUTOMASTER etapa 3", publico: true, isPrivate: false,
   } as never);
-  assert.deepEqual(escritas(), [{
+  const e = escritas();
+  assert.equal(e.length, 2); // etapa 11: POST cria, PUT aplica o tema branco
+  assert.deepEqual(e[0], {
     metodo: "post", url: `${R}/dashboards`,
     corpo: { locationId: LOC, title: "ZZ TESTE AUTOMASTER etapa 3", isPrivate: true, permissionAccess: [] },
-  }]);
+  });
+  assert.equal(e[1].metodo, "put");
+  assert.ok(!("isPrivate" in (e[1].corpo as object)) && !("permissionAccess" in (e[1].corpo as object)));
   assert.equal(s.aplicado, true);
+});
+
+// ---------- etapa 11: tema padrão branco ao criar ----------
+
+const criarCom = (extra: object = {}) => {
+  const f = falso();
+  const r = executarDashboardAcao(f.client, { location: LOC, confirmo: true, acao: "criar", titulo: "ZZ novo", ...extra } as never);
+  return { ...f, r };
+};
+
+test("criar: o 2º PUT vai no painel novo, com activityBuffer {} e tema branco aninhado", async () => {
+  const { escritas, r } = criarCom();
+  await r;
+  const put = escritas()[1];
+  assert.equal(put.url, `${R}/dashboards/NOVO1?locationId=${LOC}`);
+  const c = put.corpo as Record<string, any>;
+  assert.deepEqual(c.activityBuffer, {});
+  assert.equal(typeof c.version, "number");
+  assert.equal(c.title, "ZZ novo");
+  assert.deepEqual(c.themeConfig.widgetTheme, {});
+  const t = c.themeConfig.dashboardTheme;
+  assert.equal(t.themeName, "custom");
+  assert.equal(String(t.backgroundColor).toUpperCase(), "#FFFFFF");
+  assert.ok(!("dashboardTheme" in t), "aninhado uma vez só");
+});
+
+test("criar: título escuro (contraste >= 7) e a cor da marca padrão legível no branco em números, linhas e links", async () => {
+  const { escritas, r } = criarCom();
+  await r;
+  const t = (escritas()[1].corpo as Record<string, any>).themeConfig.dashboardTheme;
+  const HEX6 = /^#[0-9a-fA-F]{6}$/;
+  assert.match(t.titleColor, HEX6);
+  assert.ok(contraste(t.titleColor, "#FFFFFF") >= 7, t.titleColor);
+  assert.equal(t.metricColor.toUpperCase(), "#1F7A3A");
+  assert.equal(t.baseColor, t.metricColor);
+  assert.equal(t.linkColor, t.metricColor);
+  assert.ok(contraste(t.metricColor, "#FFFFFF") >= 4.5);
+});
+
+test("criar --cor-marca: a cor pedida vai em metricColor, baseColor e linkColor; fundo segue branco", async () => {
+  const { escritas, r } = criarCom({ corMarca: "#003366" });
+  await r;
+  const t = (escritas()[1].corpo as Record<string, any>).themeConfig.dashboardTheme;
+  assert.deepEqual([t.metricColor, t.baseColor, t.linkColor].map((x: string) => x.toUpperCase()), ["#003366", "#003366", "#003366"]);
+  assert.equal(String(t.backgroundColor).toUpperCase(), "#FFFFFF");
+});
+
+test("criar --cor-marca fora de #RRGGBB recusa antes do POST", async () => {
+  for (const ruim of ["#fff", "verde", "#12345g"]) {
+    const { escritas, r } = criarCom({ corMarca: ruim });
+    await assert.rejects(r, /#RRGGBB/, ruim);
+    assert.deepEqual(escritas(), [], ruim);
+  }
+});
+
+test("criar --cor-marca com contraste < 4.5 no branco recusa antes do POST (o verde #b5ff81 da ZOI)", async () => {
+  const { escritas, r } = criarCom({ corMarca: "#b5ff81" });
+  await assert.rejects(r, /contraste/);
+  assert.deepEqual(escritas(), []);
+});
+
+test("criar sem --confirmo: prévia cita o fundo branco e não escreve", async () => {
+  const { client, escritas } = falso();
+  const s = await executarDashboardAcao(client, { location: LOC, acao: "criar", titulo: "ZZ novo" } as never);
+  assert.deepEqual(escritas(), []);
+  assert.match(s.mudancas.join(" | "), /#FFFFFF|branco/i);
+});
+
+test("`dashboard-acao --help` lista --cor-marca", () => {
+  const r = spawnSync("npx", ["tsx", "src/cli.ts", "dashboard-acao", "--help"], { cwd: RAIZ, encoding: "utf-8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /--cor-marca/);
 });
 
 test("criar sem --titulo erra antes de qualquer escrita", async () => {

@@ -79,11 +79,16 @@ def test_montagem_usa_dashboard_acao(secoes):
     assert "privado" in c.lower()
 
 
-def test_loop_visual_com_checklist_de_11_itens(secoes):
+def test_loop_visual_com_checklist_de_15_itens(secoes):
+    # etapa 11: os 11 itens de antes + 4 de cara profissional (cabeçalho, títulos de seção,
+    # grade alinhada com larguras repetidas, hierarquia resumo-no-topo)
     c = _corpo(secoes, 5)
     assert "dashboard_ver" in c
     itens = re.findall(r"^\s*- \[ \] .+$", c, flags=re.MULTILINE)
-    assert len(itens) == 11, len(itens)
+    assert len(itens) == 15, len(itens)
+    checklist = "\n".join(itens).lower()
+    for termo in ("cabeçalho", "título de seção", "larguras", "hierarquia"):
+        assert termo in checklist, termo
     assert re.search(r"(até|no máximo)\s*3\s+voltas", c)
     baixo = c.lower()
     for termo in ("vazio", "cortado", "alinhad", "rolagem", "contraste"):
@@ -118,6 +123,85 @@ def test_exemplo_trabalhado_da_clinica(texto):
 
 def test_nenhuma_frase_proibida(texto):
     assert not PROIBIDO.search(texto)
+
+
+# ---------- etapa 11: leitura a fundo, grill, painel completo, tema branco ----------
+
+
+def test_leitura_a_fundo_termina_num_retrato(secoes):
+    c = _corpo(secoes, 1).lower()
+    for termo in (
+        "funis",
+        "estágios",
+        "calendários",
+        "workflows",
+        "formulários",
+        "surveys",
+        "canais de conversa",
+        "campos personalizados",
+        "usuários",
+        "anúncios",
+        "retrato",
+    ):
+        assert termo in c, termo
+
+
+def test_entrevista_e_um_grill_sem_pergunta_de_dispositivo(secoes):
+    c = _corpo(secoes, 2)
+    baixo = c.lower()
+    assert "grill" in baixo
+    assert "uma pergunta por vez" in baixo
+    assert "AskUserQuestion" in c
+    # cada pergunta cita o que a leitura achou
+    assert re.search(r"cit\w*[^\n]*leitura|leitura[^\n]*cit\w*", baixo)
+    assert "recomendad" in baixo
+    assert "ramo" in baixo
+    # o painel é sempre para computador; nunca se pergunta o dispositivo
+    assert "computador" in baixo
+    assert "celular" not in baixo
+    assert not re.search(r"dispositivo[^\n.]*\?", baixo)
+
+
+def test_plano_pede_painel_completo(secoes):
+    c = _corpo(secoes, 3).lower()
+    assert re.search(r"(pelo menos|no mínimo|mínimo de)\s*12 widgets", c)
+    assert re.search(r"altura\s*3[^\n]*(no máximo|até|máx\w*)\s*4", c)
+    assert "objectWidget".lower() in c
+    for tipo in ("número", "tendência", "funil", "tabela", "ranking"):
+        assert tipo in c, tipo
+
+
+def _luminancia(hexa: str) -> float:
+    def canal(v: int) -> float:
+        s = v / 255
+        return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (int(hexa[i : i + 2], 16) for i in (1, 3, 5))
+    return 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(b)
+
+
+def test_tema_padrao_branco_e_nenhum_fundo_escuro(texto):
+    assert "#ffffff" in texto.lower()
+    assert "grafite" not in texto.lower()
+    fundos = re.findall(r"backgroundColor\W{0,4}(#[0-9a-fA-F]{6})", texto)
+    for cor in fundos:
+        assert _luminancia(cor) > 0.8, f"fundo escuro no exemplo: {cor}"
+
+
+def test_cara_profissional_com_molde_de_layout(secoes, texto):
+    # objetos de layout do GHL (catálogo ao vivo): object-title, object-textbox, object-image,
+    # object-embed, todos chartType objectWidget. Não existe divisor próprio: o separador é o
+    # object-title de largura 12.
+    c = _corpo(secoes, 3)
+    baixo = c.lower()
+    assert "cabeçalho" in baixo and "período" in baixo
+    assert "título de seção" in baixo
+    assert re.search(r"separador|divisor", baixo)
+    assert "objectWidget" in c and "object-title" in c
+    assert re.search(r"molde[^\n]*profissional|profissional[^\n]*molde", baixo)
+    assert "hierarquia" in baixo
+    # o molde dá seções, larguras e alturas: ao menos uma linha com w e h
+    assert re.search(r"\bw\s*[:=]?\s*12\b", c) and re.search(r"\bh\s*[:=]?\s*1\b", c)
 
 
 def test_claude_md_lista_a_skill():

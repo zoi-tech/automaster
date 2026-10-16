@@ -10,6 +10,14 @@
  *     abaixo caberia ocupar subindo (mesmas colunas livres). Uma acusação por widget que sobe.
  *   validarComposicao(plano: {id, titulo, chartType, module, x, y, w, h, options}[]): {codigo, mensagem}[]
  *     avisos: numeros_demais_no_topo | donut_com_fatias_demais | data_nao_dita_no_titulo | titulo_longo
+ *       | painel_simploria | numero_alto_demais (etapa 11)
+ *     painel_simploria: de 1 a 11 widgets (objectWidget, o título de seção, não conta); painel
+ *       vazio não avisa (é o estado de quem ainda vai montar); 12 ou mais não avisa.
+ *     numero_alto_demais: numeric com h maior que 4 (h 4 passa); a mensagem cita o id.
+ *     sem_secoes: mais de 8 widgets que não são objectWidget e nenhum título de seção. Título de
+ *       seção = chartType "objectWidget" com identifier "object-title" (o item do plano pode trazer
+ *       `identifier`, copiado do molde). object-textbox/object-image/object-embed não contam como
+ *       título. 8 widgets sem título não avisa.
  *     "título cita a data" = o título contém a palavra "data" (sem diferenciar maiúscula).
  *     a data usada de um widget de oportunidade é options.dateProperty.
  *   contraste(corA: string, corB: string): number
@@ -156,7 +164,8 @@ const numeros = (n: number, yDoUltimo = 0) =>
 
 test("composição: painel vazio e widget comum não avisam", () => {
   assert.deepEqual(validarComposicao([]), []);
-  assert.deepEqual(validarComposicao([w({})]), []);
+  // um widget só cai em painel_simploria (etapa 11); fora isso, nada
+  assert.deepEqual(validarComposicao([w({})]).filter((e) => e.codigo !== "painel_simploria"), []);
 });
 
 test("numeros_demais_no_topo: 5 numeric na linha do topo avisa", () => {
@@ -244,7 +253,84 @@ test("titulo_longo: conta caracteres, não bytes (acentos)", () => {
 
 test("os avisos citam o widget na mensagem", () => {
   const p = validarComposicao([w({ id: "longo1", titulo: "a".repeat(40), w: 4 })]);
-  assert.match(p[0].mensagem, /longo1|a{10}/);
+  assert.match(p.find((e) => e.codigo === "titulo_longo")!.mensagem, /longo1|a{10}/);
+});
+
+// ---------- etapa 11: painel_simploria e numero_alto_demais ----------
+
+const comuns = (n: number) => Array.from({ length: n }, (_, i) => w({ id: `g${i}`, y: i * 6 }));
+
+test("painel_simploria: 11 widgets avisa e a mensagem cita a contagem", () => {
+  const p = validarComposicao(comuns(11));
+  const s = p.find((e) => e.codigo === "painel_simploria");
+  assert.ok(s, JSON.stringify(p));
+  assert.match(s.mensagem, /11/);
+});
+
+test("painel_simploria: 1 widget avisa", () => {
+  assert.ok(codigos(validarComposicao(comuns(1))).includes("painel_simploria"));
+});
+
+test("painel_simploria: 12 widgets não avisa", () => {
+  assert.ok(!codigos(validarComposicao(comuns(12))).includes("painel_simploria"));
+});
+
+test("painel_simploria: objectWidget não entra na conta (11 + 3 títulos de seção avisa)", () => {
+  const plano = [...comuns(11), ...["s1", "s2", "s3"].map((id, i) => w({ id, chartType: "objectWidget", y: 100 + i }))];
+  assert.ok(codigos(validarComposicao(plano)).includes("painel_simploria"));
+});
+
+test("painel_simploria: painel vazio não avisa", () => {
+  assert.ok(!codigos(validarComposicao([])).includes("painel_simploria"));
+});
+
+test("numero_alto_demais: numeric com h 5 avisa e cita o widget", () => {
+  const p = validarComposicao([w({ id: "alto1", chartType: "numeric", w: 3, h: 5 })]);
+  const a = p.find((e) => e.codigo === "numero_alto_demais");
+  assert.ok(a, JSON.stringify(p));
+  assert.match(a.mensagem, /alto1/);
+});
+
+test("numero_alto_demais: numeric com h 4 ou 3 não avisa", () => {
+  for (const h of [3, 4]) {
+    assert.ok(!codigos(validarComposicao([w({ chartType: "numeric", w: 3, h })])).includes("numero_alto_demais"), String(h));
+  }
+});
+
+test("numero_alto_demais: só vale para numeric (bar com h 10 não avisa)", () => {
+  assert.ok(!codigos(validarComposicao([w({ chartType: "bar", h: 10 })])).includes("numero_alto_demais"));
+});
+
+test("numero_alto_demais: acusa cada numeric alto, um aviso por widget", () => {
+  const plano = [w({ id: "a1", chartType: "numeric", w: 3, h: 6 }), w({ id: "a2", chartType: "numeric", x: 3, w: 3, h: 8 })];
+  assert.equal(codigos(validarComposicao(plano)).filter((c) => c === "numero_alto_demais").length, 2);
+});
+
+// ---------- etapa 11: sem_secoes ----------
+
+const objeto = (id: string, identifier: string) =>
+  ({ ...w({ id, chartType: "objectWidget", module: "object-widget", x: 0, y: 200, w: 12, h: 1 }), identifier });
+
+test("sem_secoes: 9 widgets e nenhum objeto de título avisa", () => {
+  assert.ok(codigos(validarComposicao(comuns(9))).includes("sem_secoes"));
+});
+
+test("sem_secoes: 8 widgets sem título não avisa", () => {
+  assert.ok(!codigos(validarComposicao(comuns(8))).includes("sem_secoes"));
+});
+
+test("sem_secoes: 9 widgets com um object-title não avisa", () => {
+  assert.ok(!codigos(validarComposicao([...comuns(9), objeto("sec1", "object-title")])).includes("sem_secoes"));
+});
+
+test("sem_secoes: caixa de texto, imagem ou embed não contam como título de seção", () => {
+  const plano = [...comuns(9), objeto("t", "object-textbox"), objeto("i", "object-image"), objeto("e", "object-embed")];
+  assert.ok(codigos(validarComposicao(plano)).includes("sem_secoes"));
+});
+
+test("sem_secoes: objectWidget não entra na conta dos 8 (8 widgets + 3 caixas de texto não avisa)", () => {
+  const plano = [...comuns(8), objeto("t1", "object-textbox"), objeto("t2", "object-textbox"), objeto("t3", "object-textbox")];
+  assert.ok(!codigos(validarComposicao(plano)).includes("sem_secoes"));
 });
 
 // ---------- contraste ----------
