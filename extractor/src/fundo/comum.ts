@@ -6,6 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { APP_GHL } from "../app-ghl.js";
 
 export interface Caminhos {
   dir: string;
@@ -134,7 +135,7 @@ export function pedir(
 export function ehTelaDeLogin(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.hostname === "app.gohighlevel.com" && u.pathname === "/" && u.searchParams.has("url");
+    return [new URL(APP_GHL).hostname, "app.gohighlevel.com"].includes(u.hostname) && u.pathname === "/" && u.searchParams.has("url");
   } catch {
     return false;
   }

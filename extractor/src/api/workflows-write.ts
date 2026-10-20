@@ -1,4 +1,5 @@
 import type { GhlClient } from "./client.js";
+import { APP_GHL } from "../app-ghl.js";
 
 /**
  * Rotas de ESCRITA de workflow, mapeadas do bundle do editor
@@ -9,7 +10,7 @@ export const WF_WRITE = "https://backend.leadconnectorhq.com/workflow";
 
 /** URL do editor no app. `workflow` no SINGULAR: com o plural (rota da lista) o app dá 404. */
 export function urlEditor(loc: string, wid: string): string {
-  return `https://app.gohighlevel.com/v2/location/${loc}/automation/workflow/${wid}`;
+  return `${APP_GHL}/v2/location/${loc}/automation/workflow/${wid}`;
 }
 
 /**

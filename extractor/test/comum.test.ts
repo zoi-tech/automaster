@@ -243,10 +243,11 @@ test("PRAZOS tem os valores combinados e as somas cabem nos cortes", () => {
 
 const LOGIN = "https://app.gohighlevel.com/?url=%2Fv2%2Flocation%2FX%2Fautomation%2Fworkflows";
 
-test("ehTelaDeLogin reconhece só o redirecionamento de login do app.gohighlevel.com", () => {
+test("ehTelaDeLogin reconhece o redirecionamento de login no white label e no app.gohighlevel.com", () => {
   assert.equal(ehTelaDeLogin(LOGIN), true);
   assert.equal(ehTelaDeLogin("https://app.gohighlevel.com/v2/location/X/automation/workflows"), false);
-  assert.equal(ehTelaDeLogin("https://app.zoitech.com.br/?url=%2Fv2%2Flocation%2FX"), false);
+  assert.equal(ehTelaDeLogin("https://app.zoitech.com.br/?url=%2Fv2%2Flocation%2FX"), true);
+  assert.equal(ehTelaDeLogin("https://app.zoitech.com.br/v2/location/X/automation/workflows"), false);
   assert.equal(ehTelaDeLogin("https://outro.gohighlevel.com/?url=%2Fv2"), false);
   assert.equal(ehTelaDeLogin("https://app.gohighlevel.com/v2/location/X?url=%2Fv2"), false);
   assert.equal(ehTelaDeLogin("https://app.gohighlevel.com/"), false);

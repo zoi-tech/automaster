@@ -14,6 +14,7 @@ import {
 import { DumpWriter, stampNow } from "../dump/writer.js";
 import { DUMPS_DIR, withClient } from "./shared.js";
 import { conferirDump } from "../dump/schema.js";
+import { APP_GHL } from "../app-ghl.js";
 
 async function runExtract(opts: { location: string }): Promise<void> {
   const locationId = opts.location;
@@ -118,7 +119,7 @@ async function runDiscover(opts: { location: string; area: string; rota?: string
     const limite = req.method() === "GET" ? 4000 : 500;
     console.log(`  \u2190 ${res.status()} ${res.url()}\n  ${(await res.text().catch(() => "")).slice(0, limite)}`);
   });
-  await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/${rota}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${APP_GHL}/v2/location/${opts.location}/${rota}`, { waitUntil: "domcontentloaded" });
   await page.waitForEvent("close", { timeout: 0 }).catch(() => {});
   await context.close();
   soltar();

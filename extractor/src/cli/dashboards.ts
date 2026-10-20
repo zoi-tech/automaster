@@ -16,6 +16,7 @@ import { entrarNaFila } from "../auth/lock.js";
 import { caminhosDaSessao, ErroSessao } from "../fundo/comum.js";
 import { abrirPerfilDeTela } from "../tela/perfil.js";
 import { conferirPainel } from "../api/dashboards-conferir.js";
+import { APP_GHL } from "../app-ghl.js";
 
 /**
  * As opções salvas no widget não valem como corpo: o app as materializa antes de pedir os números
@@ -87,7 +88,7 @@ async function importarSessaoSalva(context: Pick<BrowserContext, "addCookies" | 
   }
 }
 
-const URL_LOGIN = "https://app.gohighlevel.com/";
+const URL_LOGIN = `${APP_GHL}/`;
 
 interface Resultado { arquivo: string; largura: number; altura: number; widgets: number; vazios: string[] }
 
@@ -134,7 +135,7 @@ export async function runDashboardVer(
       emitir(opts.json, { login: "ok" });
       return vazio;
     }
-    await page.goto(`https://app.gohighlevel.com/v2/location/${opts.location}/dashboard/${opts.id}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${APP_GHL}/v2/location/${opts.location}/dashboard/${opts.id}`, { waitUntil: "domcontentloaded" });
     if (page.url().includes("/login")) {
       throw new ErroSessao("login_pendente", "o perfil de tela não está logado: rode npm run dashboard-ver -- --login");
     }

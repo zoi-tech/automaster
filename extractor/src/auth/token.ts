@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Page, Request } from "playwright";
 import { ehTelaDeLogin } from "../fundo/comum.js";
+import { APP_GHL } from "../app-ghl.js";
 
 export interface Tokens {
   bearer: string;
@@ -59,7 +60,7 @@ export class SemTokens extends Error {
 }
 
 const WORKFLOWS_URL = (loc: string) =>
-  `https://app.gohighlevel.com/v2/location/${loc}/automation/workflows`;
+  `${APP_GHL}/v2/location/${loc}/automation/workflows`;
 
 /**
  * Captura os dois tokens (`authorization: Bearer` + `token-id`) que o app envia

@@ -236,7 +236,7 @@ test("carrega a rota exata do painel, sem networkidle, e espera seletor de widge
   limpar();
   const a = montar();
   await runDashboardVer({ location: "LOC1", id: "PNL1" }, a.abrir as any);
-  assert.equal(a.chamadas.goto[0]!.url, "https://app.gohighlevel.com/v2/location/LOC1/dashboard/PNL1");
+  assert.equal(a.chamadas.goto[0]!.url, "https://app.zoitech.com.br/v2/location/LOC1/dashboard/PNL1");
   assert.notEqual(a.chamadas.goto[0]!.opts?.waitUntil, "networkidle");
   assert.ok(a.chamadas.seletor.length >= 1, "não esperou widget");
   for (const s of a.chamadas.seletor) {
@@ -267,7 +267,7 @@ test("--login abre o perfil visível na raiz do app (o /login do GHL fica em bra
   const a = montar({ saiDoLogin: true });
   await runDashboardVer({ login: true }, a.abrir as any);
   assert.ok(a.eventos.includes("abrir:true"), "perfil não abriu visível");
-  assert.equal(a.chamadas.goto[0]!.url, "https://app.gohighlevel.com/");
+  assert.equal(a.chamadas.goto[0]!.url, "https://app.zoitech.com.br/");
   assert.equal(a.chamadas.shots.length, 0);
   assert.deepEqual(a.eventos.filter((e) => e.endsWith(".close")), ["pagina.close", "contexto.close"]);
 });

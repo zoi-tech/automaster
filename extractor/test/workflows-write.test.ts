@@ -135,7 +135,7 @@ test("criarTrigger reaponta as actions recebidas para o workflow certo", async (
 // A URL do editor é `workflow` no SINGULAR; com o plural (rota da lista) o app devolve 404
 // e a página fica branca, inclusive em workflow publicado e íntegro.
 test("urlEditor usa workflow no singular", () => {
-  assert.equal(urlEditor(LOC, WID), "https://app.gohighlevel.com/v2/location/LOC1/automation/workflow/WF1");
+  assert.equal(urlEditor(LOC, WID), "https://app.zoitech.com.br/v2/location/LOC1/automation/workflow/WF1");
 });
 
 test("listarPastas devolve só os diretórios da raiz", async () => {
