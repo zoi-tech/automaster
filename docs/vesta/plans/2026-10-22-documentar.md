@@ -378,3 +378,33 @@ Roda antes da etapa 9: as provas das etapas 2, 5 e 7 em dados reais mostraram qu
 `.folha` não capa, pegue `getBoundingClientRect().top` da folha e `bottom` de cada descendente direto
 visível; passe para `alturaConteudo`. Depois da verificação, a sessão principal grava as provas de
 tela em `docs/vesta/mockups/2026-10-22-documentar/etapa-10/`.
+
+---
+
+## Etapa 11 — Falhas vistas na prova em duas subcontas
+
+**Tela:** sim (a faixa de fases muda no `zoi.css`).
+
+**Arquivos:** mudar `auditor/src/automaster_audit/ficha.py`, `auditor/src/automaster_audit/loader.py` (se
+precisar guardar os modelos de WhatsApp), `auditor/src/automaster_audit/rules/ai_leftover_published.py`,
+`skills/automaster-documentar/manual/zoi.css`, `skills/automaster-documentar/manual.md` (uma linha
+sobre a prévia velha); criar `auditor/tests/test_ajustes_prova_final.py`.
+
+**O que prova a etapa:**
+- Ficha, passo `whatsapp_v2` com `attributes.template_id` que existe em `whatsapp_templates.json` do
+  dump (`raw: [{id, name, components:[{type:"BODY", text}]}]`): mostra "modelo <nome>" e o texto do
+  BODY do modelo, não o `attributes.message` (que pode ser uma prévia velha). Sem o modelo no dump,
+  mostra "modelo <id>" e o `message` marcado como "prévia guardada no passo". Sem `template_id`,
+  continua mostrando o `message`.
+- Ficha, `internal_notification` com `attributes.type == "whatsapp"` e
+  `attributes.whatsapp.template_id`: mostra "modelo <nome>" e o BODY quando o modelo está no dump,
+  senão "modelo <id>".
+- Ficha, `goto`: mostra o nome do passo de destino ao lado do id quando o destino existe.
+- `ai_leftover_published`: passo de tipo `chatgpt` (e tipos que contenham `gpt` ou `openai`) num
+  workflow publicado acusa; rascunho não.
+- `zoi.css`: a `.jornada` usa colunas automáticas (`repeat(auto-fit, minmax(...))`) para caber 3 a 6
+  fases numa linha; `.ramos.tres` tem três colunas.
+- `manual.md` diz que o texto do passo de WhatsApp pode ser prévia velha e que vale o modelo pelo id.
+
+**Como fazer:** padrão das etapas 2, 5 e 10. Depois da verificação, a sessão principal grava as provas
+de tela em `docs/vesta/mockups/2026-10-22-documentar/etapa-11/`.
