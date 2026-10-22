@@ -18,6 +18,7 @@ import { registrarWorkflows } from "./cli/workflows.js";
 import { registrarWorkflowEditar } from "./cli/workflow-editar.js";
 import { registrarSmoke } from "./cli/smoke.js";
 import { registrarSessao } from "./cli/sessao.js";
+import { registrarManual } from "./cli/manual.js";
 import { falhar } from "./saida.js";
 
 const program = new Command();
@@ -36,5 +37,6 @@ registrarWorkflows(program);
 registrarWorkflowEditar(program);
 registrarSmoke(program);
 registrarSessao(program);
+registrarManual(program);
 
 program.parseAsync(process.argv).catch(falhar);
