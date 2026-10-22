@@ -4,6 +4,35 @@ Versões do `.claude-plugin/plugin.json`. Toda mudança que afete o que o plugin
 instalado faz sobe a versão aqui; o time atualiza com
 `claude plugin marketplace update zoi && claude plugin install automaster@zoi`.
 
+## 0.33.0 — documentar: auditoria das automações e manual do cliente
+
+- **Skill nova `automaster-documentar`**, em duas partes que só leem a subconta: a auditoria
+  (`auditoria.md`: método de leitura, lista de verificação, lições e modelo do relatório em
+  `docs/<cliente>-auditoria-AAAA-MM-DD.md`) e o manual do cliente (`manual.md`: leitura dos
+  publicados e dos modelos de WhatsApp, estrutura, regras de linguagem, geração e conferência
+  página a página do PDF em `docs/`). Regras comuns: extrair de novo antes de ler, ler ao vivo o
+  que muda, conferir a entrega do canal antes de opinar sobre fluxo de mensagem.
+- **Comando `ficha` do auditor** (`automaster-audit ficha <dump> [--workflow ID] [-o arquivo]`):
+  por workflow, status, pasta, configurações (reentrada, parar quando responder, várias
+  oportunidades), gatilhos com todos os filtros e os passos na ordem, com texto das mensagens,
+  esperas, condições e destino de cada ramo.
+- **Onze regras novas (29 no total):** `exposed_secret` (ERROR); `published_outside_folder`,
+  `opportunity_trigger_no_pipeline`, `duplicate_reply_responders`, `impossible_time_condition`,
+  `appointment_waits_out_of_order`, `create_opportunity_without_lookup`,
+  `notify_owner_after_unassign` (WARN); e por aproximação, a conferir, `loss_keeps_cadence`,
+  `cadence_without_exit`, `ai_leftover_published` (INFO).
+- A tool e o comando `conversas` trazem o `status` de entrega de cada mensagem (entregue, lida,
+  falhou…) e o `erro` quando falhou.
+- **Comando `manual-pdf` do extractor:** gera o PDF do manual numa passada só no Chrome do sistema,
+  com a capa ZOI, o `zoi.css` e as fontes da marca (baixadas da Fontshare para
+  `~/.automaster/fontes/` na primeira vez, fora do repositório pela licença), rodapé com logo e
+  número pelo CSS da página, e devolve `paginas`, `secoesEstouradas`, `termosInternos` e `avisos`.
+- **Peças do manual ZOI** em `skills/automaster-documentar/manual/`: `modelo.html` com cliente
+  inventado (fluxo, linha do tempo, semana, funil, balão de WhatsApp com botões, mapa e rodapé,
+  tabela, quadro, pílula, perguntas rápidas), `zoi.css` e logo e sol em SVG.
+- A `automaster-leitura` corrige a pasta da extração pela linha de comando: grava em
+  `~/.automaster/dumps`, a mesma que as tools leem.
+
 ## 0.31.1 — conferência e captura em subconta grande (painel da Nick)
 
 - `dashboard-conferir` pagina as oportunidades pelo cursor (`startAfter`/`startAfterId`): a busca

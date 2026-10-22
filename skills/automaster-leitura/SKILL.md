@@ -287,11 +287,11 @@ workflow (extração nova ou `workflow`) antes de repetir: repetir um `step-cria
 VAZIA é o mesmo `DELETE` do workflow. Antes de apagar, confira que ela não tem filhos: a lista
 `…/list` traz `parentId` de cada item.
 
-**A extração pela linha de comando e as tools leem lugares diferentes.** `npx tsx src/cli.ts
-extract` grava em `automaster_v2/dumps/` (padrão de `cli/shared.ts`). As tools e a validação das 18
-regras leem `~/.automaster/dumps/` (padrão de `mcp/base.py`). Extração rodada pela CLI sem
-`AUTOMASTER_DUMPS=~/.automaster/dumps` não atualiza o que a validação vê, e a resposta continua
-citando o snapshot antigo em `validacao.snapshot`.
+**A extração pela linha de comando e as tools leem o mesmo lugar.** `npx tsx src/cli.ts
+extract` grava em `~/.automaster/dumps/` (padrão de `cli/shared.ts`), e as tools e a validação das
+29 regras leem dali (padrão de `mcp/base.py`). Só uma `AUTOMASTER_DUMPS` apontando para outra pasta
+separa os dois: aí a extração não atualiza o que a validação vê, e a resposta continua citando o
+snapshot antigo em `validacao.snapshot`.
 
 **A CLI crua do extractor recusa escrita sem `--sem-regras`.** Para escrever em lote com a guarda
 das 29 regras, use `bin/automaster-python.sh -m automaster_audit.cli workflow-editar -l <loc> …`,
