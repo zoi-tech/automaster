@@ -17,6 +17,9 @@ Extraia de novo (`/automaster-extract <locationId>`): as correções mudaram o d
 - **Texto aprovado de cada modelo de WhatsApp:** `whatsapp` (`o=templates`), com os componentes
   inteiros (cabeçalho, corpo, rodapé, botões). Só modelo `APPROVED` vira balão. Para um só, passe
   `template=<nome>`.
+- **Texto guardado no passo de WhatsApp:** o `message` do passo pode ser uma prévia velha, de
+  quando o modelo foi escolhido. Vale o modelo pelo `template_id` do passo; a ficha mostra o
+  modelo e, sem ele no dump, marca o texto como prévia.
 - **Se a `whatsapp` voltar vazia** com a linha ligada, o cliente tem a linha na integração da ZOI,
   e o GHL não enxerga os modelos. Peça a quem administra o Hub da ZOI o id da conta do WhatsApp
   (WABA) e o token da conexão do cliente, e puxe a lista direto da Meta:

@@ -1,7 +1,7 @@
 """INFO: passo de IA (ou webhook/código que chama provedor de IA) em workflow publicado.
 
-Por aproximação: tipo de passo com `ai` como palavra (`ai_agent`, `conversation_ai`…) ou
-`webhook`/`custom_code` cuja URL ou código cite openai, anthropic, gemini ou chatgpt. Pode ser
+Por aproximação: tipo de passo com `ai` como palavra (`ai_agent`, `conversation_ai`…), tipo que
+contenha `gpt` ou `openai` (`chatgpt`, `gpt_4`, `openai_assistant`…) ou `webhook`/`custom_code` cuja URL ou código cite openai, anthropic, gemini ou chatgpt. Pode ser
 uso de propósito, não sobra de teste.
 """
 
@@ -12,12 +12,13 @@ import re
 from ..finding import INFO, Finding
 
 _PALAVRA_AI = re.compile(r"(?<![a-z0-9])ai(?![a-z0-9])", re.IGNORECASE)
+_TIPO_GPT = re.compile(r"gpt|openai", re.IGNORECASE)
 _PROVEDOR = re.compile(r"openai|anthropic|gemini|chatgpt", re.IGNORECASE)
 
 
 def _motivo(step: dict) -> str | None:
     tipo = str(step.get("type") or "")
-    if _PALAVRA_AI.search(tipo):
+    if _PALAVRA_AI.search(tipo) or _TIPO_GPT.search(tipo):
         return f"passo de IA ({tipo})"
     if tipo in ("webhook", "custom_code"):
         a = step.get("attributes") or {}

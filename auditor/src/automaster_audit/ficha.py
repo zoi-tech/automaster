@@ -54,14 +54,40 @@ def _texto_mensagem(step: dict) -> str | None:
     return None
 
 
+def _modelo_whatsapp(tid: str, ctx: DumpContext) -> list[str] | None:
+    """Modelo de WhatsApp do dump pelo id: nome e texto do BODY. `None` se o dump não tem o modelo."""
+    modelo = next((t for t in ctx.whatsapp_templates if str(t.get("id") or t.get("_id") or "") == tid), None)
+    if modelo is None:
+        return None
+    componentes = modelo.get("components") or []
+    body = next((c for c in componentes if isinstance(c, dict) and c.get("type") == "BODY"), {})
+    corpo = _resumo(body.get("text"))
+    return [f"modelo **{modelo.get('name') or tid}**"] + ([f"texto: {corpo}"] if corpo else [])
+
+
+def _whatsapp_passo(step: dict, ctx: DumpContext) -> list[str] | None:
+    """Passo `whatsapp_v2` com `template_id`: vale o modelo; o `message` guardado no passo pode ser prévia velha."""
+    a = step.get("attributes") or {}
+    tid = str(a.get("template_id") or "").strip()
+    if not tid:
+        return None
+    modelo = _modelo_whatsapp(tid, ctx)
+    if modelo is not None:
+        return modelo
+    previa = _resumo(a.get("message"))
+    return [f"modelo `{tid}`"] + ([f"prévia guardada no passo: {previa}"] if previa else [])
+
+
 def _modelo_aviso(step: dict, ctx: DumpContext) -> list[str]:
-    """Aviso interno por SMS/e-mail que tira o texto de um modelo: nome e corpo, ou o id sem o modelo."""
+    """Aviso interno por SMS/e-mail/WhatsApp que tira o texto de um modelo: nome e corpo, ou o id sem o modelo."""
     a = step.get("attributes") or {}
     canal = a.get("type")
-    config = a.get(canal) if canal in ("sms", "email") else None
+    config = a.get(canal) if canal in ("sms", "email", "whatsapp") else None
     tid = str(config.get("template_id") or "").strip() if isinstance(config, dict) else ""
     if not tid:
         return []
+    if canal == "whatsapp":
+        return _modelo_whatsapp(tid, ctx) or [f"modelo `{tid}`"]
     modelo = next((t for t in ctx.message_templates if str(t.get("id") or t.get("_id") or "") == tid), None)
     if modelo is None:
         assunto = _resumo(config.get("subject")) if canal == "email" else None
@@ -108,11 +134,15 @@ def _rotulo_ramo(container: dict, node: dict) -> str:
     return node.get("name") or node.get("id") or "?"
 
 
-def _linha_passo(step: dict, ctx: DumpContext) -> str:
+def _linha_passo(step: dict, ctx: DumpContext, by_id: dict) -> str:
     tipo = step.get("type") or "?"
     nome = step.get("name") or tipo
     linha = f"**{nome}** (`{tipo}`)"
     detalhe = _regra_espera(step) if tipo == "wait" else describe_step(step, ctx)
+    if tipo == "goto":
+        destino = by_id.get((step.get("attributes") or {}).get("targetNodeId"))
+        if destino is not None and destino.get("name"):
+            detalhe += f" (**{destino['name']}**)"
     if detalhe and detalhe not in (tipo, nome):
         linha += f": {detalhe}"
     return linha
@@ -136,10 +166,14 @@ def _passos(wf: Workflow, ctx: DumpContext) -> list[str]:
                 item(nivel, f"volta para **{step.get('name') or nid}**")
                 return
             vistos.add(nid)
-            item(nivel, _linha_passo(step, ctx))
+            item(nivel, _linha_passo(step, ctx, by_id))
             tipo = step.get("type")
             a = step.get("attributes") or {}
-            if tipo in _MENSAGEM:
+            modelo_zap = _whatsapp_passo(step, ctx) if tipo == "whatsapp_v2" else None
+            if modelo_zap is not None:
+                for linha in modelo_zap:
+                    item(nivel + 1, linha)
+            elif tipo in _MENSAGEM:
                 texto = _texto_mensagem(step)
                 if texto:
                     item(nivel + 1, f"texto: {texto}")
