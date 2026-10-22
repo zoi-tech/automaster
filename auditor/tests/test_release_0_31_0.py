@@ -22,13 +22,52 @@ def _ler(rel: str) -> str:
     return (RAIZ / rel).read_text(encoding="utf-8")
 
 
-def test_os_tres_manifestos_estao_em_0_31_0():
+def _versao_minima_ok(versoes, minimo):
+    # Import local: se o módulo faltar, só os testes de versão quebram, não o arquivo inteiro.
+    from automaster_audit.versao import versao_minima_ok
+
+    return versao_minima_ok(versoes, minimo)
+
+
+def test_os_tres_manifestos_tem_a_mesma_versao_e_ao_menos_0_31_0():
     v = {
         "plugin.json": json.loads(_ler(".claude-plugin/plugin.json"))["version"],
         "package.json": json.loads(_ler("extractor/package.json"))["version"],
         "pyproject.toml": tomllib.loads(_ler("auditor/pyproject.toml"))["project"]["version"],
     }
-    assert v == {k: ALVO for k in v}, v
+    assert _versao_minima_ok(v, (0, 31, 0)) is True, v
+
+
+def test_versao_minima_ok_tres_iguais_acima_do_minimo():
+    v = {"a": "0.31.1", "b": "0.31.1", "c": "0.31.1"}
+    assert _versao_minima_ok(v, (0, 31, 0)) is True
+
+
+def test_versao_minima_ok_tres_iguais_ao_minimo():
+    v = {"a": "0.31.0", "b": "0.31.0", "c": "0.31.0"}
+    assert _versao_minima_ok(v, (0, 31, 0)) is True
+
+
+def test_versao_minima_ok_reprova_uma_abaixo_do_minimo():
+    v = {"a": "0.31.1", "b": "0.31.1", "c": "0.30.9"}
+    assert _versao_minima_ok(v, (0, 31, 0)) is False
+
+
+def test_versao_minima_ok_reprova_tres_iguais_abaixo_do_minimo():
+    # Pega quem só confere igualdade e quem compara só major.minor.
+    v = {"a": "0.31.0", "b": "0.31.0", "c": "0.31.0"}
+    assert _versao_minima_ok(v, (0, 31, 1)) is False
+
+
+def test_versao_minima_ok_reprova_versoes_diferentes_mesmo_acima_do_minimo():
+    v = {"a": "0.31.1", "b": "0.32.0", "c": "0.31.1"}
+    assert _versao_minima_ok(v, (0, 31, 0)) is False
+
+
+def test_versao_minima_ok_compara_numeros_e_nao_texto():
+    # Como texto, "0.31.10" < "0.31.9"; como número, 10 > 9.
+    v = {"a": "0.31.10", "b": "0.31.10", "c": "0.31.10"}
+    assert _versao_minima_ok(v, (0, 31, 9)) is True
 
 
 def test_changelog_0_31_0_cita_o_que_entrou():
