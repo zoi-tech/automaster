@@ -15,7 +15,7 @@ const COMANDOS = [
   "agenda", "agenda-acao", "anotacao-acao", "anotacoes", "config", "contato-editar",
   "conversas", "conversas-anexar", "conversas-buscar", "conversas-enviar", "conversas-marcar",
   "conversas-mensagem", "conversas-rascunho", "dashboard-acao", "dashboard-conferir", "dashboard-ver", "dashboards", "discover", "extract", "formulario-acao",
-  "formulario-estilo", "formularios", "grupo", "oportunidade-acao", "oportunidades",
+  "formulario-estilo", "formularios", "grupo", "manual-pdf", "oportunidade-acao", "oportunidades",
   "pipeline", "sessao", "smoke", "tag-acao", "tags", "timeline", "whatsapp", "whatsapp-enviar",
   "workflow-acao", "workflow-editar", "workflows-ao-vivo",
 ];
