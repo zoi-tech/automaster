@@ -149,6 +149,11 @@ def root(make_dump, tmp_path, monkeypatch):
     from automaster_audit.mcp import base as mcp_base
 
     def _build(snapshot="2026-06-10_0000", **kw):
+        # workflow sem pasta dispararia `published_outside_folder` em todo teste do servidor
+        for w in kw.get("workflows") or []:
+            entrada = (w.get("raw") or {}).get("list_entry")
+            if isinstance(entrada, dict):
+                entrada.setdefault("parentId", "pasta-teste")
         d = make_dump(**kw)
         dest = tmp_path / "root" / LOC / snapshot
         dest.parent.mkdir(parents=True, exist_ok=True)
