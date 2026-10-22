@@ -11,7 +11,7 @@ Spec: `docs/vesta/specs/2026-10-22-documentar-design.md`
 
 ### A2 — O manual da subconta A e qualquer dado de cliente não podem entrar no plugin
 - Fonte: mesmo commit `f2b654c`; teste previsto `auditor/tests/test_sem_ids_reais.py` (`docs/vesta/plans/2026-10-16-autoevolucao.md:383-399`) que falha com id real em arquivo versionado.
-- Contradiz a spec: parcial (prova 1 fala em "refazer o manual da subconta A a partir do modelo"; o modelo não pode levar a Nick).
+- Contradiz a spec: parcial (prova 1 fala em "refazer o manual da subconta A a partir do modelo"; o modelo não pode levar dado da subconta A).
 - Pergunta que levanta: o modelo traz um cliente fictício; a prova da subconta A roda fora do repositório, com o conteúdo na pasta de trabalho do Luccas.
 
 ### A3 — O extractor abre o Chrome do sistema, não o Chromium do Playwright, e não há Playwright para Python no repo
