@@ -342,3 +342,39 @@ pasta onde a skill roda, com o nome do cliente e a data no arquivo.
 - Em ambas, cada página do PDF é lida como imagem antes de registrar.
 - O teste lê o registro e cobra os campos. O escritor de teste escreve o teste antes; a sessão
   principal escreve o registro com os números medidos.
+
+---
+
+## Etapa 10 — Ajustes vistos nas provas parciais
+
+Roda antes da etapa 9: as provas das etapas 2, 5 e 7 em dados reais mostraram quatro falhas.
+
+**Tela:** sim (o ajuste da tabela muda o `zoi.css`).
+
+**Arquivos:** mudar `auditor/src/automaster_audit/ficha.py`, `auditor/src/automaster_audit/rules/_helpers.py`,
+`extractor/src/cli/manual.ts` (ou `extractor/src/manual/conferencias.ts`),
+`skills/automaster-documentar/manual/zoi.css`; criar `auditor/tests/test_ajustes_provas.py` e
+`extractor/test/manual-medida.test.ts`.
+
+**O que prova a etapa:**
+- Ficha: passo `email` sem `body` mostra o assunto (`attributes.subject`) como "assunto: ..."; passo
+  `internal_notification` com `attributes.type` em `sms`/`email` e o texto num modelo
+  (`attributes.sms.template_id` ou `attributes.email.template_id`) mostra o nome e o corpo do modelo
+  quando o dump tem o modelo em `message_templates.json` (`raw.templates[{id, name, template:{body}}]`);
+  sem o modelo no dump, mostra "modelo <id>".
+- `cadencias(ctx)`: um workflow em laço (mensagem → `goto` que volta para uma espera de tempo antes
+  da mensagem, como numa cadência de follow-up que repete) conta como cadência. Laço sem espera de
+  tempo não conta. O caminho não entra em loop infinito.
+- Gerador: a conta de seção estourada mede o fim do conteúdo da folha (o fundo do último elemento
+  visível em relação ao topo da folha), não a altura da caixa com margem. Uma função pura
+  `alturaConteudo(topoFolha, fundos)` devolve `max(fundos) - topoFolha`; sem filhos devolve 0. O
+  comando também compara o número de páginas do PDF com o número de folhas e, se houver mais páginas
+  que folhas, avisa "o PDF tem N páginas para M folhas".
+- `zoi.css`: tabelas cabem na largura com a borda direita visível (`width: 100%` com
+  `box-sizing: border-box` ou `calc(100% - 1px)`); o teste confere a regra da tabela.
+
+**Como fazer:** ficha e cadência no padrão das etapas 2 e 5; `goto` tem
+`attributes.targetNodeId` (ver `rules/broken_goto.py`). Gerador: no `page.evaluate`, para cada
+`.folha` não capa, pegue `getBoundingClientRect().top` da folha e `bottom` de cada descendente direto
+visível; passe para `alturaConteudo`. Depois da verificação, a sessão principal grava as provas de
+tela em `docs/vesta/mockups/2026-10-22-documentar/etapa-10/`.
