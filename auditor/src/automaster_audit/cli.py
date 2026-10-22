@@ -10,6 +10,7 @@ from pathlib import Path
 from . import rules
 from .contract import ContractError, format_results, run_contracts
 from .diff import build_diff, write_diff
+from .ficha import gerar_fichas
 from .finding import ERROR, INFO, WARN
 from .flow import enumerate_paths
 from .loader import DumpError, load_dump
@@ -57,6 +58,25 @@ def run_paths(args: argparse.Namespace) -> int:
     if n_trunc:
         print(f"atenção: {n_trunc} workflow(s) truncado(s) no cap de caminhos", file=sys.stderr)
     print(f"relatório: {out}")
+    return 0
+
+
+def run_ficha(args: argparse.Namespace) -> int:
+    try:
+        ctx = load_dump(args.dump_path)
+    except DumpError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    try:
+        md = gerar_fichas(ctx, args.workflow)
+    except ValueError as e:
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    if args.output:
+        Path(args.output).write_text(md, encoding="utf-8")
+        print(f"fichas: {args.output}")
+    else:
+        sys.stdout.write(md)
     return 0
 
 
@@ -154,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_paths.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: <dump>/paths.md)")
     p_paths.set_defaults(func=run_paths)
 
+    p_ficha = sub.add_parser("ficha", help="ficha por workflow: configurações, gatilhos e passos (Markdown)")
+    p_ficha.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
+    p_ficha.add_argument("-o", "--output", type=Path, help="arquivo MD de saída (default: stdout)")
+    p_ficha.add_argument("--workflow", help="id do workflow: limita a ficha a ele")
+    p_ficha.set_defaults(func=run_ficha)
+
     p_vc = sub.add_parser("verify-contracts", help="roda contratos de teste contra o dump (PASS/FAIL/AMBIGUOUS)")
     p_vc.add_argument("dump_path", type=Path, help="caminho da pasta de dump")
     p_vc.add_argument(
@@ -212,6 +238,7 @@ def main(argv: list[str] | None = None) -> int:
         not in (
             "audit",
             "paths",
+            "ficha",
             "verify-contracts",
             "diff",
             "workflow-editar",
