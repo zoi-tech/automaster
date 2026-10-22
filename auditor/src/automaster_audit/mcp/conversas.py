@@ -342,8 +342,9 @@ TOOLS = {
         conversas,
         (
             "AO VIVO, pelo processo de fundo do extractor: lê as mensagens trocadas com um contato (SMS, e-mail, "
-            "WhatsApp...). Cada mensagem traz tipo, direcao, autor e `origem` (app/workflow/campaign/api) — "
-            "é `origem` que diz se veio de automação. Corpo cortado em 400 chars; eventos de timeline "
+            "WhatsApp...). Cada mensagem traz tipo, direcao, autor, `origem` (app/workflow/campaign/api) — "
+            "é `origem` que diz se veio de automação —, `status` de entrega (entregue, lida, falhou…) e `erro` "
+            "(texto do erro quando falhou). Corpo cortado em 400 chars; eventos de timeline "
             "(ACTIVITY_*) ficam de fora salvo atividades=true. SEM `id`, com `busca`, procura o texto nas "
             "mensagens da subconta INTEIRA e devolve as conversas que casaram, com contato e trecho."
         ),

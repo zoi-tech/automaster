@@ -4,12 +4,38 @@ import {
   searchConversations, fetchMessages, sendMessage, typeName, isActivity, SEND_TYPES,
   type SendType, searchInConversation, searchMessages, fetchEmail, fetchTranscription,
   recordingUrl, updateConversation, deleteConversation, saveDraft, fetchDrafts, deleteDraft,
-  cancelScheduled, resend, uploadAttachments
+  cancelScheduled, resend, uploadAttachments, type RawMessage
 } from "../api/conversations.js";
 import { stampNow } from "../dump/writer.js";
 import fs from "node:fs";
 import { DUMPS_DIR, withClient } from "./shared.js";
 import { emitir, falhar } from "../saida.js";
+
+/** O que `conversas --json` devolve por mensagem. */
+export function resumirMensagem(m: RawMessage) {
+  const { error, errorMessage } = m as { error?: unknown; errorMessage?: unknown };
+  const msgErro = error && typeof error === "object" ? (error as { message?: unknown }).message : undefined;
+  const erro = typeof error === "string" ? error
+    : typeof msgErro === "string" ? msgErro
+    : typeof errorMessage === "string" ? errorMessage
+    : null;
+  return {
+    id: m.id,
+    data: m.dateAdded,
+    tipo: typeName(m.type),
+    direcao: m.direction,
+    autor: m.userId ?? null,
+    // campo da API: app | workflow | campaign | api | bulk_actions. Nem toda mensagem traz.
+    origem: (m as { source?: string }).source ?? null,
+    corpo: m.body ?? m.activity?.title ?? "",
+    // o e-mail completo se pede com este id, não com o da mensagem
+    emailMessageId: (m as { altId?: string }).altId ?? null,
+    temGravacao: Boolean((m as { meta?: unknown }).meta),
+    // entrega: pending | sent | delivered | read | failed... Nem toda mensagem traz.
+    status: (m as { status?: string }).status ?? null,
+    erro,
+  };
+}
 
 async function runConversas(opts: {
   location: string; id: string; max: string; atividades?: boolean; tipo?: string;
@@ -51,19 +77,7 @@ async function runConversas(opts: {
     const itens = mensagens
       .filter((m) => (filtroIds ? filtroIds.has(m.id) : true))
       .filter((m) => opts.atividades || !isActivity(m.type))
-      .map((m) => ({
-        id: m.id,
-        data: m.dateAdded,
-        tipo: typeName(m.type),
-        direcao: m.direction,
-        autor: m.userId ?? null,
-        // campo da API: app | workflow | campaign | api | bulk_actions. Nem toda mensagem traz.
-        origem: (m as { source?: string }).source ?? null,
-        corpo: m.body ?? m.activity?.title ?? "",
-        // o e-mail completo se pede com este id, não com o da mensagem
-        emailMessageId: (m as { altId?: string }).altId ?? null,
-        temGravacao: Boolean((m as { meta?: unknown }).meta),
-      }));
+      .map(resumirMensagem);
     const payload = {
       contactId: opts.id,
       conversationId: conv.id,
