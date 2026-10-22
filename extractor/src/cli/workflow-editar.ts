@@ -135,7 +135,7 @@ export async function runWorkflowEditar(o: Opts): Promise<void> {
         documento: editado,
         documentoAntes: doc,
         // lista AUTORITATIVA de triggers: o documento não a traz. Quem valida contra
-        // as 18 regras precisa dela, senão conclui que o workflow não tem trigger.
+        // as 29 regras precisa dela, senão conclui que o workflow não tem trigger.
         triggers: await listarTriggers(client, o.location, o.id!),
         ...(await entidadesParaPrevia(client, o.location, tokens)),
       });
@@ -309,7 +309,7 @@ async function acaoTrigger(
   const vazio = { workflowData: { templates: [] } } as unknown as Documento;
   const diff = diffWorkflow({ ...vazio, triggersData: triggers }, { ...vazio, triggersData: restantes });
   // `triggers` na saída é sempre a lista do DEPOIS, igual a `documento`: é ela que quem
-  // valida contra as 18 regras precisa. A lista de antes está no `diff`.
+  // valida contra as 29 regras precisa. A lista de antes está no `diff`.
   // `triggersAntes` é o que a porta com guarda carrega para a gravação
   // (`--triggers-esperados`): sem version que se mexa, é esta lista que fecha a janela.
   Object.assign(saida, {
@@ -503,7 +503,7 @@ export function registrarWorkflowEditar(program: Command): void {
     .option("--trigger-corpo <json>", "JSON do trigger que entra (adicionar, substituir)")
     .option("--versao-esperada <n>", "version que a prévia viu; aborta se o workflow mudou desde então")
     .option("--triggers-esperados <ids>", "ids de trigger que a prévia viu, separados por vírgula; apagar trigger não mexe no version, então é esta lista que guarda a janela entre prévia e gravação")
-    .option("--sem-regras", "assume gravar por fora da validação das 18 regras (camada crua)")
+    .option("--sem-regras", "assume gravar por fora da validação das 29 regras (camada crua)")
     .option("--usuario <id>", "autor da edição; sem ele, sai do token")
     .option("--confirmo", "obrigatório para gravar: muda dado real e não tem desfazer")
     .option("--publicado", "obrigatório junto de --confirmo quando o workflow está publicado")

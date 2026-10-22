@@ -6,7 +6,19 @@ import re
 from collections.abc import Iterator
 from urllib.parse import unquote
 
+from ..flow import enumerate_paths, index_steps
 from ..loader import DumpContext, Workflow
+
+# passos que mandam mensagem ao cliente
+MENSAGEM_AO_CLIENTE = {"sms", "whatsapp_v2", "email"}
+
+GATILHOS_OPORTUNIDADE = {
+    "opportunity_created",
+    "opportunity_status_changed",
+    "pipeline_stage_updated",
+    "opportunity_decay",
+    "opportunity_changed",
+}
 
 
 def steps_of_type(ctx: DumpContext, *types: str) -> Iterator[tuple[Workflow, dict]]:
@@ -46,3 +58,58 @@ def step_template_id(step: dict) -> str:
     """Id do template SMS/WhatsApp citado por um step (`template_id` ou `templateId`)."""
     attrs = step.get("attributes", {}) or {}
     return str(attrs.get("template_id") or attrs.get("templateId") or "").strip()
+
+
+def _espera_de_tempo(step: dict) -> bool:
+    return step.get("type") == "wait" and (step.get("attributes") or {}).get("type") == "time"
+
+
+def _tem_cadencia(wf: Workflow) -> bool:
+    """Algum caminho passa por mensagem → espera de tempo → mensagem (com outros passos no meio)."""
+    by_id = index_steps(wf)
+    paths, _ = enumerate_paths(wf)
+    for path in paths:
+        mensagem = esperou = False
+        for sid, _label in path.steps:
+            step = by_id[sid]
+            if step.get("type") in MENSAGEM_AO_CLIENTE:
+                if esperou:
+                    return True
+                mensagem = True
+            elif mensagem and _espera_de_tempo(step):
+                esperou = True
+    return False
+
+
+def cadencias(ctx: DumpContext) -> list[str]:
+    """Ids (ordenados) dos workflows publicados com 2+ mensagens ao cliente e espera de tempo entre elas."""
+    return sorted(wf.id for wf in ctx.workflows if wf.status == "published" and _tem_cadencia(wf))
+
+
+def gatilhos_ativos(wf: Workflow) -> list[dict]:
+    return [t for t in wf.triggers if t.get("active") and not t.get("deleted")]
+
+
+def status_do_gatilho(trigger: dict) -> set[str]:
+    """Valores de `opportunity.status` filtrados pelo gatilho (vazio se não filtra)."""
+    valores: set[str] = set()
+    for c in trigger.get("conditions") or []:
+        if c.get("field") != "opportunity.status":
+            continue
+        v = c.get("value")
+        valores.update(str(x) for x in (v if isinstance(v, list) else [v]))
+    return valores
+
+
+def remove_de(wf: Workflow, alvo: str) -> bool:
+    """O workflow tem passo `remove_from_workflow` que tira o contato de `alvo` (ou de todos)."""
+    for step in wf.steps:
+        if step.get("type") != "remove_from_workflow":
+            continue
+        a = step.get("attributes") or {}
+        if a.get("allWorkflows"):
+            return True
+        ids = a.get("workflow_id")
+        if ids == alvo or (isinstance(ids, list) and alvo in ids):
+            return True
+    return False

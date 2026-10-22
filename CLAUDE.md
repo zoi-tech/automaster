@@ -31,7 +31,18 @@ Módulos do auditor: `mcp/` (as tools do servidor MCP), `loader.py` (monta `Dump
 
 **Índice reverso com papel:** `dashboard._wf_refs` varre steps **e** triggers; cada tag tem `papeis` (`dispara`/`adiciona`/`remove`/`condicao`). Tag só citada em trigger ou condição não é órfã.
 
-**Regras de auditoria (18):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value,template}_ref` (ERROR; `template` cobre WhatsApp e SMS — e-mail tem regra própria); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `broken_form_ref` (ERROR; formulário/survey citado por trigger ou por `formId` de calendário que não existe mais — id `fb-` é o lead gen do Facebook e nunca acusa); `stale_email_template` (WARN; step de e-mail cujo template sumiu do builder — o id sai do `previewUrl`, nunca do `template_id`, e o e-mail continua sendo enviado, só não dá mais para editá-lo pelo app); `naming_convention`/`dead_end_draft`/`unused_form`/`unused_email_template` (INFO).
+**Regras de auditoria (29):** refs quebradas `broken_{tag,pipeline,field,workflow,user,custom_value,template}_ref` (ERROR; `template` cobre WhatsApp e SMS — e-mail tem regra própria); `workflow_unreachable` (sem entrada; cruza `add_to_workflow`); camada 1 lógica `unreachable_step`/`broken_goto`/`workflow_call_cycle`/`uncovered_condition`; `broken_form_ref` (ERROR; formulário/survey citado por trigger ou por `formId` de calendário que não existe mais — id `fb-` é o lead gen do Facebook e nunca acusa); `stale_email_template` (WARN; step de e-mail cujo template sumiu do builder — o id sai do `previewUrl`, nunca do `template_id`, e o e-mail continua sendo enviado, só não dá mais para editá-lo pelo app); `naming_convention`/`dead_end_draft`/`unused_form`/`unused_email_template` (INFO).
+- `exposed_secret` (ERROR): chave de API ou token escrito direto em custom value, custom code ou webhook.
+- `published_outside_folder` (WARN): workflow publicado fora de qualquer pasta.
+- `opportunity_trigger_no_pipeline` (WARN): gatilho de oportunidade sem filtro de pipeline numa subconta com 2+ pipelines.
+- `duplicate_reply_responders` (WARN): dois ou mais workflows publicados respondem à mesma resposta do cliente.
+- `impossible_time_condition` (WARN): ramo de if/else com condições de horário em E que nunca são verdade juntas.
+- `appointment_waits_out_of_order` (WARN): espera "antes do compromisso" maior ou igual a uma anterior do mesmo caminho.
+- `create_opportunity_without_lookup` (WARN): cria oportunidade sem antes procurar uma no mesmo pipeline.
+- `notify_owner_after_unassign` (WARN): notifica o dono do contato depois de tirar o dono sem atribuir outro.
+- `loss_keeps_cadence` (INFO, a conferir): cadência que nenhum workflow de oportunidade perdida (`lost`) remove.
+- `cadence_without_exit` (INFO, a conferir): cadência entrada pela oportunidade sem saída na mudança de etapa ou na venda (`won`).
+- `ai_leftover_published` (INFO, a conferir): passo de IA, ou webhook/custom code que cita provedor de IA, em workflow publicado.
 
 O contrato entre as partes é o formato do dump (`<raiz>/<locationId>/<YYYY-MM-DD_HHmm>/`), descrito em **`auditor/src/automaster_audit/dump_schema.json`** e conferido pelos dois lados — o extractor no fim da extração (`src/dump/schema.ts`, aviso) e o auditor ao carregar (`dump_schema.py`, recusa). Mudou a forma? Muda o schema junto, senão o dump novo é recusado: `manifest.json` com `schemaVersion` + envelopes com `raw` = resposta da API **intocada**. Workflows: `raw` mescla 4 fontes (`list_entry`, `detail`, `steps` [do Firebase], `triggers`). As **actions vivem em `raw.steps.templates`**, não no `detail`. Entidades: `{fetchedAt, raw:<resposta API>}`. Nunca transformar/limpar o `raw`. Mudou o formato? Incremente `schemaVersion` e atualize o loader.
 
@@ -66,7 +77,7 @@ npm run agenda-acao -- -l <loc> --acao marcar --calendario <id> --contato <conta
 npm run agenda-acao -- -l <loc> --acao bloquear --dono <userId> --inicio <isoComFuso> --fim <isoComFuso> --confirmo --json  # ESCREVE: bloqueia horário na agenda de um usuário
 npm run workflows-ao-vivo -- -l <loc> -o dentro -i <workflowId> --json    # quem está dentro de um workflow, ao vivo
 npm run workflow-acao -- -l <loc> --acao inscrever -i <workflowId> --contato <contactId> --confirmo --json  # ESCREVE: publica/despublica, inscreve, remove ou retoma
-npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico/configuracao/step-criar/step-remover/step-mover); sem --confirmo é prévia; camada CRUA, grava sem as 18 regras
+npm run workflow-editar -- -l <loc> --acao trocar-ref -i <workflowId> --de <idVelho> --para <idNovo> --confirmo --json  # ESCREVE: estrutura (criar/renomear/mover/duplicar/apagar/trocar-ref/trocar-tag/limpar-orfaos/atributo/trigger/historico/configuracao/step-criar/step-remover/step-mover); sem --confirmo é prévia; camada CRUA, grava sem as 29 regras
 npm run workflow-editar -- -l <loc> --acao step-criar -i <wid> --depois-de <stepId> --corpo '{"type":"sms",...}' --confirmo --json  # ESCREVE: monta o canvas (step-criar/step-remover/step-mover)
 npm run anotacoes -- -l <loc> --contato <contactId> --tipo nota --json   # notas e tarefas do contato (leitura ao vivo)
 npm run anotacao-acao -- -l <loc> --contato <id> --tipo tarefa --acao criar --titulo "..." --prazo <iso> --confirmo --json  # ESCREVE: nota/tarefa
@@ -89,7 +100,7 @@ python -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/automaster-audit paths dumps/<loc>/<ts>/        # paths.md (árvore de caminhos)
 .venv/bin/automaster-audit verify-contracts dumps/<loc>/<ts>/ --contracts contracts/  # contratos PASS/FAIL/AMBIGUOUS
 .venv/bin/automaster-audit diff dumps/<loc>/<ts-antigo>/ dumps/<loc>/<ts-novo>/  # diff.md (o que mudou)
-.venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 18 regras
+.venv/bin/automaster-audit workflow-editar -l <loc> --acao trocar-tag -i <wid> --de x --para y --confirmo  # ESCREVE workflow COM a validação das 29 regras
 .venv/bin/python -m pytest -q                             # suíte (660 testes)
 .venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests  # lint + formatação
 AUTOMASTER_DUMPS=~/.automaster/dumps .venv/bin/python -m automaster_audit.mcp_server  # servidor MCP (stdio)
@@ -136,7 +147,7 @@ Subconta de validação: `idTeste0000000000004` (subconta de teste, 72 workflows
   `sibling[]`. Container só sai com `--com-subarvore`. Step criado sem
   `advanceCanvasMeta.position` aparece no lugar certo — o editor calcula o layout (provado ao
   vivo em 2026-09-21).
-- **A validação pelas 18 regras mora acima do comando.** `npm run workflow-editar` é a camada crua e
+- **A validação pelas 29 regras mora acima do comando.** `npm run workflow-editar` é a camada crua e
   RECUSA gravar sem `--sem-regras` (o aviso em stderr não segurava ninguém). As duas portas com guarda são a tool MCP
   `workflow_editar` e `automaster-audit workflow-editar`, que chamam o mesmo caminho: prévia sem
   `--confirmo` → `validar_edicao` → gravação. Ação nova entra nas três, e com teste próprio.

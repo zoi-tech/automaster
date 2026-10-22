@@ -180,7 +180,7 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
   o que foi pedido — e nesta API 200 e bump de `version` não provam gravação (a rota irmã
   `only-triggers` faz os dois sem gravar). O diff residual vem em `residual`: confira o workflow
   antes de dizer ao usuário que a edição foi feita.
-- **`validacao.rodou: false` quer dizer que as 18 regras NÃO foram checadas**, por falta de dump
+- **`validacao.rodou: false` quer dizer que as 29 regras NÃO foram checadas**, por falta de dump
   desta subconta em disco ou porque o workflow é mais novo que o último snapshot (recém-criado ou
   duplicado). A escrita não fica travada por isso, mas ninguém conferiu se a edição quebra
   alguma referência — extraia a subconta de novo se quiser a rede de proteção.
@@ -196,11 +196,11 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
   tem âncora.
 - **O `corpo` de `step-criar` é JSON cru, e os attributes não são validados.** Copie um step
   existente do mesmo tipo (via `workflow(loc, id)`) como molde: um `attributes` errado vira caixa
-  que o editor do app não abre, e nenhuma das 18 regras acha isso estranho.
+  que o editor do app não abre, e nenhuma das 29 regras acha isso estranho.
 - **`aviso` numa prévia de trigger quer dizer que a lista de triggers não pôde ser lida.** A
   prévia segue sem ela em vez de falhar inteira, e a validação cai na lista do dump — o que
   vier de achado de trigger ali vale para o snapshot, não para agora.
-- **A guarda das 18 regras é desta tool, não do comando cru.** `npm run workflow-editar` é a
+- **A guarda das 29 regras é desta tool, não do comando cru.** `npm run workflow-editar` é a
   camada de baixo e grava sem rodar regra nenhuma (ele avisa disso em stderr). Fora daqui, a
   outra porta com validação é `automaster-audit workflow-editar`, que chama exatamente o mesmo
   caminho desta tool.
@@ -225,7 +225,7 @@ trigger) e monta o CANVAS (`step-criar`, `step-remover`, `step-mover`). Como ler
   avisa em `avisos`. Quem for abrir o editor do GHL vai ver o nome velho ao lado do id novo.
 - **`trocar-ref` só aceita id em `de`.** Ela substitui em qualquer profundidade, inclusive DENTRO
   do texto de SMS, e-mail e WhatsApp: `de="Olá"` reescreveria o que o cliente fala com a base
-  dele, e nenhuma das 18 regras acharia isso estranho. Texto que não tem cara de id é recusado.
+  dele, e nenhuma das 29 regras acharia isso estranho. Texto que não tem cara de id é recusado.
   Para tag pelo nome use `trocar-tag`; para um campo de um step, `atributo`.
 - **Escrita ao vivo entra numa fila.** Duas escritas ao mesmo tempo não falham, a segunda espera
   a vez (até 2 min); leitura roda em paralelo entre sessões. Navegar no app do GHL com Playwright
@@ -294,7 +294,7 @@ regras leem `~/.automaster/dumps/` (padrão de `mcp/base.py`). Extração rodada
 citando o snapshot antigo em `validacao.snapshot`.
 
 **A CLI crua do extractor recusa escrita sem `--sem-regras`.** Para escrever em lote com a guarda
-das 18 regras, use `bin/automaster-python.sh -m automaster_audit.cli workflow-editar -l <loc> …`,
+das 29 regras, use `bin/automaster-python.sh -m automaster_audit.cli workflow-editar -l <loc> …`,
 com as mesmas flags da tool.
 
 

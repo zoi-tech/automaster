@@ -47,7 +47,7 @@ export const clonar = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
  * com espaço, acento ou curto não é id. É a única defesa de `trocarReferencia`, que
  * faz substring replace em TODA string do documento — `--de "Olá"` reescreveria o
  * corpo de SMS, e-mail e WhatsApp que o cliente manda para a base dele, e nenhuma das
- * 18 regras acha isso estranho.
+ * 29 regras acha isso estranho.
  */
 export function pareceId(v: string): boolean {
   return /^[A-Za-z0-9_-]{16,}$/.test(v.trim());

@@ -1,6 +1,6 @@
 """Valida uma edição de workflow ANTES de gravá-la.
 
-Roda as 18 regras sobre o dump com o workflow editado no lugar do antigo, em
+Roda as 29 regras sobre o dump com o workflow editado no lugar do antigo, em
 memória — nada é escrito em disco. A edição é recusada só se INTRODUZIR um
 achado ERROR novo; ERROR que já existia não bloqueia, senão nenhum workflow
 com achado poderia ser corrigido.

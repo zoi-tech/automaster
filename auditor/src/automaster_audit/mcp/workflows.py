@@ -96,7 +96,7 @@ WF_EDITAR_ACOES = (
     "configuracao",
 )
 
-# ações que mexem no corpo do workflow e por isso passam pela validação das 18 regras
+# ações que mexem no corpo do workflow e por isso passam pela validação das 29 regras
 _WF_EDITAR_COM_CORPO = {
     "trocar-ref",
     "trocar-tag",
@@ -145,7 +145,7 @@ def workflow_editar(
     """ESCREVE workflow ao vivo. Sem `confirmo`, devolve a prévia com o diff.
 
     Para ação que mexe no corpo, roda SEMPRE a prévia primeiro e valida o documento
-    editado contra as 18 regras (`validar_edicao`) antes de decidir se grava. Sem dump em
+    editado contra as 29 regras (`validar_edicao`) antes de decidir se grava. Sem dump em
     disco a validação não roda, mas isso não trava a gravação.
 
     O documento editado NÃO volta na resposta: serve à validação local e só. A `version`
@@ -172,7 +172,7 @@ def workflow_editar(
 
     def _args(com_confirmo: bool, versao: object = None, triggers: object = None) -> list[str]:
         a = ["workflow-editar", "-l", loc, "--acao", acao]
-        # Esta porta É a guarda das 18 regras: a camada crua recusa gravar sem esta flag,
+        # Esta porta É a guarda das 29 regras: a camada crua recusa gravar sem esta flag,
         # justamente para que ninguém passe por fora dela sem querer.
         if com_confirmo:
             a.append("--sem-regras")
@@ -226,7 +226,7 @@ def workflow_editar(
     try:
         ctx, meta = base._load(loc, snapshot)
     except ToolError:
-        sem_validacao = "sem dump desta subconta em disco: as 18 regras não foram rodadas"
+        sem_validacao = "sem dump desta subconta em disco: as 29 regras não foram rodadas"
 
     previa = base._run_extractor(*_args(False))
     # M3: o documento inteiro do workflow e as entidades ao vivo não voltam para o
@@ -244,7 +244,7 @@ def workflow_editar(
     if fora_do_dump and documento_antes is None:
         sem_validacao = (
             f"workflow {id} não está no dump {meta['snapshot']} (criado ou duplicado depois da "
-            "última extração) e a prévia não trouxe o documento de antes: as 18 regras não foram rodadas."
+            "última extração) e a prévia não trouxe o documento de antes: as 29 regras não foram rodadas."
         )
         ctx = None
     if ctx is not None and entidades:
@@ -265,7 +265,7 @@ def workflow_editar(
         # se lê como "validou e passou".
         previa["validacao"] = {
             "rodou": False,
-            "motivo": "a prévia não devolveu documento para validar (nada a mudar): as 18 regras não foram rodadas",
+            "motivo": "a prévia não devolveu documento para validar (nada a mudar): as 29 regras não foram rodadas",
         }
         if not confirmo:
             return previa
@@ -315,7 +315,7 @@ def workflow_editar(
 
     if not resultado_validacao.pode_gravar:
         previa["aplicado"] = False
-        previa["motivo"] = "gravação recusada: a validação contra as 18 regras encontrou erro novo — " + "; ".join(
+        previa["motivo"] = "gravação recusada: a validação contra as 29 regras encontrou erro novo — " + "; ".join(
             resultado_validacao.erros_novos
         )
         return previa

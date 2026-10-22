@@ -116,7 +116,7 @@ def run_diff(args: argparse.Namespace) -> int:
 
 
 def run_workflow_editar(args: argparse.Namespace) -> int:
-    """ESCREVE workflow ao vivo passando pela validação das 18 regras.
+    """ESCREVE workflow ao vivo passando pela validação das 29 regras.
 
     Mesma orquestração da tool MCP (prévia → validação → gravação): esta função só
     dá uma porta de linha de comando para ela. `npm run workflow-editar` é a camada
@@ -194,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.set_defaults(func=run_diff)
 
     p_we = sub.add_parser(
-        "workflow-editar", help="ESCREVE workflow ao vivo com a validação das 18 regras (a guarda da tool MCP)"
+        "workflow-editar", help="ESCREVE workflow ao vivo com a validação das 29 regras (a guarda da tool MCP)"
     )
     p_we.add_argument("-l", "--loc", required=True, help="locationId da subconta")
     p_we.add_argument("--acao", required=True, choices=WF_EDITAR_ACOES, help="operação a aplicar")

@@ -141,7 +141,7 @@ export async function lerDocumento(client: GhlClient, loc: string, wid: string):
   } catch (e) {
     throw new Error(
       `não foi possível ler o documento do workflow ${wid} (${e instanceof Error ? e.message : e}). ` +
-      "Sem ele não há prévia nem o que validar contra as 18 regras.",
+      "Sem ele não há prévia nem o que validar contra as 29 regras.",
       { cause: e },
     );
   }
@@ -167,7 +167,7 @@ export async function listarTriggersPrevia(
       triggers: null,
       aviso:
         `a lista de triggers não pôde ser lida (${e instanceof Error ? e.message : e}): a prévia segue ` +
-        "sem ela, e quem validar contra as 18 regras vai usar a lista do dump",
+        "sem ela, e quem validar contra as 29 regras vai usar a lista do dump",
     };
   }
 }

@@ -108,13 +108,13 @@ export function conferirCamadaCrua(o: { confirmo?: boolean; semRegras?: boolean;
   if (!o.confirmo || o.acao === "historico") return;
   if (o.semRegras) {
     console.error(
-      "aviso: gravação SEM validação contra as 18 regras — esta rota é a camada crua. " +
+      "aviso: gravação SEM validação contra as 29 regras — esta rota é a camada crua. " +
       "A guarda está em `automaster-audit workflow-editar` (auditor) e na tool MCP `workflow_editar`.",
     );
     return;
   }
   throw new Error(
-    "esta é a camada CRUA: grava sem rodar as 18 regras de auditoria. Entre pela porta com guarda " +
+    "esta é a camada CRUA: grava sem rodar as 29 regras de auditoria. Entre pela porta com guarda " +
     "(`automaster-audit workflow-editar` ou a tool MCP `workflow_editar`), ou repita com --sem-regras " +
     "para gravar por fora dela de propósito.",
   );
