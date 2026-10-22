@@ -86,6 +86,7 @@ class DumpContext:
     # templates por canal (ausentes em dumps anteriores; lista vazia = regra no-op)
     template_ids: dict[str, set[str]] = field(default_factory=dict)
     email_templates: list[dict] = field(default_factory=list)
+    message_templates: list[dict] = field(default_factory=list)
     template_names: dict[str, str] = field(default_factory=dict)
     # formulários e surveys (ausentes em dumps anteriores; chave ausente = regra no-op)
     form_ids: dict[str, set[str]] = field(default_factory=dict)
@@ -263,6 +264,7 @@ def _load_templates(ctx: DumpContext, path: Path) -> None:
     builders = _entity_raw_optional(arquivos["email"]).get("builders", []) or []
     emails = [b for b in builders if b.get("templateType") != "folder"]
     ctx.email_templates = emails
+    ctx.message_templates = [t for t in msgs if isinstance(t, dict)]
 
     for canal, itens in (("message", msgs), ("whatsapp", was), ("email", emails)):
         if not arquivos[canal].exists():

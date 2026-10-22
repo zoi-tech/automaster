@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 import type { Browser } from "playwright";
 import { emitir, falhar } from "../saida.js";
 import { montarCapa, injetar, escapar, PASTA_MANUAL } from "../manual/capa.js";
-import { termosInternos, secoesEstouradas } from "../manual/conferencias.js";
+import { termosInternos, secoesEstouradas, alturaConteudo, avisoPaginas } from "../manual/conferencias.js";
 import type { MedidaSecao } from "../manual/conferencias.js";
 import { caminhoFontes, fontesFaces, baixarFontes } from "../manual/fontes.js";
 
@@ -86,16 +86,23 @@ async function runManual(opts: OpcoesManual): Promise<void> {
 
   const navegador = await abrirChrome();
   let medidas: MedidaSecao[];
+  let folhas: number;
   let texto: string;
   try {
     const aba = await navegador.newPage({ viewport: { width: LARGURA_UTIL, height: Math.round(ALTURA_UTIL) } });
     await aba.emulateMedia({ media: "print" });
     await aba.setContent(html, { waitUntil: "load" });
     await aba.evaluate(() => document.fonts.ready.then(() => undefined));
-    medidas = await aba.$$eval(".folha:not(.capa)", (folhas) => folhas.map((f) => ({
+    // o fim do conteúdo é o fundo do último filho visível, não a caixa da folha com margem
+    const caixas = await aba.$$eval(".folha:not(.capa)", (lista) => lista.map((f) => ({
       titulo: f.querySelector("h2")?.textContent?.trim() ?? "",
-      altura: Math.round(f.getBoundingClientRect().height),
+      topo: f.getBoundingClientRect().top,
+      fundos: Array.from(f.children)
+        .filter((c) => c.getClientRects().length > 0)
+        .map((c) => c.getBoundingClientRect().bottom),
     })));
+    medidas = caixas.map(({ titulo, topo, fundos }) => ({ titulo, altura: Math.round(alturaConteudo(topo, fundos)) }));
+    folhas = await aba.locator(".folha").count();
     texto = await aba.evaluate(() => document.body.innerText);
     fs.mkdirSync(path.dirname(saida), { recursive: true });
     await aba.pdf({ path: saida, printBackground: true, preferCSSPageSize: true });
@@ -103,9 +110,13 @@ async function runManual(opts: OpcoesManual): Promise<void> {
     await navegador.close();
   }
 
+  const paginas = contarPaginas(saida);
+  const aviso = avisoPaginas(paginas, folhas);
+  if (aviso) avisos.push(aviso);
+
   emitir(opts.json, {
     pdf: saida,
-    paginas: contarPaginas(saida),
+    paginas,
     secoesEstouradas: secoesEstouradas(medidas, ALTURA_UTIL),
     termosInternos: termosInternos(texto),
     avisos,

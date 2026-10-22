@@ -65,10 +65,20 @@ def _espera_de_tempo(step: dict) -> bool:
 
 
 def _tem_cadencia(wf: Workflow) -> bool:
-    """Algum caminho passa por mensagem → espera de tempo → mensagem (com outros passos no meio)."""
+    """Algum caminho passa por mensagem → espera de tempo → mensagem (com outros passos no meio).
+
+    Caminho que fecha laço (`goto` que volta) conta quando o ciclo tem mensagem e espera de
+    tempo: a mensagem repete depois da espera.
+    """
     by_id = index_steps(wf)
     paths, _ = enumerate_paths(wf)
     for path in paths:
+        if path.terminal.startswith("loop → "):
+            alvo = path.terminal.removeprefix("loop → ")
+            ids = [sid for sid, _label in path.steps]
+            ciclo = [by_id[sid] for sid in ids[ids.index(alvo) :]] if alvo in ids else []
+            if any(s.get("type") in MENSAGEM_AO_CLIENTE for s in ciclo) and any(map(_espera_de_tempo, ciclo)):
+                return True
         mensagem = esperou = False
         for sid, _label in path.steps:
             step = by_id[sid]

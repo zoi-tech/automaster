@@ -61,3 +61,17 @@ export interface MedidaSecao {
 export function secoesEstouradas(medidas: MedidaSecao[], alturaUtil: number): MedidaSecao[] {
   return medidas.filter((m) => m.altura > alturaUtil);
 }
+
+/**
+ * Altura do conteúdo de uma folha: o fundo mais baixo dos elementos visíveis menos o topo da
+ * folha. Folha sem elementos mede 0; nunca negativa.
+ */
+export function alturaConteudo(topoFolha: number, fundos: number[]): number {
+  if (fundos.length === 0) return 0;
+  return Math.max(0, Math.max(...fundos) - topoFolha);
+}
+
+/** Aviso quando o PDF saiu com mais páginas que folhas (alguma folha quebrou em duas). */
+export function avisoPaginas(paginas: number, folhas: number): string | null {
+  return paginas > folhas ? `o PDF tem ${paginas} páginas para ${folhas} folhas` : null;
+}

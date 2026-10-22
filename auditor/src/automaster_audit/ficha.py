@@ -38,14 +38,37 @@ def _nomeado(ctx: DumpContext, valor) -> str:
     return texto
 
 
+def _resumo(t) -> str | None:
+    if not isinstance(t, str) or not t.strip():
+        return None
+    t = " ".join(t.split())
+    return t[:_LIMITE_TEXTO] + ("…" if len(t) > _LIMITE_TEXTO else "")
+
+
 def _texto_mensagem(step: dict) -> str | None:
     a = step.get("attributes") or {}
     notif = a.get("notification")
     for t in (a.get("body"), a.get("message"), notif.get("body") if isinstance(notif, dict) else None):
-        if isinstance(t, str) and t.strip():
-            t = " ".join(t.split())
-            return t[:_LIMITE_TEXTO] + ("…" if len(t) > _LIMITE_TEXTO else "")
+        if texto := _resumo(t):
+            return texto
     return None
+
+
+def _modelo_aviso(step: dict, ctx: DumpContext) -> list[str]:
+    """Aviso interno por SMS/e-mail que tira o texto de um modelo: nome e corpo, ou o id sem o modelo."""
+    a = step.get("attributes") or {}
+    canal = a.get("type")
+    config = a.get(canal) if canal in ("sms", "email") else None
+    tid = str(config.get("template_id") or "").strip() if isinstance(config, dict) else ""
+    if not tid:
+        return []
+    modelo = next((t for t in ctx.message_templates if str(t.get("id") or t.get("_id") or "") == tid), None)
+    if modelo is None:
+        assunto = _resumo(config.get("subject")) if canal == "email" else None
+        return [f"modelo `{tid}`"] + ([f"assunto: {assunto}"] if assunto else [])
+    corpo = _resumo((modelo.get("template") or {}).get("body"))
+    linhas = [f"modelo **{modelo.get('name') or tid}**"]
+    return linhas + ([f"texto: {corpo}"] if corpo else [])
 
 
 def _regra_espera(step: dict) -> str | None:
@@ -120,6 +143,11 @@ def _passos(wf: Workflow, ctx: DumpContext) -> list[str]:
                 texto = _texto_mensagem(step)
                 if texto:
                     item(nivel + 1, f"texto: {texto}")
+                elif tipo == "email" and (assunto := _resumo(a.get("subject"))):
+                    item(nivel + 1, f"assunto: {assunto}")
+                elif tipo == "internal_notification":
+                    for linha in _modelo_aviso(step, ctx):
+                        item(nivel + 1, linha)
             if tipo == "find_opportunity":
                 for f in a.get("__customInputFields__") or []:
                     if isinstance(f, dict):

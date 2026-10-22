@@ -136,7 +136,7 @@ h3 { display: inline-block; background: var(--cor-realce); padding: var(--esp-1)
 .mapa .pino { width: 16px; height: 16px; flex: none; border-radius: 50% 50% 50% 0; background: var(--cor-alerta); transform: rotate(-45deg); }
 
 /* ===== Tabela e cartões ===== */
-table { width: 100%; border-collapse: collapse; font-size: var(--texto-menor); margin: var(--esp-3) 0; }
+table { width: calc(100% - 1px); border-collapse: collapse; font-size: var(--texto-menor); margin: var(--esp-3) 0; }
 th { background: var(--neutro-900); color: var(--neutro-0); font-family: var(--fonte-titulo); font-weight: 500; text-align: left; padding: var(--esp-2) var(--esp-3); border: 1px solid var(--neutro-900); }
 td { border: 1px solid #d0d7de; padding: var(--esp-2) var(--esp-3); vertical-align: top; font-variant-numeric: tabular-nums; }
 tr:nth-child(even) td { background: var(--cor-calma); }
@@ -151,7 +151,7 @@ td:first-child { font-weight: 700; color: var(--cor-titulo); }
 .logo i { width: 22px; height: 22px; background: var(--verde-400); border-radius: 5px; display: grid; place-items: center; }
 .logo i svg { width: 16px; height: 16px; }
 
-@media (max-width: 640px) {
+@media screen and (max-width: 640px) {
   .jornada, .ramos, .duas { grid-template-columns: 1fr; }
   .capa-contatos div + div { border-left: 0; padding-left: 0; }
   .folha { padding: var(--esp-6) var(--esp-4); }
